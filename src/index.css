@@ -2,39 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* EcoRoute Travel App Design System - Nature & Sustainability Inspired */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 120 20% 98%;
+    --foreground: 160 40% 12%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 160 40% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 160 40% 12%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 142 70% 45%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 142 70% 40%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 200 80% 85%;
+    --secondary-foreground: 160 40% 12%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 120 20% 95%;
+    --muted-foreground: 160 20% 50%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 185 75% 50%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 120 60% 50%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 45 90% 60%;
+    --warning-foreground: 160 40% 12%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 120 20% 90%;
+    --input: 120 20% 95%;
+    --ring: 142 70% 45%;
+
+    /* Travel-specific colors */
+    --eco-green: 142 70% 45%;
+    --ocean-blue: 200 80% 60%;
+    --forest-dark: 160 40% 12%;
+    --nature-light: 120 20% 98%;
+    
+    /* Gradients */
+    --gradient-hero: linear-gradient(135deg, hsl(142 70% 45%), hsl(200 80% 60%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(120 20% 98%));
+    --gradient-sustainability: linear-gradient(90deg, hsl(142 70% 45%), hsl(120 60% 50%));
+    
+    /* Shadows */
+    --shadow-card: 0 4px 20px -2px hsl(160 40% 12% / 0.08);
+    --shadow-hero: 0 10px 40px -10px hsl(142 70% 45% / 0.3);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
     --radius: 0.5rem;
 
