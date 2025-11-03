@@ -1,10 +1,12 @@
 import { useState } from "react";
+// ✨ --- IMPORT THE HOOK --- ✨
+import { useJsApiLoader } from "@react-google-maps/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, Navigation, Clock, Fuel, Route, Zap } from "lucide-react";
+import { MapPin, Navigation, Clock, Fuel, Route, Zap, Loader2 } from "lucide-react"; // Added Loader2 for loading state
 
 interface RouteOption {
   id: string;
@@ -17,89 +19,139 @@ interface RouteOption {
   highlights: string[];
 }
 
+// This is the library you need for the hook
+const libraries: ("places" | "drawing" | "geometry" | "localContext" | "visualization")[] = ["places"];
+
 const RoutePlanner = () => {
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [routes, setRoutes] = useState<RouteOption[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false); // This is for API calculation
 
-  const mockRoutes: RouteOption[] = [
-    {
-      id: "fastest",
-      name: "Fastest Route",
-      distance: "487 miles",
-      duration: "7h 23m",
-      fuelCost: "$68.20",
-      type: "fastest",
-      description: "Direct highway route with minimal stops",
-      highlights: ["Interstate highways", "3 rest stops", "No scenic detours"]
-    },
-    {
-      id: "eco",
-      name: "Eco-Friendly Route",
-      distance: "502 miles",
-      duration: "8h 15m",
-      fuelCost: "$52.40",
-      type: "eco",
-      description: "Optimized for fuel efficiency and lower emissions",
-      highlights: ["EV charging stations", "Hybrid-friendly roads", "Reduced idling time"]
-    },
-    {
-      id: "scenic",
-      name: "Scenic Route",
-      distance: "523 miles",
-      duration: "9h 45m",
-      fuelCost: "$72.80",
-      type: "scenic",
-      description: "Beautiful landscapes and interesting stops along the way",
-      highlights: ["National parks", "Scenic overlooks", "Historic landmarks"]
-    }
-  ];
+  // ✨ --- USE THE HOOK TO LOAD THE SCRIPT --- ✨
+  // It safely loads the Google Maps script using your .env variable
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries: libraries,
+  });
 
-  const planRoute = () => {
-    if (origin && destination) {
-      setRoutes(mockRoutes);
+  // --- Fetch Distance using Google Maps JS SDK ---
+  const getDistanceData = async () => {
+    if (!origin || !destination) {
+      alert("Enter both origin and destination");
+      return;
     }
+
+    // isLoaded is from the hook, it checks if the Google script is ready
+    if (!isLoaded) {
+      alert("Google Maps script is not loaded yet.");
+      return;
+    }
+
+    setLoading(true);
+
+    // We can now safely use `window.google`
+    const service = new google.maps.DistanceMatrixService();
+
+    service.getDistanceMatrix(
+      {
+        origins: [origin],
+        destinations: [destination],
+        travelMode: google.maps.TravelMode.DRIVING,
+        unitSystem: google.maps.UnitSystem.METRIC,
+      },
+      (response, status) => {
+        if (status === "OK" && response?.rows[0]?.elements[0]?.status === "OK") {
+          const element = response.rows[0].elements[0];
+          const distanceText = element.distance.text;
+          const durationText = element.duration.text;
+
+          const fuelCost = calculateFuelCost(distanceText);
+
+          const routeData: RouteOption[] = [
+            {
+              id: "fastest",
+              name: "Fastest Route",
+              distance: distanceText,
+              duration: durationText,
+              fuelCost,
+              type: "fastest",
+              description: "Optimized route with minimal travel time",
+              highlights: ["Efficient highways", `From ${response.originAddresses[0]}`, `To ${response.destinationAddresses[0]}`],
+            },
+          ];
+
+          setRoutes(routeData);
+          setSelectedRoute("fastest"); // Auto-select the route
+        } else {
+          console.error("Error:", status, response);
+          alert("Error fetching data from Google Maps API. Check console for details.");
+        }
+        setLoading(false);
+      }
+    );
   };
 
-  // ✨ --- NEW FUNCTION --- ✨
-  // This function will open the full map in a new tab
+  // --- Helper to calculate mock fuel cost ---
+  const calculateFuelCost = (distanceText: string): string => {
+    const km = parseFloat(distanceText.replace(/[^\d.]/g, ""));
+    const fuelPricePerLiter = 100; // ₹100 per liter
+    const mileage = 15; // km/l
+    const cost = (km / mileage) * fuelPricePerLiter;
+    return `₹${cost.toFixed(2)}`;
+  };
+
+  // ✨ --- FIXED URL --- ✨
+  // This now uses the correct Google Maps URL format to open directions
   const handleViewFullMap = () => {
     if (origin && destination) {
-      // Construct the Google Maps URL with the origin and destination
       const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
         origin
       )}&destination=${encodeURIComponent(destination)}`;
-      
-      // Open the URL in a new browser tab
-      window.open(googleMapsUrl, '_blank');
+      window.open(googleMapsUrl, "_blank");
     } else {
       alert("Please enter both an origin and a destination.");
     }
   };
 
-  const getRouteIcon = (type: RouteOption['type']) => {
+  const getRouteIcon = (type: RouteOption["type"]) => {
     switch (type) {
-      case 'fastest':
+      case "fastest":
         return <Navigation className="w-5 h-5" />;
-      case 'eco':
+      case "eco":
         return <Zap className="w-5 h-5" />;
-      case 'scenic':
+      case "scenic":
         return <Route className="w-5 h-5" />;
     }
   };
 
-  const getRouteColor = (type: RouteOption['type']) => {
+  const getRouteColor = (type: RouteOption["type"]) => {
     switch (type) {
-      case 'fastest':
-        return 'bg-primary text-primary-foreground';
-      case 'eco':
-        return 'bg-green-500 text-white'; // Changed for better visibility
-      case 'scenic':
-        return 'bg-blue-500 text-white'; // Changed for better visibility
+      case "fastest":
+        return "bg-primary text-primary-foreground";
+      case "eco":
+        return "bg-green-500 text-white";
+      case "scenic":
+        return "bg-blue-500 text-white";
     }
   };
 
+  // ✨ --- ADDED LOADING/ERROR STATES FOR THE SCRIPT --- ✨
+  if (loadError) {
+    return <div>Error loading maps. Check your API key.</div>;
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <Loader2 className="w-12 h-12 animate-spin" />
+        <p className="ml-4 text-lg">Loading Maps...</p>
+      </div>
+    );
+  }
+
+  // --- Render the original component ---
   return (
     <section id="routes" className="py-20 bg-background">
       <div className="container mx-auto px-4">
@@ -149,9 +201,18 @@ const RoutePlanner = () => {
                   />
                 </div>
               </div>
-              <Button onClick={planRoute} className="w-full md:w-auto" size="lg">
-                <MapPin className="w-4 h-4 mr-2" />
-                Find Routes
+              <Button onClick={getDistanceData} className="w-full md:w-auto" size="lg" disabled={loading}>
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Calculating...
+                  </>
+                ) : (
+                  <>
+                    <MapPin className="w-4 h-4 mr-2" />
+                    Find Routes
+                  </>
+                )}
               </Button>
             </CardContent>
           </Card>
@@ -161,10 +222,10 @@ const RoutePlanner = () => {
             <div className="space-y-4">
               <h3 className="text-2xl font-bold text-foreground mb-6">Route Options</h3>
               {routes.map((route) => (
-                <Card 
-                  key={route.id} 
+                <Card
+                  key={route.id}
                   className={`cursor-pointer transition-all duration-200 shadow-card hover:shadow-xl ${
-                    selectedRoute === route.id ? 'ring-2 ring-primary' : ''
+                    selectedRoute === route.id ? "ring-2 ring-primary" : ""
                   }`}
                   onClick={() => setSelectedRoute(route.id)}
                 >
@@ -180,12 +241,9 @@ const RoutePlanner = () => {
                         </div>
                       </div>
                       <Badge variant="secondary" className="w-fit">
-                        {route.type === 'fastest' && 'Fastest'}
-                        {route.type === 'eco' && 'Most Eco-Friendly'}
-                        {route.type === 'scenic' && 'Most Scenic'}
+                        {route.type === "fastest" && "Fastest"}
                       </Badge>
                     </div>
-
                     <div className="grid grid-cols-3 gap-4 mb-4">
                       <div className="text-center p-3 bg-muted/50 rounded-lg">
                         <MapPin className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
@@ -200,10 +258,9 @@ const RoutePlanner = () => {
                       <div className="text-center p-3 bg-muted/50 rounded-lg">
                         <Fuel className="w-5 h-5 text-muted-foreground mx-auto mb-1" />
                         <p className="text-sm font-medium text-foreground">{route.fuelCost}</p>
-                        <p className="text-xs text-muted-foreground">Fuel Cost</p>
+                        <p className="text-xs text-foreground">Fuel Cost</p>
                       </div>
                     </div>
-
                     <div className="space-y-2">
                       <p className="text-sm font-medium text-foreground">Route Highlights:</p>
                       <div className="flex flex-wrap gap-2">
@@ -228,7 +285,6 @@ const RoutePlanner = () => {
                       <p className="text-sm text-muted-foreground">
                         Detailed route visualization with real-time traffic and points of interest
                       </p>
-                      {/*  --- BUTTON UPDATED ---  */}
                       <Button variant="outline" className="mt-4 bg-green-400" onClick={handleViewFullMap}>
                         View Full Map
                       </Button>
