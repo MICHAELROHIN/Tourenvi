@@ -42,6 +42,7 @@
     "@react-google-maps/api": "^2.20.7",
     "@tailwindcss/vite": "^4.1.13",
     "@tanstack/react-query": "^5.83.0",
+    "axios": "^1.13.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -84,6 +85,19 @@
     "tailwindcss": "^3.4.17",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.38.0",
-    "vite": "^5.4.19"
-  }
+    "vite": "^7.1.12"
+  },
+  "description": "**URL**: https://lovable.dev/projects/6d324811-3481-4f31-a71c-e1b84ea3ed96",
+  "main": "eslint.config.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MICHAELROHIN/Tourenvi.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MICHAELROHIN/Tourenvi/issues"
+  },
+  "homepage": "https://github.com/MICHAELROHIN/Tourenvi#readme"
 }

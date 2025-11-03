@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Leaf, MapPin, Calculator, BarChart3 } from "lucide-react";
+import {
+  Menu,
+  X,
+  Leaf,
+  MapPin,
+  Calculator,
+  BarChart3,
+  Sparkles,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const Navigation = () => {
@@ -11,6 +19,7 @@ const Navigation = () => {
     { icon: MapPin, label: "Route Planner", href: "#routes" },
     { icon: Leaf, label: "Eco Insights", href: "#sustainability" },
     { icon: BarChart3, label: "Dashboard", href: "#dashboard" },
+    { icon: Sparkles, label: "Destination Genie", href: "#locgenie" },
   ];
 
   return (
