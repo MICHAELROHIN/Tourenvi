@@ -31,7 +31,7 @@ const Hero = () => {
           </h1>
 
           {/* Subtitle */}
-          <p className="text-xl md:text-2xl text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed">
+          <p className="text-xl md:text-2xl text-green-900 text-muted-foreground mb-12 max-w-3xl mx-auto leading-relaxed">
             Plan your perfect trip with AI-powered cost estimation, eco-friendly route optimization, 
             and personalized recommendations that care for both your wallet and the planet.
           </p>

@@ -62,6 +62,22 @@ const RoutePlanner = () => {
     }
   };
 
+  // ✨ --- NEW FUNCTION --- ✨
+  // This function will open the full map in a new tab
+  const handleViewFullMap = () => {
+    if (origin && destination) {
+      // Construct the Google Maps URL with the origin and destination
+      const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(
+        origin
+      )}&destination=${encodeURIComponent(destination)}`;
+      
+      // Open the URL in a new browser tab
+      window.open(googleMapsUrl, '_blank');
+    } else {
+      alert("Please enter both an origin and a destination.");
+    }
+  };
+
   const getRouteIcon = (type: RouteOption['type']) => {
     switch (type) {
       case 'fastest':
@@ -78,9 +94,9 @@ const RoutePlanner = () => {
       case 'fastest':
         return 'bg-primary text-primary-foreground';
       case 'eco':
-        return 'bg-success text-success-foreground';
+        return 'bg-green-500 text-white'; // Changed for better visibility
       case 'scenic':
-        return 'bg-accent text-accent-foreground';
+        return 'bg-blue-500 text-white'; // Changed for better visibility
     }
   };
 
@@ -212,7 +228,8 @@ const RoutePlanner = () => {
                       <p className="text-sm text-muted-foreground">
                         Detailed route visualization with real-time traffic and points of interest
                       </p>
-                      <Button variant="outline" className="mt-4">
+                      {/*  --- BUTTON UPDATED ---  */}
+                      <Button variant="outline" className="mt-4 bg-green-400" onClick={handleViewFullMap}>
                         View Full Map
                       </Button>
                     </div>

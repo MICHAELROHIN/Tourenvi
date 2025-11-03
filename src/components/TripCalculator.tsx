@@ -151,7 +151,7 @@ const TripCalculator = () => {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="nights">Number of Nights</Label>
+                  <Label htmlFor="nights">Number of Stay</Label>
                   <Input
                     id="nights"
                     type="number"

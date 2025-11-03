@@ -22,7 +22,7 @@ const Navigation = () => {
             <div className="w-8 h-8 bg-gradient-hero rounded-lg flex items-center justify-center">
               <Leaf className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-bold text-foreground">EcoRoute</span>
+            <span className="text-xl font-bold text-foreground">TOURENVI</span>
           </div>
 
           {/* Desktop Navigation */}
@@ -31,7 +31,7 @@ const Navigation = () => {
               <a
                 key={item.label}
                 href={item.href}
-                className="flex items-center space-x-2 text-muted-foreground hover:text-foreground transition-colors duration-200"
+                className="flex items-center space-x-2 hover:text-green-900 text-muted-foreground hover:text-foreground transition-colors duration-200"
               >
                 <item.icon className="w-4 h-4" />
                 <span>{item.label}</span>
