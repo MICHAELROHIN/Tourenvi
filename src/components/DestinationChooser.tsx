@@ -165,6 +165,8 @@ const DestinationChooser = () => {
                     setPrimary("");
                     setSecondary("none");
                     setResult(null);
+                    setRecommendations([]);
+                    setError(null);
                   }}
                 >
                   Reset
