@@ -1,4 +1,4 @@
-import tamilNaduVideo from "@/assets/video_20251104_094816_edit.mp4"
+import tamilNaduVideo from "@/assets/tn.mp4"
 
 const HeroVideo = () => {
   return (
