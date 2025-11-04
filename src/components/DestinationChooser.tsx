@@ -20,8 +20,9 @@ import { Sparkles, MapPin } from "lucide-react";
 const moods = [
   "Adventure",
   "Relaxation",
-  "Cultural.scenary",
-  "urban life",
+  "Culture/History",
+  "scenary",
+  "Urban Life",
   "Romantic",
   "Water activity",
 ];
@@ -78,7 +79,7 @@ const DestinationChooser = () => {
         <div className="text-center mb-8">
           <div className="inline-flex items-center space-x-2 bg-primary/10 rounded-full px-4 py-2 mb-4">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Loc-GENIE</span>
+            <span className="text-sm font-medium text-primary">Destination-GENIE</span>
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
             Find destinations tailored to your mood
