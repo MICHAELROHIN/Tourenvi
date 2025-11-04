@@ -22,6 +22,7 @@ const DESTINATION_DATA = [
 
 const FEATURES = [
   "Adventure_Score","Relaxation_Score","Cultur_Score","Scenic_Score",
+  
   "Urban_Score","Family_Score","Romantic_Score","Water_Activity_Tag"
 ];
 
