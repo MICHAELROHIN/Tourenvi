@@ -1,4 +1,7 @@
+// DestinationChooser.tsx
+
 import { useState } from "react";
+import { useNavigate } from "react-router-dom"; // <-- 1. Import useNavigate
 import {
   Card,
   CardContent,
@@ -15,7 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, MapPin } from "lucide-react";
+import { Sparkles, MapPin } from "lucide-react"; // <-- Removed Hotel, Star
+
+// --- 2. REMOVED Hotel interface ---
 
 const moods = [
   "Adventure",
@@ -28,6 +33,9 @@ const moods = [
 ];
 
 const DestinationChooser = () => {
+  const navigate = useNavigate(); // <-- 3. Initialize navigate
+
+  // --- State for recommendations ---
   const [primary, setPrimary] = useState<string>("");
   const [secondary, setSecondary] = useState<string>("none");
   const [result, setResult] = useState<string | null>(null);
@@ -35,18 +43,22 @@ const DestinationChooser = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // --- 4. REMOVED all hotel state (selectedDestination, hotels, isHotelLoading, hotelError) ---
+
   const handleFind = async () => {
     if (!primary) {
       setResult("Please choose a Primary option.");
       return;
     }
 
+    // --- 5. REMOVED resetHotelState() call ---
     setIsLoading(true);
     setError(null);
+    setRecommendations([]); // Clear old recommendations
 
-    const moods = [primary];
+    const moodsList = [primary];
     if (secondary !== "none") {
-      moods.push(secondary);
+      moodsList.push(secondary);
     }
 
     try {
@@ -55,7 +67,7 @@ const DestinationChooser = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ moods }),
+        body: JSON.stringify({ moods: moodsList }),
       });
 
       if (!response.ok) {
@@ -73,13 +85,33 @@ const DestinationChooser = () => {
     }
   };
 
+  // --- 6. REPLACED function to navigate ---
+  const handleDestinationClick = (destination: string) => {
+    navigate(`/hotels?destination=${encodeURIComponent(destination)}`);
+  };
+
+  // --- 7. REMOVED resetHotelState helper ---
+
+  // --- 8. UPDATED reset all helper ---
+  const handleResetAll = () => {
+    setPrimary("");
+    setSecondary("none");
+    setResult(null);
+    setRecommendations([]);
+    setError(null);
+    // REMOVED resetHotelState() call
+  };
+
   return (
     <section id="locgenie" className="py-20">
       <div className="container mx-auto px-4">
+        {/* --- Header (No Changes) --- */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center space-x-2 bg-primary/10 rounded-full px-4 py-2 mb-4">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Destination-GENIE</span>
+            <span className="text-sm font-medium text-primary">
+              Destination-GENIE
+            </span>
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
             Find destinations tailored to your mood
@@ -104,12 +136,12 @@ const DestinationChooser = () => {
             </CardHeader>
 
             <CardContent className="space-y-6">
+              {/* --- Mood Selection (No Changes) --- */}
               <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">
                   Enter your mood to travel
                 </p>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="primary">Primary option</Label>
@@ -129,7 +161,6 @@ const DestinationChooser = () => {
                     </SelectContent>
                   </Select>
                 </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="secondary">Secondary option</Label>
                   <Select
@@ -151,29 +182,23 @@ const DestinationChooser = () => {
                 </div>
               </div>
 
+              {/* --- Buttons (Updated Reset) --- */}
               <div className="flex items-center space-x-4">
                 <Button
                   size="lg"
                   onClick={handleFind}
                   className="flex items-center"
+                  disabled={isLoading}
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
-                  Find Destinations
+                  {isLoading ? "Finding..." : "Find Destinations"}
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setPrimary("");
-                    setSecondary("none");
-                    setResult(null);
-                    setRecommendations([]);
-                    setError(null);
-                  }}
-                >
+                <Button variant="outline" onClick={handleResetAll}>
                   Reset
                 </Button>
               </div>
 
+              {/* --- 9. UPDATED Results Section --- */}
               {isLoading ? (
                 <div className="mt-4 p-4 bg-muted/50 rounded-lg">
                   <p className="text-sm text-foreground">
@@ -187,25 +212,30 @@ const DestinationChooser = () => {
               ) : recommendations.length > 0 ? (
                 <div className="mt-4 space-y-4">
                   <p className="text-sm font-medium text-foreground">
-                    {result}
+                    {result} (Click a destination to see hotels on a new page)
                   </p>
                   <div className="grid gap-2">
                     {recommendations.map((place, index) => (
-                      <div
+                      <button
                         key={place}
-                        className="p-4 bg-muted/50 rounded-lg flex items-center justify-between hover:bg-muted/70 transition-colors"
+                        onClick={() => handleDestinationClick(place)}
+                        className={`p-4 bg-muted/50 rounded-lg flex items-center justify-between text-left w-full hover:bg-primary/10 hover:ring-2 hover:ring-primary transition-all`}
                       >
                         <div className="flex items-center space-x-3">
                           <span className="text-primary font-medium">
                             #{index + 1}
                           </span>
-                          <span className="text-foreground">{place}</span>
+                          <span className="text-foreground font-medium">
+                            {place}
+                          </span>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
                 </div>
               ) : null}
+
+              {/* --- 10. REMOVED Hotel Results Section --- */}
             </CardContent>
           </Card>
         </div>
