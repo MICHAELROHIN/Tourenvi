@@ -17,6 +17,14 @@ interface TripData {
   vehicleType: string;
 }
 
+interface ResultData {
+  fuelCost: string;
+  accommodationCost: string;
+  tollCharges: string;
+  totalCost: string;
+  carbonFootprint: string;
+}
+
 const TripCalculator = () => {
   const [tripData, setTripData] = useState<TripData>({
     distance: 0,
@@ -28,7 +36,7 @@ const TripCalculator = () => {
     vehicleType: "gasoline"
   });
 
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<ResultData | null>(null);
 
   const accommodationPrices = {
     budget: 60,
@@ -72,9 +80,9 @@ const TripCalculator = () => {
           </p>
         </div>
 
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className={`max-w-6xl mx-auto gap-8 transition-all duration-300 ${results ? 'grid grid-cols-1 lg:grid-cols-2' : 'flex justify-center'}`}>          
           {/* Input Form */}
-          <Card className="shadow-card">
+          <Card className={`shadow-card transition-all duration-300 ${!results ? 'w-full max-w-xl' : ''}`}>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
                 <Car className="w-5 h-5 text-primary" />
@@ -182,7 +190,7 @@ const TripCalculator = () => {
 
           {/* Results */}
           {results && (
-            <Card className="shadow-card">
+            <Card className="shadow-card transition-opacity duration-300 animate-in fade-in">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <DollarSign className="w-5 h-5 text-success" />
