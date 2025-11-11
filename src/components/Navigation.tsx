@@ -20,6 +20,7 @@ const Navigation = () => {
     { icon: Leaf, label: "Eco Insights", href: "#sustainability" },
     { icon: BarChart3, label: "Dashboard", href: "#dashboard" },
     { icon: Sparkles, label: "Destination Genie", href: "#locgenie" },
+    { icon: Calculator, label: "Fuel Estimator", href: "#fuel-estimator" },
   ];
 
   return (
@@ -46,7 +47,11 @@ const Navigation = () => {
                 <span>{item.label}</span>
               </a>
             ))}
-            <Button variant="default" className="shadow-card" onClick={() => window.location.assign('#get-started')}>
+            <Button
+              variant="default"
+              className="shadow-card"
+              onClick={() => window.location.assign("#get-started")}
+            >
               Get Started
             </Button>
           </div>
@@ -81,7 +86,14 @@ const Navigation = () => {
                 <span className="text-foreground">{item.label}</span>
               </a>
             ))}
-            <Button variant="default" className="w-full mt-4" onClick={() => { setIsOpen(false); window.location.assign('#get-started'); }}>
+            <Button
+              variant="default"
+              className="w-full mt-4"
+              onClick={() => {
+                setIsOpen(false);
+                window.location.assign("#get-started");
+              }}
+            >
               Get Started
             </Button>
           </div>

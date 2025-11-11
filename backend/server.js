@@ -142,3 +142,112 @@ app.get("/get-hotels", async (req, res) => {
 });
 
 app.listen(8000, () => console.log("✅ Server running on http://localhost:8000"));
+
+// ---------------- Fuel Estimator API ----------------
+// Lightweight in-memory dataset; replace with your dataset as needed
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Load CSV dataset (Brand,Model,Fuel_Type,Mileage)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const CSV_PATH = path.join(__dirname, "brand_model_fuel_mileage.csv");
+
+function loadCarsFromCSV(csvPath) {
+  try {
+    const raw = fs.readFileSync(csvPath, "utf8");
+    const lines = raw.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length < 2) return [];
+    const header = lines[0].split(",").map((h) => h.trim().toLowerCase());
+    const idxBrand = header.indexOf("brand");
+    const idxModel = header.indexOf("model");
+    const idxFuel = header.indexOf("fuel_type");
+    const idxMileage = header.indexOf("mileage");
+    const out = [];
+    for (let i = 1; i < lines.length; i++) {
+      const parts = lines[i].split(",").map((p) => p.trim());
+      if (parts.length < 4) continue;
+      const brand = parts[idxBrand] || "";
+      const model = parts[idxModel] || "";
+      const fuel = parts[idxFuel] || "";
+      const mileageNum = Number(parts[idxMileage]);
+      if (!brand || !model || !fuel || !isFinite(mileageNum)) continue;
+      out.push({
+        brandLower: brand.toLowerCase(),
+        modelLower: model.toLowerCase(),
+        fuelLower: fuel.toLowerCase(),
+        brand,
+        model,
+        fuel,
+        mileage: mileageNum,
+      });
+    }
+    return out;
+  } catch (e) {
+    console.error("Failed to load CSV:", e.message);
+    return [];
+  }
+}
+
+const carData = loadCarsFromCSV(CSV_PATH);
+
+// Get unique brands
+app.get("/brands", (req, res) => {
+  try {
+    // Unique by lower-case, return a nicely-cased brand (first occurrence)
+    const map = new Map();
+    carData.forEach((c) => {
+      if (!map.has(c.brandLower)) map.set(c.brandLower, c.brand);
+    });
+    const brands = Array.from(map.values()).sort();
+    res.json(brands);
+  } catch (e) {
+    console.error("/brands error", e);
+    res.status(500).json([]);
+  }
+});
+
+// Get models for a brand
+app.get("/models", (req, res) => {
+  const { brand } = req.query;
+  if (!brand) return res.json([]);
+  const b = String(brand).toLowerCase();
+  const map = new Map();
+  carData
+    .filter((car) => car.brandLower === b)
+    .forEach((car) => {
+      if (!map.has(car.modelLower)) map.set(car.modelLower, car.model);
+    });
+  const models = Array.from(map.values()).sort();
+  res.json(models);
+});
+
+// Get fuel types for brand + model
+app.get("/fuel", (req, res) => {
+  const { brand, model } = req.query;
+  if (!brand || !model) return res.json([]);
+  const b = String(brand).toLowerCase();
+  const m = String(model).toLowerCase();
+  const map = new Map();
+  carData
+    .filter((car) => car.brandLower === b && car.modelLower === m)
+    .forEach((car) => {
+      if (!map.has(car.fuelLower)) map.set(car.fuelLower, car.fuel);
+    });
+  const fuels = Array.from(map.values()).sort();
+  res.json(fuels);
+});
+
+// Get mileage for brand + model + fuel
+app.get("/mileage", (req, res) => {
+  const { brand, model, fuel } = req.query;
+  if (!brand || !model || !fuel) return res.json({ mileage: null });
+  const b = String(brand).toLowerCase();
+  const m = String(model).toLowerCase();
+  const f = String(fuel).toLowerCase();
+  const match = carData.find(
+    (car) => car.brandLower === b && car.modelLower === m && car.fuelLower === f
+  );
+  res.json({ mileage: match ? match.mileage : null });
+});

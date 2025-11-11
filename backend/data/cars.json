@@ -1,0 +1,11 @@
+[
+  { "brand": "honda", "model": "city", "fuel": "petrol", "mileage": 17.8 },
+  { "brand": "honda", "model": "city", "fuel": "diesel", "mileage": 24.1 },
+  { "brand": "honda", "model": "civic", "fuel": "petrol", "mileage": 16.5 },
+  { "brand": "toyota", "model": "corolla", "fuel": "petrol", "mileage": 16.7 },
+  { "brand": "toyota", "model": "innova", "fuel": "diesel", "mileage": 15.0 },
+  { "brand": "hyundai", "model": "i20", "fuel": "petrol", "mileage": 19.0 },
+  { "brand": "hyundai", "model": "verna", "fuel": "diesel", "mileage": 22.0 },
+  { "brand": "maruti", "model": "swift", "fuel": "petrol", "mileage": 22.5 },
+  { "brand": "maruti", "model": "baleno", "fuel": "petrol", "mileage": 22.9 }
+]
