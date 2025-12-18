@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { Toaster, toast } from "react-hot-toast"; 
+import { Toaster, toast } from "react-hot-toast";
 import {
   Card,
   CardContent,
@@ -22,7 +22,7 @@ import {
   MapPin,
   Info,
   ShoppingBag,
-  ShoppingCart // Imported ShoppingCart icon
+  ShoppingCart, // Imported ShoppingCart icon
 } from "lucide-react";
 import {
   Tooltip,
@@ -40,7 +40,7 @@ interface HotelDetails {
   user_ratings_total: number;
   phone?: string;
   photoUrl?: string;
-  price_level?: number | null; 
+  price_level?: number | null;
 }
 
 // Interface for what we save to the Cart
@@ -65,13 +65,26 @@ const Hotels = () => {
 
   // --- Search Parameters ---
   const today = new Date();
-  const defaultIn = new Date(today.getTime() + 7 * 86400000); 
-  const defaultOut = new Date(today.getTime() + 9 * 86400000); 
+  const defaultIn = new Date(today.getTime() + 7 * 86400000);
+  const defaultOut = new Date(today.getTime() + 9 * 86400000);
 
-  const [checkInDate, setCheckInDate] = useState(toISODate(defaultIn));
-  const [checkOutDate, setCheckOutDate] = useState(toISODate(defaultOut));
-  const [adults, setAdults] = useState(2);
-  const [rooms, setRooms] = useState(1);
+  const checkInParam = searchParams.get("checkIn");
+  const checkOutParam = searchParams.get("checkOut");
+  const isISO = (s: string | null) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
+  const [checkInDate, setCheckInDate] = useState(
+    isISO(checkInParam) ? (checkInParam as string) : toISODate(defaultIn)
+  );
+  const [checkOutDate, setCheckOutDate] = useState(
+    isISO(checkOutParam) ? (checkOutParam as string) : toISODate(defaultOut)
+  );
+  const adultsParam = Number(searchParams.get("adults"));
+  const roomsParam = Number(searchParams.get("rooms"));
+  const [adults, setAdults] = useState(
+    Number.isFinite(adultsParam) && adultsParam > 0 ? adultsParam : 2
+  );
+  const [rooms, setRooms] = useState(
+    Number.isFinite(roomsParam) && roomsParam > 0 ? roomsParam : 1
+  );
 
   // --- Fetch Data ---
   useEffect(() => {
@@ -92,14 +105,14 @@ const Hotels = () => {
           )}`
         );
         if (!response.ok) {
-           const errData = await response.json();
-           throw new Error(errData.error || "Failed to fetch hotel data.");
+          const errData = await response.json();
+          throw new Error(errData.error || "Failed to fetch hotel data.");
         }
         const data = await response.json();
         if (data.hotels && data.hotels.length > 0) {
-            setHotels(data.hotels);
+          setHotels(data.hotels);
         } else {
-            setError("No hotels found for this location.");
+          setError("No hotels found for this location.");
         }
       } catch (err: any) {
         setError(err.message || "An unknown error occurred.");
@@ -109,40 +122,51 @@ const Hotels = () => {
     };
 
     fetchHotels();
-  }, [destination]); 
+  }, [destination]);
 
   // --- Price Logic ---
   const getPriceDetails = (hotel: HotelDetails) => {
-    let basePrice = 3500; 
+    let basePrice = 3500;
     if (hotel.price_level) {
-        switch(hotel.price_level) {
-            case 1: basePrice = 2000; break; 
-            case 2: basePrice = 4500; break; 
-            case 3: basePrice = 8000; break; 
-            case 4: basePrice = 15000; break; 
-            default: basePrice = 3500;
-        }
+      switch (hotel.price_level) {
+        case 1:
+          basePrice = 2000;
+          break;
+        case 2:
+          basePrice = 4500;
+          break;
+        case 3:
+          basePrice = 8000;
+          break;
+        case 4:
+          basePrice = 15000;
+          break;
+        default:
+          basePrice = 3500;
+      }
     } else if (hotel.rating) {
-        basePrice = hotel.rating > 4.3 ? 7000 : hotel.rating > 3.8 ? 4000 : 2500;
+      basePrice = hotel.rating > 4.3 ? 7000 : hotel.rating > 3.8 ? 4000 : 2500;
     }
-    const randomFactor = Math.floor(Math.random() * 500 - 250); 
-    const finalPrice = Math.max(1500, (basePrice + randomFactor) * rooms); 
-    
+    const randomFactor = Math.floor(Math.random() * 500 - 250);
+    const finalPrice = Math.max(1500, (basePrice + randomFactor) * rooms);
+
     return {
-        price: finalPrice.toLocaleString('en-IN'), 
-        currency: "INR",
-        label: "Estimated Price / Night"
+      price: finalPrice.toLocaleString("en-IN"),
+      currency: "INR",
+      label: "Estimated Price / Night",
     };
   };
 
   const createBookingLink = (hotelName: string) => {
-    return `https://www.google.com/search?q=${encodeURIComponent(hotelName + " " + destination + " booking")}`;
+    return `https://www.google.com/search?q=${encodeURIComponent(
+      hotelName + " " + destination + " booking"
+    )}`;
   };
 
   // --- Handle Add to Cart ---
   const handleAddToCart = (hotel: HotelDetails) => {
     const priceInfo = getPriceDetails(hotel);
-    
+
     // Create the item object
     const newItem: CartItem = {
       ...hotel,
@@ -150,12 +174,15 @@ const Hotels = () => {
       bookedRooms: rooms,
       bookedGuests: adults,
       checkIn: checkInDate,
-      checkOut: checkOutDate
+      checkOut: checkOutDate,
     };
 
     // Save to LocalStorage
     const existingCart = JSON.parse(localStorage.getItem("tripCart") || "[]");
-    localStorage.setItem("tripCart", JSON.stringify([...existingCart, newItem]));
+    localStorage.setItem(
+      "tripCart",
+      JSON.stringify([...existingCart, newItem])
+    );
 
     toast.success(`${hotel.name} added to cart!`);
   };
@@ -165,11 +192,14 @@ const Hotels = () => {
       <Toaster position="top-center" reverseOrder={false} />
 
       <div className="container mx-auto px-4 py-8">
-        
         {/* --- Header Section with Cart Button --- */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
           <div>
-            <Button asChild variant="ghost" className="pl-0 hover-pl-2 transition-all">
+            <Button
+              asChild
+              variant="ghost"
+              className="pl-0 hover-pl-2 transition-all"
+            >
               <Link to="/#locgenie">
                 <ChevronLeft className="w-4 h-4 mr-1" />
                 Back to Destination Finder
@@ -181,7 +211,10 @@ const Hotels = () => {
           </div>
 
           {/* Cart Button */}
-          <Button asChild className="bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all">
+          <Button
+            asChild
+            className="bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all"
+          >
             <Link to="/cart">
               <ShoppingCart className="w-4 h-4 mr-2" />
               View Cart
@@ -191,137 +224,192 @@ const Hotels = () => {
 
         {/* Controls Section */}
         <Card className="mb-8 shadow-sm border-primary/10">
-            <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    <div className="space-y-1">
-                        <label className="text-xs font-semibold text-muted-foreground uppercase">Check In</label>
-                        <div className="flex items-center border rounded-md px-2 bg-background">
-                             <Calendar className="w-4 h-4 text-primary mr-2"/>
-                             <input type="date" value={checkInDate} onChange={e => setCheckInDate(e.target.value)} className="w-full p-2 bg-transparent text-sm outline-none" />
-                        </div>
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-semibold text-muted-foreground uppercase">Check Out</label>
-                        <div className="flex items-center border rounded-md px-2 bg-background">
-                             <Calendar className="w-4 h-4 text-primary mr-2"/>
-                             <input type="date" value={checkOutDate} onChange={e => setCheckOutDate(e.target.value)} className="w-full p-2 bg-transparent text-sm outline-none" />
-                        </div>
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-semibold text-muted-foreground uppercase">Adults</label>
-                        <div className="flex items-center border rounded-md px-2 bg-background">
-                             <Users className="w-4 h-4 text-primary mr-2"/>
-                             <input type="number" min={1} value={adults} onChange={e => setAdults(Number(e.target.value))} className="w-full p-2 bg-transparent text-sm outline-none" />
-                        </div>
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-semibold text-muted-foreground uppercase">Rooms</label>
-                         <div className="flex items-center border rounded-md px-2 bg-background">
-                             <BedDouble className="w-4 h-4 text-primary mr-2"/>
-                             <input type="number" min={1} value={rooms} onChange={e => setRooms(Number(e.target.value))} className="w-full p-2 bg-transparent text-sm outline-none" />
-                        </div>
-                    </div>
-                    <div className="flex items-end">
-                        <Button onClick={() => {}} disabled={true} className="w-full" variant="outline">
-                            (Prices Auto-Update)
-                        </Button>
-                    </div>
+          <CardContent className="pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground uppercase">
+                  Check In
+                </label>
+                <div className="flex items-center border rounded-md px-2 bg-background">
+                  <Calendar className="w-4 h-4 text-primary mr-2" />
+                  <input
+                    type="date"
+                    value={checkInDate}
+                    onChange={(e) => setCheckInDate(e.target.value)}
+                    className="w-full p-2 bg-transparent text-sm outline-none"
+                  />
                 </div>
-            </CardContent>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground uppercase">
+                  Check Out
+                </label>
+                <div className="flex items-center border rounded-md px-2 bg-background">
+                  <Calendar className="w-4 h-4 text-primary mr-2" />
+                  <input
+                    type="date"
+                    value={checkOutDate}
+                    onChange={(e) => setCheckOutDate(e.target.value)}
+                    className="w-full p-2 bg-transparent text-sm outline-none"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground uppercase">
+                  Adults
+                </label>
+                <div className="flex items-center border rounded-md px-2 bg-background">
+                  <Users className="w-4 h-4 text-primary mr-2" />
+                  <input
+                    type="number"
+                    min={1}
+                    value={adults}
+                    onChange={(e) => setAdults(Number(e.target.value))}
+                    className="w-full p-2 bg-transparent text-sm outline-none"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-muted-foreground uppercase">
+                  Rooms
+                </label>
+                <div className="flex items-center border rounded-md px-2 bg-background">
+                  <BedDouble className="w-4 h-4 text-primary mr-2" />
+                  <input
+                    type="number"
+                    min={1}
+                    value={rooms}
+                    onChange={(e) => setRooms(Number(e.target.value))}
+                    className="w-full p-2 bg-transparent text-sm outline-none"
+                  />
+                </div>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  onClick={() => {}}
+                  disabled={true}
+                  className="w-full"
+                  variant="outline"
+                >
+                  (Prices Auto-Update)
+                </Button>
+              </div>
+            </div>
+          </CardContent>
         </Card>
 
         {/* Results Section */}
         {loading && (
-             <div className="flex flex-col items-center py-12">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
-                <p className="text-muted-foreground">Finding hotels in {destination}...</p>
-             </div>
+          <div className="flex flex-col items-center py-12">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
+            <p className="text-muted-foreground">
+              Finding hotels in {destination}...
+            </p>
+          </div>
         )}
 
         {!loading && error && (
-            <div className="p-6 text-center bg-destructive/10 text-destructive rounded-lg border border-destructive/20">
-                <p className="font-medium">{error}</p>
-            </div>
+          <div className="p-6 text-center bg-destructive/10 text-destructive rounded-lg border border-destructive/20">
+            <p className="font-medium">{error}</p>
+          </div>
         )}
 
         {!loading && !error && hotels.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {hotels.map((hotel) => {
-                    const priceDetails = getPriceDetails(hotel);
-                    
-                    return (
-                    <Card key={hotel.id} className="overflow-hidden shadow-md hover:shadow-xl transition-all flex flex-col group">
-                        <div className="h-48 overflow-hidden bg-muted relative">
-                            {hotel.photoUrl ? (
-                                <img src={hotel.photoUrl} alt={hotel.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                            ) : (
-                                <div className="flex items-center justify-center h-full text-muted-foreground">
-                                    <ImageOff className="w-10 h-10" />
-                                </div>
-                            )}
-                            {hotel.rating && (
-                                <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-full flex items-center">
-                                    <Star className="w-3 h-3 text-yellow-400 fill-yellow-400 mr-1" />
-                                    {hotel.rating} ({hotel.user_ratings_total})
-                                </div>
-                            )}
-                        </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {hotels.map((hotel) => {
+              const priceDetails = getPriceDetails(hotel);
 
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-lg truncate" title={hotel.name}>{hotel.name}</CardTitle>
-                            <CardDescription className="flex items-start gap-1 text-xs mt-1 h-10 line-clamp-2">
-                                <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
-                                {hotel.address}
-                            </CardDescription>
-                        </CardHeader>
+              return (
+                <Card
+                  key={hotel.id}
+                  className="overflow-hidden shadow-md hover:shadow-xl transition-all flex flex-col group"
+                >
+                  <div className="h-48 overflow-hidden bg-muted relative">
+                    {hotel.photoUrl ? (
+                      <img
+                        src={hotel.photoUrl}
+                        alt={hotel.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">
+                        <ImageOff className="w-10 h-10" />
+                      </div>
+                    )}
+                    {hotel.rating && (
+                      <div className="absolute top-2 right-2 bg-black/70 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-full flex items-center">
+                        <Star className="w-3 h-3 text-yellow-400 fill-yellow-400 mr-1" />
+                        {hotel.rating} ({hotel.user_ratings_total})
+                      </div>
+                    )}
+                  </div>
 
-                        <CardContent className="flex-grow flex flex-col justify-end pt-0">
-                            <div className="bg-secondary/10 p-3 rounded-lg mb-4 border border-secondary/20">
-                                <p className="text-xs text-muted-foreground mb-1 flex items-center">
-                                    {priceDetails.label}
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger className="ml-1">
-                                                <Info className="w-3 h-3 text-muted-foreground cursor-help" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>Est. based on Google price level & rating.</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                </p>
-                                <div className="flex items-center gap-1 text-2xl font-bold text-primary">
-                                    {priceDetails.currency === "INR" && <IndianRupee className="w-5 h-5" />}
-                                    {priceDetails.price}
-                                    <span className="text-sm font-normal text-muted-foreground ml-1 self-end mb-1">{priceDetails.currency}</span>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
-                                   Per Night ({rooms} {rooms > 1 ? 'Rooms' : 'Room'}, {adults} {adults > 1 ? 'Guests' : 'Guest'})
-                                </p>
-                            </div>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-lg truncate" title={hotel.name}>
+                      {hotel.name}
+                    </CardTitle>
+                    <CardDescription className="flex items-start gap-1 text-xs mt-1 h-10 line-clamp-2">
+                      <MapPin className="w-3 h-3 mt-0.5 shrink-0" />
+                      {hotel.address}
+                    </CardDescription>
+                  </CardHeader>
 
-                            <div className="flex gap-2">
-                                <Button 
-                                    variant="outline" 
-                                    className="flex-1"
-                                    onClick={() => handleAddToCart(hotel)}
-                                >
-                                    <ShoppingBag className="w-4 h-4 mr-2" />
-                                    Add to Cart
-                                </Button>
+                  <CardContent className="flex-grow flex flex-col justify-end pt-0">
+                    <div className="bg-secondary/10 p-3 rounded-lg mb-4 border border-secondary/20">
+                      <p className="text-xs text-muted-foreground mb-1 flex items-center">
+                        {priceDetails.label}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger className="ml-1">
+                              <Info className="w-3 h-3 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Est. based on Google price level & rating.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </p>
+                      <div className="flex items-center gap-1 text-2xl font-bold text-primary">
+                        {priceDetails.currency === "INR" && (
+                          <IndianRupee className="w-5 h-5" />
+                        )}
+                        {priceDetails.price}
+                        <span className="text-sm font-normal text-muted-foreground ml-1 self-end mb-1">
+                          {priceDetails.currency}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1 line-clamp-1">
+                        Per Night ({rooms} {rooms > 1 ? "Rooms" : "Room"},{" "}
+                        {adults} {adults > 1 ? "Guests" : "Guest"})
+                      </p>
+                    </div>
 
-                                <Button asChild className="flex-1">
-                                    <a href={createBookingLink(hotel.name)} target="_blank" rel="noreferrer">
-                                        Book Now
-                                        <ExternalLink className="w-4 h-4 ml-2" />
-                                    </a>
-                                </Button>
-                            </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        className="flex-1"
+                        onClick={() => handleAddToCart(hotel)}
+                      >
+                        <ShoppingBag className="w-4 h-4 mr-2" />
+                        Add to Cart
+                      </Button>
 
-                        </CardContent>
-                    </Card>
-                )})}
-            </div>
+                      <Button asChild className="flex-1">
+                        <a
+                          href={createBookingLink(hotel.name)}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Book Now
+                          <ExternalLink className="w-4 h-4 ml-2" />
+                        </a>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>

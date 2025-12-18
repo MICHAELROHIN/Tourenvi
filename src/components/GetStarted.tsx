@@ -16,11 +16,20 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Leaf, MapPin } from "lucide-react";
+import { Leaf, MapPin, Calendar as CalendarIcon } from "lucide-react";
 import HeroVideo from "./HeroVideo";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 
 const GetStarted = () => {
+  const navigate = useNavigate();
   const [started, setStarted] = useState(false);
   const [travelType, setTravelType] = useState<string>("");
   const [preference, setPreference] = useState<string>("");
@@ -29,6 +38,8 @@ const GetStarted = () => {
   const [endDate, setEndDate] = useState<string>("");
   const [days, setDays] = useState<number | "">("");
   const [pace, setPace] = useState<string>("");
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
+  const [highlightDest, setHighlightDest] = useState(false);
 
   const onDatesChange = (s: string, e: string) => {
     setStartDate(s);
@@ -41,6 +52,41 @@ const GetStarted = () => {
       if (!isNaN(diff) && diff > 0) setDays(diff);
     }
   };
+
+  // Update derived values when selecting a range from the calendar
+  useEffect(() => {
+    if (dateRange.from && dateRange.to) {
+      const sd = dateRange.from;
+      const ed = dateRange.to;
+      const diff =
+        Math.ceil((ed.getTime() - sd.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      setStartDate(sd.toISOString().slice(0, 10));
+      setEndDate(ed.toISOString().slice(0, 10));
+      if (!isNaN(diff) && diff > 0) setDays(diff);
+    }
+  }, [dateRange]);
+
+  // Listen for selected destination from Destination Genie
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const ce = e as CustomEvent<{ destination?: string }>;
+      const d = ce?.detail?.destination;
+      if (d) {
+        setStarted(true);
+        setDestination(d);
+        setHighlightDest(true);
+        setTimeout(() => setHighlightDest(false), 1200);
+        const el = document.querySelector("#get-started") as HTMLElement | null;
+        if (el) el.scrollIntoView({ behavior: "smooth" });
+      }
+    };
+    window.addEventListener("tourenvi:setDestination" as any, handler as any);
+    return () =>
+      window.removeEventListener(
+        "tourenvi:setDestination" as any,
+        handler as any
+      );
+  }, []);
 
   return (
     <section id="get-started" className="mt-16 py-10 bg-background">
@@ -124,7 +170,7 @@ const GetStarted = () => {
 
           {/* Right: Panel 1/4 */}
           <div className="lg:col-span-1">
-            <Card className="h-full shadow-card">
+            <Card className="h-full shadow-card shadow-2xl rounded-[50px] border border-border max-w-sm lg:max-w-md mx-auto">
               {!started ? (
                 <>
                   <CardHeader>
@@ -197,17 +243,12 @@ const GetStarted = () => {
               ) : (
                 <>
                   <CardHeader>
-                    <div className="inline-flex items-center space-x-2 bg-primary/10 rounded-full px-3 py-1 mb-2">
+                    <div className="inline-flex items-center space-x-2 bg-primary/10 rounded-full px-3 py-1 ">
                       <MapPin className="w-4 h-4 text-primary" />
                       <span className="text-xs font-medium text-primary">
-                        Destination
+                        Destination & Date
                       </span>
                     </div>
-                    <CardTitle>Select destination and dates</CardTitle>
-                    <CardDescription>
-                      Search and set trip dates; pace defines your daily plan
-                      intensity.
-                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {/* Onboarding controls become visible only after Get Started */}
@@ -226,98 +267,74 @@ const GetStarted = () => {
                     </div>
 
                     <div>
-                      <Label>Quick Preference</Label>
-                      <ToggleGroup
-                        type="single"
-                        value={preference}
-                        onValueChange={setPreference}
-                        className="mt-1"
-                      >
-                        <ToggleGroupItem value="eco" aria-label="Eco-Friendly">
-                          Eco-Friendly
-                        </ToggleGroupItem>
-                        <ToggleGroupItem
-                          value="budget"
-                          aria-label="Budget-Friendly"
-                        >
-                          Budget-Friendly
-                        </ToggleGroupItem>
-                        <ToggleGroupItem value="premium" aria-label="Premium">
-                          Premium
-                        </ToggleGroupItem>
-                      </ToggleGroup>
-                    </div>
-
-                    <div>
                       <Label>Destination</Label>
                       <Input
                         placeholder="Search or enter destination"
                         value={destination}
                         onChange={(e) => setDestination(e.target.value)}
-                        className="mt-1"
+                        className={`mt-1 ${
+                          highlightDest
+                            ? "ring-2 ring-primary/60 transition-shadow"
+                            : ""
+                        }`}
                       />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <Label>Start Date</Label>
-                        <Input
-                          type="date"
-                          value={startDate}
-                          onChange={(e) =>
-                            onDatesChange(e.target.value, endDate)
-                          }
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label>End Date</Label>
-                        <Input
-                          type="date"
-                          value={endDate}
-                          onChange={(e) =>
-                            onDatesChange(startDate, e.target.value)
-                          }
-                          className="mt-1"
-                        />
+                      <div className="mt-2 flex">
+                        <Button asChild variant="outline" className="w-full">
+                          <a href="#locgenie">Choose according to your mood</a>
+                        </Button>
                       </div>
                     </div>
 
                     <div>
-                      <Label>Number of Days</Label>
-                      <Input
-                        type="number"
-                        value={days}
-                        onChange={(e) => setDays(Number(e.target.value) || "")}
-                        placeholder="Auto-calculated"
-                        className="mt-1"
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Trip Pace</Label>
-                      <Select onValueChange={setPace}>
-                        <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Relaxed / Medium / Intense" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="relaxed">Relaxed</SelectItem>
-                          <SelectItem value="medium">Medium</SelectItem>
-                          <SelectItem value="intense">Intense</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label>Dates</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className="w-full justify-start text-left font-normal mt-1"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {dateRange.from && dateRange.to ? (
+                              <span>
+                                {format(dateRange.from, "MMM d")} -{" "}
+                                {format(dateRange.to, "MMM d, yyyy")}
+                              </span>
+                            ) : (
+                              <span>Pick a date range</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          align="start"
+                          className="p-0 w-[18rem] sm:w-[22rem]"
+                        >
+                          <Calendar
+                            mode="range"
+                            selected={dateRange as any}
+                            onSelect={(range) => setDateRange(range ?? {})}
+                            numberOfMonths={1}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      {days ? (
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          Trip length: {days} day(s)
+                        </p>
+                      ) : null}
                     </div>
 
                     <Button
                       className="w-full"
                       onClick={() => {
-                        // For now just scroll to destination chooser section if present
-                        const el = document.querySelector(
-                          "#locgenie"
-                        ) as HTMLElement | null;
-                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                        if (!destination || !startDate || !endDate) return;
+                        const url = `/hotels?destination=${encodeURIComponent(
+                          destination
+                        )}&checkIn=${encodeURIComponent(
+                          startDate
+                        )}&checkOut=${encodeURIComponent(endDate)}`;
+                        navigate(url);
                       }}
-                      disabled={!destination || !days || !pace}
+                      disabled={!destination || !days}
                     >
                       Save & Continue
                     </Button>

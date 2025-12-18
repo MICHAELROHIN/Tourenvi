@@ -12,7 +12,7 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Navigation />
       <GetStarted />
-      <TripCalculator />
+     
       <FuelEstimator />
       <DestinationChooser />
       <RoutePlanner />

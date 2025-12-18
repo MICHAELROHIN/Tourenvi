@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom"; // <-- 1. Import useNavigate
 import {
   Card,
   CardContent,
@@ -31,8 +30,6 @@ const moods = [
 ];
 
 const DestinationChooser = () => {
-  const navigate = useNavigate(); // <-- 3. Initialize navigate
-
   // --- State for recommendations ---
   const [primary, setPrimary] = useState<string>("");
   const [secondary, setSecondary] = useState<string>("none");
@@ -83,9 +80,16 @@ const DestinationChooser = () => {
     }
   };
 
-  // --- 6. REPLACED function to navigate ---
+  // --- 6. When user picks a destination: broadcast selection and scroll ---
   const handleDestinationClick = (destination: string) => {
-    navigate(`/hotels?destination=${encodeURIComponent(destination)}`);
+    try {
+      const ev = new CustomEvent("tourenvi:setDestination", {
+        detail: { destination },
+      });
+      window.dispatchEvent(ev);
+    } catch {}
+    const el = document.querySelector("#get-started") as HTMLElement | null;
+    if (el) el.scrollIntoView({ behavior: "smooth" });
   };
 
   // --- 7. REMOVED resetHotelState helper ---
@@ -210,7 +214,7 @@ const DestinationChooser = () => {
               ) : recommendations.length > 0 ? (
                 <div className="mt-4 space-y-4">
                   <p className="text-sm font-medium text-foreground">
-                    {result} (Click a destination to see hotels on a new page)
+                    {result}
                   </p>
                   <div className="grid gap-2">
                     {recommendations.map((place, index) => (
