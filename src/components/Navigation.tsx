@@ -89,7 +89,7 @@ const Navigation = () => {
             <Button
               variant="default"
               className="w-full mt-4"
-              onClick={() => {
+              onClick={() => {  
                 setIsOpen(false);
                 window.location.assign("#get-started");
               }}

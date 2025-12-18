@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
+import { Toaster, toast } from "react-hot-toast"; 
 import {
   Card,
   CardContent,
@@ -19,7 +20,9 @@ import {
   BedDouble,
   IndianRupee,
   MapPin,
-  Info
+  Info,
+  ShoppingBag,
+  ShoppingCart // Imported ShoppingCart icon
 } from "lucide-react";
 import {
   Tooltip,
@@ -28,7 +31,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// --- 1. Interface for Google Places Data ---
+// --- Interfaces ---
 interface HotelDetails {
   id: string;
   name: string;
@@ -37,7 +40,16 @@ interface HotelDetails {
   user_ratings_total: number;
   phone?: string;
   photoUrl?: string;
-  price_level?: number | null; // 0=Free, 1=Inexpensive, 2=Moderate, 3=Expensive, 4=Very Expensive
+  price_level?: number | null; 
+}
+
+// Interface for what we save to the Cart
+interface CartItem extends HotelDetails {
+  bookedPrice: string;
+  bookedRooms: number;
+  bookedGuests: number;
+  checkIn: string;
+  checkOut: string;
 }
 
 const toISODate = (d: Date) => d.toISOString().slice(0, 10);
@@ -51,18 +63,17 @@ const Hotels = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // --- Search Parameters (Dates & Rooms) ---
-  // These controls will now just update the text on the price card
+  // --- Search Parameters ---
   const today = new Date();
-  const defaultIn = new Date(today.getTime() + 7 * 86400000); // 7 days from now
-  const defaultOut = new Date(today.getTime() + 9 * 86400000); // 9 days from now
+  const defaultIn = new Date(today.getTime() + 7 * 86400000); 
+  const defaultOut = new Date(today.getTime() + 9 * 86400000); 
 
   const [checkInDate, setCheckInDate] = useState(toISODate(defaultIn));
   const [checkOutDate, setCheckOutDate] = useState(toISODate(defaultOut));
   const [adults, setAdults] = useState(2);
   const [rooms, setRooms] = useState(1);
 
-  // --- 2. Function to Fetch Hotel Details from Google ---
+  // --- Fetch Data ---
   useEffect(() => {
     if (!destination) {
       setError("No destination specified.");
@@ -75,7 +86,6 @@ const Hotels = () => {
       setError(null);
       setHotels([]);
       try {
-        // We ONLY call /get-hotels now
         const response = await fetch(
           `http://localhost:8000/get-hotels?destination=${encodeURIComponent(
             destination
@@ -99,32 +109,27 @@ const Hotels = () => {
     };
 
     fetchHotels();
-  }, [destination]); // Runs only when destination changes
+  }, [destination]); 
 
-  // --- 3. PRICE ESTIMATION LOGIC ---
+  // --- Price Logic ---
   const getPriceDetails = (hotel: HotelDetails) => {
-    let basePrice = 3500; // Default base if no data
-
-    // Use Google's Price Level (1-4) for a good estimate
+    let basePrice = 3500; 
     if (hotel.price_level) {
         switch(hotel.price_level) {
-            case 1: basePrice = 2000; break; // Inexpensive
-            case 2: basePrice = 4500; break; // Moderate
-            case 3: basePrice = 8000; break; // Expensive
-            case 4: basePrice = 15000; break; // Very Expensive
+            case 1: basePrice = 2000; break; 
+            case 2: basePrice = 4500; break; 
+            case 3: basePrice = 8000; break; 
+            case 4: basePrice = 15000; break; 
             default: basePrice = 3500;
         }
     } else if (hotel.rating) {
-        // If no price level, guess based on star rating
         basePrice = hotel.rating > 4.3 ? 7000 : hotel.rating > 3.8 ? 4000 : 2500;
     }
-
-    // Add a small random amount to make prices look varied
     const randomFactor = Math.floor(Math.random() * 500 - 250); 
-    const finalPrice = Math.max(1500, (basePrice + randomFactor) * rooms); // Multiply by rooms
+    const finalPrice = Math.max(1500, (basePrice + randomFactor) * rooms); 
     
     return {
-        price: finalPrice.toLocaleString('en-IN'), // Format as "8,000"
+        price: finalPrice.toLocaleString('en-IN'), 
         currency: "INR",
         label: "Estimated Price / Night"
     };
@@ -134,28 +139,60 @@ const Hotels = () => {
     return `https://www.google.com/search?q=${encodeURIComponent(hotelName + " " + destination + " booking")}`;
   };
 
+  // --- Handle Add to Cart ---
+  const handleAddToCart = (hotel: HotelDetails) => {
+    const priceInfo = getPriceDetails(hotel);
+    
+    // Create the item object
+    const newItem: CartItem = {
+      ...hotel,
+      bookedPrice: priceInfo.price,
+      bookedRooms: rooms,
+      bookedGuests: adults,
+      checkIn: checkInDate,
+      checkOut: checkOutDate
+    };
+
+    // Save to LocalStorage
+    const existingCart = JSON.parse(localStorage.getItem("tripCart") || "[]");
+    localStorage.setItem("tripCart", JSON.stringify([...existingCart, newItem]));
+
+    toast.success(`${hotel.name} added to cart!`);
+  };
+
   return (
     <div className="min-h-screen bg-background pb-20">
+      <Toaster position="top-center" reverseOrder={false} />
+
       <div className="container mx-auto px-4 py-8">
         
-        {/* Header Section */}
-        <div className="mb-6">
-          <Button asChild variant="ghost" className="pl-0 hover-pl-2 transition-all">
-            <Link to="/#locgenie">
-              <ChevronLeft className="w-4 h-4 mr-1" />
-              Back to Destination Finder
+        {/* --- Header Section with Cart Button --- */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div>
+            <Button asChild variant="ghost" className="pl-0 hover-pl-2 transition-all">
+              <Link to="/#locgenie">
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Back to Destination Finder
+              </Link>
+            </Button>
+            <h1 className="text-3xl font-bold mt-2">
+              Hotels in <span className="text-primary">{destination}</span>
+            </h1>
+          </div>
+
+          {/* Cart Button */}
+          <Button asChild className="bg-primary text-primary-foreground shadow-lg hover:shadow-xl transition-all">
+            <Link to="/cart">
+              <ShoppingCart className="w-4 h-4 mr-2" />
+              View Cart
             </Link>
           </Button>
-          <h1 className="text-3xl font-bold mt-2">
-            Hotels in <span className="text-primary">{destination}</span>
-          </h1>
         </div>
 
-        {/* Controls Section (Inputs) */}
+        {/* Controls Section */}
         <Card className="mb-8 shadow-sm border-primary/10">
             <CardContent className="pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                    {/* Check In */}
                     <div className="space-y-1">
                         <label className="text-xs font-semibold text-muted-foreground uppercase">Check In</label>
                         <div className="flex items-center border rounded-md px-2 bg-background">
@@ -163,7 +200,6 @@ const Hotels = () => {
                              <input type="date" value={checkInDate} onChange={e => setCheckInDate(e.target.value)} className="w-full p-2 bg-transparent text-sm outline-none" />
                         </div>
                     </div>
-                    {/* Check Out */}
                     <div className="space-y-1">
                         <label className="text-xs font-semibold text-muted-foreground uppercase">Check Out</label>
                         <div className="flex items-center border rounded-md px-2 bg-background">
@@ -171,7 +207,6 @@ const Hotels = () => {
                              <input type="date" value={checkOutDate} onChange={e => setCheckOutDate(e.target.value)} className="w-full p-2 bg-transparent text-sm outline-none" />
                         </div>
                     </div>
-                    {/* Adults */}
                     <div className="space-y-1">
                         <label className="text-xs font-semibold text-muted-foreground uppercase">Adults</label>
                         <div className="flex items-center border rounded-md px-2 bg-background">
@@ -179,7 +214,6 @@ const Hotels = () => {
                              <input type="number" min={1} value={adults} onChange={e => setAdults(Number(e.target.value))} className="w-full p-2 bg-transparent text-sm outline-none" />
                         </div>
                     </div>
-                    {/* Rooms */}
                     <div className="space-y-1">
                         <label className="text-xs font-semibold text-muted-foreground uppercase">Rooms</label>
                          <div className="flex items-center border rounded-md px-2 bg-background">
@@ -187,7 +221,6 @@ const Hotels = () => {
                              <input type="number" min={1} value={rooms} onChange={e => setRooms(Number(e.target.value))} className="w-full p-2 bg-transparent text-sm outline-none" />
                         </div>
                     </div>
-                    {/* Button */}
                     <div className="flex items-end">
                         <Button onClick={() => {}} disabled={true} className="w-full" variant="outline">
                             (Prices Auto-Update)
@@ -214,12 +247,10 @@ const Hotels = () => {
         {!loading && !error && hotels.length > 0 && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {hotels.map((hotel) => {
-                    // Get the estimated price
                     const priceDetails = getPriceDetails(hotel);
                     
                     return (
                     <Card key={hotel.id} className="overflow-hidden shadow-md hover:shadow-xl transition-all flex flex-col group">
-                        {/* Hotel Image */}
                         <div className="h-48 overflow-hidden bg-muted relative">
                             {hotel.photoUrl ? (
                                 <img src={hotel.photoUrl} alt={hotel.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -245,7 +276,6 @@ const Hotels = () => {
                         </CardHeader>
 
                         <CardContent className="flex-grow flex flex-col justify-end pt-0">
-                            {/* Price Box */}
                             <div className="bg-secondary/10 p-3 rounded-lg mb-4 border border-secondary/20">
                                 <p className="text-xs text-muted-foreground mb-1 flex items-center">
                                     {priceDetails.label}
@@ -270,12 +300,24 @@ const Hotels = () => {
                                 </p>
                             </div>
 
-                            <Button asChild className="w-full">
-                                <a href={createBookingLink(hotel.name)} target="_blank" rel="noreferrer">
-                                    Check Availability
-                                    <ExternalLink className="w-4 h-4 ml-2" />
-                                </a>
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button 
+                                    variant="outline" 
+                                    className="flex-1"
+                                    onClick={() => handleAddToCart(hotel)}
+                                >
+                                    <ShoppingBag className="w-4 h-4 mr-2" />
+                                    Add to Cart
+                                </Button>
+
+                                <Button asChild className="flex-1">
+                                    <a href={createBookingLink(hotel.name)} target="_blank" rel="noreferrer">
+                                        Book Now
+                                        <ExternalLink className="w-4 h-4 ml-2" />
+                                    </a>
+                                </Button>
+                            </div>
+
                         </CardContent>
                     </Card>
                 )})}

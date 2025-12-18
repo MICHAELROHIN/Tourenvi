@@ -1,5 +1,3 @@
-// DestinationChooser.tsx
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom"; // <-- 1. Import useNavigate
 import {
