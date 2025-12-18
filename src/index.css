@@ -6,7 +6,8 @@
 
 @layer base {
   :root {
-    --background: 120 20% 98%;
+    /* Light green background across the app */
+    --background: 120 50% 96%;
     --foreground: 160 40% 12%;
 
     --card: 0 0% 100%;
@@ -45,17 +46,25 @@
     --eco-green: 142 70% 45%;
     --ocean-blue: 200 80% 60%;
     --forest-dark: 160 40% 12%;
-    --nature-light: 120 20% 98%;
-    
+    --nature-light: 120 50% 96%;
+
     /* Gradients */
-    --gradient-hero: linear-gradient(135deg, hsl(142 70% 45%), hsl(200 80% 60%));
+    --gradient-hero: linear-gradient(
+      135deg,
+      hsl(142 70% 45%),
+      hsl(200 80% 60%)
+    );
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(120 20% 98%));
-    --gradient-sustainability: linear-gradient(90deg, hsl(142 70% 45%), hsl(120 60% 50%));
-    
+    --gradient-sustainability: linear-gradient(
+      90deg,
+      hsl(142 70% 45%),
+      hsl(120 60% 50%)
+    );
+
     /* Shadows */
     --shadow-card: 0 4px 20px -2px hsl(160 40% 12% / 0.08);
     --shadow-hero: 0 10px 40px -10px hsl(142 70% 45% / 0.3);
-    
+
     /* Animations */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
