@@ -22,7 +22,7 @@ import {
   MapPin,
   Info,
   ShoppingBag,
-  ShoppingCart // Imported ShoppingCart icon
+  ShoppingCart 
 } from "lucide-react";
 import {
   Tooltip,
@@ -31,7 +31,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-// --- Interfaces ---
+
 interface HotelDetails {
   id: string;
   name: string;
