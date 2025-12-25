@@ -256,7 +256,7 @@ const GetStarted = () => {
                       <Label>Travel Type</Label>
                       <Select value={travelType} onValueChange={setTravelType}>
                         <SelectTrigger className="mt-1">
-                          <SelectValue placeholder="Choose solo/family/business" />
+                          <SelectValue placeholder="Choose your travel type" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="solo">Solo</SelectItem>

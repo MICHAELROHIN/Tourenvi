@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom"; 
 import {
   Card,
   CardContent,
@@ -16,17 +17,16 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Fuel, Car, Gauge, Loader2, Info } from "lucide-react";
+import { Fuel, Car, Gauge, Loader2, Lock } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 const API_BASE = "http://localhost:8000";
 
-// ✨ Configuration for RapidAPI (Real-time Fuel Prices)
-// Get your key from: https://rapidapi.com/mi8y-mi8y-default/api/daily-petrol-diesel-lpg-cng-fuel-prices-in-india
 const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY || "YOUR_RAPIDAPI_KEY"; 
 const RAPIDAPI_HOST = "daily-petrol-diesel-lpg-cng-fuel-prices-in-india.p.rapidapi.com";
 
 const FuelEstimator = () => {
+  const [searchParams] = useSearchParams();
   const [brands, setBrands] = useState<string[]>([]);
   const [models, setModels] = useState<string[]>([]);
   const [fuels, setFuels] = useState<string[]>([]);
@@ -34,9 +34,10 @@ const FuelEstimator = () => {
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [fuelType, setFuelType] = useState("");
-  const [city, setCity] = useState("Chennai"); // Default city for API fetch
+  const [city, setCity] = useState("Chennai");
 
   const [distanceKm, setDistanceKm] = useState<string>("");
+  const [isDistanceLocked, setIsDistanceLocked] = useState(false); // ✨ New state for lock
   const [fuelPrice, setFuelPrice] = useState<string>("");
 
   const [mileage, setMileage] = useState<number | null>(null);
@@ -45,6 +46,16 @@ const FuelEstimator = () => {
   const [priceLoading, setPriceLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // ✨ Auto-fill distance from URL param
+  useEffect(() => {
+    const distParam = searchParams.get("distance");
+    if (distParam) {
+        setDistanceKm(distParam);
+        setIsDistanceLocked(true); // Lock it when auto-filled
+        toast.success(`Distance auto-filled: ${distParam} km`);
+    }
+  }, [searchParams]);
+
   useEffect(() => {
     fetch(`${API_BASE}/brands`)
       .then((r) => r.json())
@@ -52,19 +63,17 @@ const FuelEstimator = () => {
       .catch(() => setBrands([]));
   }, []);
 
-  // --- Fetch Real-Time Fuel Price from API ---
   const fetchLiveFuelPrice = async (selectedFuel: string) => {
     if (selectedFuel === "Electric") {
-        setFuelPrice("20"); // Avg public charging cost/kWh in India
-        toast.success("Set estimated EV charging rate: ₹20/kWh");
+        setFuelPrice("20");
+        toast.success("Auto-set EV rate: ₹20/kWh");
         return;
     }
 
     setPriceLoading(true);
+    setFuelPrice("");
     try {
-        // Mapping our fuel selection to API query params
-        const fuelQuery = selectedFuel.toLowerCase(); // petrol, diesel, cng
-        
+        const fuelQuery = selectedFuel.toLowerCase(); 
         const response = await fetch(
             `https://${RAPIDAPI_HOST}/v1/fuel-prices?city=${city}&fuelType=${fuelQuery}`,
             {
@@ -76,18 +85,15 @@ const FuelEstimator = () => {
             }
         );
 
-        if (!response.ok) throw new Error("API Limit Reached or Error");
+        if (!response.ok) throw new Error("API Error");
         
         const data = await response.json();
-        // Adjust this path based on the specific API response structure you choose
-        // Example: data.price or data.retailPrice
         const price = data?.retailPrice || data?.price; 
 
         if (price) {
             setFuelPrice(String(price));
-            toast.success(`Live ${selectedFuel} price in ${city}: ₹${price}`);
+            toast.success(`Fetched live ${selectedFuel} price: ₹${price}`);
         } else {
-            // Fallback if API fails or city not found
             fallbackPrices(selectedFuel);
         }
     } catch (err) {
@@ -99,15 +105,13 @@ const FuelEstimator = () => {
   };
 
   const fallbackPrices = (fType: string) => {
-      // Approximate defaults for 2025 if API fails
       let price = "102";
       if (fType.toLowerCase() === "diesel") price = "94";
       if (fType.toLowerCase() === "cng") price = "85";
       setFuelPrice(price);
-      toast.error("Live price failed. Using estimation.");
+      toast.error("Live fetch failed. Using standard estimate.");
   };
 
-  // --- Vehicle Logic ---
   const onBrandChange = async (value: string) => {
     setBrand(value);
     setModel("");
@@ -136,7 +140,7 @@ const FuelEstimator = () => {
 
   const onFuelChange = (val: string) => {
       setFuelType(val);
-      fetchLiveFuelPrice(val); // ✨ Auto-fetch price on selection
+      fetchLiveFuelPrice(val);
   };
 
   const fetchMileage = async () => {
@@ -167,8 +171,6 @@ const FuelEstimator = () => {
       const km = parseFloat(distanceKm);
       const price = parseFloat(fuelPrice);
       if (!isNaN(km) && !isNaN(price) && m > 0) {
-        // For EV: Mileage is usually km/full charge or km/kWh. 
-        // Assuming standard km/l or km/kWh logic:
         const unitsNeeded = km / m; 
         const total = unitsNeeded * price;
         setCost(parseFloat(total.toFixed(2)));
@@ -183,6 +185,7 @@ const FuelEstimator = () => {
     setModels([]);
     setFuels([]);
     setDistanceKm("");
+    setIsDistanceLocked(false); // Unlock distance on reset
     setFuelPrice("");
     setMileage(null);
     setCost(null);
@@ -203,7 +206,7 @@ const FuelEstimator = () => {
             Estimate Fuel Cost (Live Rates)
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Select your vehicle and get real-time fuel prices for accurate trip costing.
+            Select your vehicle. We automatically fetch today's fuel prices for accurate costing.
           </p>
         </div>
 
@@ -215,7 +218,7 @@ const FuelEstimator = () => {
                 <span>Vehicle & Trip Details</span>
               </CardTitle>
               <CardDescription>
-                We auto-fetch daily fuel rates based on your selection.
+                Configure your trip parameters.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -292,13 +295,23 @@ const FuelEstimator = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="distance">Distance (km)</Label>
-                  <Input
-                    id="distance"
-                    type="number"
-                    placeholder="500"
-                    value={distanceKm}
-                    onChange={(e) => setDistanceKm(e.target.value)}
-                  />
+                  {/* ✨ Locked/Auto-filled Distance Input */}
+                  <div className="relative">
+                    <Input
+                        id="distance"
+                        type="number"
+                        placeholder="500"
+                        value={distanceKm}
+                        onChange={(e) => setDistanceKm(e.target.value)}
+                        readOnly={isDistanceLocked}
+                        className={isDistanceLocked ? "pr-8 bg-muted text-muted-foreground cursor-not-allowed border-primary/20" : ""}
+                    />
+                    {isDistanceLocked && (
+                        <div className="absolute right-3 top-2.5 text-muted-foreground text-xs">
+                            <Lock className="w-3 h-3" />
+                        </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="space-y-2">
@@ -306,20 +319,19 @@ const FuelEstimator = () => {
                     <span>
                         {fuelType === 'Electric' ? 'Cost per kWh' : 'Price / Litre'}
                     </span>
-                    {priceLoading && <Loader2 className="w-3 h-3 animate-spin" />}
+                    {priceLoading && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
                   </Label>
                   <div className="relative">
                     <Input
                         id="price"
                         type="number"
-                        step="0.01"
-                        placeholder="Fetch or enter"
+                        placeholder={priceLoading ? "Fetching..." : "Auto-filled"}
                         value={fuelPrice}
-                        onChange={(e) => setFuelPrice(e.target.value)}
-                        className="pr-8"
+                        readOnly 
+                        className="pr-8 bg-muted text-muted-foreground cursor-not-allowed border-primary/20"
                     />
                     <div className="absolute right-3 top-2.5 text-muted-foreground text-xs">
-                        ₹
+                        {priceLoading ? "" : <Lock className="w-3 h-3" />}
                     </div>
                   </div>
                 </div>
@@ -342,7 +354,6 @@ const FuelEstimator = () => {
             </CardContent>
           </Card>
 
-          {/* Results Card */}
           <Card className="shadow-card">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">

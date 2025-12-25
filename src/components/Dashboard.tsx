@@ -64,7 +64,7 @@ const Dashboard = () => {
           </div>
           <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Plan, Save and Resume</h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">Quick access to your routes, recent costs, and handy actions.</p>
-        </div>
+        </div>  
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {/* Overview */}

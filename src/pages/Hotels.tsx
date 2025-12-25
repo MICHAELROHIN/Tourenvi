@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useSearchParams, Link } from "react-router-dom";
+import { useSearchParams, Link, useNavigate } from "react-router-dom"; // ✨ Imported useNavigate
 import { Toaster, toast } from "react-hot-toast";
 import {
   Card,
@@ -56,6 +56,7 @@ const toISODate = (d: Date) => d.toISOString().slice(0, 10);
 
 const Hotels = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate(); // ✨ Initialize the navigation hook
   const destination = searchParams.get("destination");
 
   // --- State ---
@@ -184,7 +185,13 @@ const Hotels = () => {
       JSON.stringify([...existingCart, newItem])
     );
 
-    toast.success(`${hotel.name} added to cart!`);
+    toast.success(`${hotel.name} added to cart! Redirecting to Route Planner...`);
+
+    // ✨ Redirect to Route Planner after 1.5 seconds so user sees the message
+    setTimeout(() => {
+        // We use window.location.href to ensure it forces a scroll to the hash on the main page
+        window.location.href = "/#routes"; 
+    }, 1500);
   };
 
   return (
