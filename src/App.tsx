@@ -11,6 +11,7 @@ import Cart from "./pages/Cart";
 import RoutePlanner from "@/components/RoutePlanner";
 import FuelEstimator from "@/components/FuelEstimator";
 import DestinationChooser from "@/components/DestinationChooser";
+import AIChat from "./pages/AIChat";
 import Login from "./pages/Login";
 
 const queryClient = new QueryClient();
@@ -91,6 +92,14 @@ const AppContent = () => {
             </ProtectedRoute>
           } 
         />
+        <Route 
+  path="/chatAI" 
+  element={
+    <ProtectedRoute>
+      <AIChat />
+    </ProtectedRoute>
+  } 
+/>
         
         {/* ✨ PUBLIC ROUTE: Only accessible if NOT logged in */}
         <Route 

@@ -12,7 +12,8 @@ import {
   ShoppingCart,
   User,
   LogOut,
-  AlertTriangle 
+  AlertTriangle,
+  MessageSquare
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -61,6 +62,8 @@ const Navigation = () => {
     { icon: BarChart3, label: "Dashboard", href: "/#dashboard" },
     { icon: Sparkles, label: "Destination Genie", href: "/destination-genie" },
     { icon: Calculator, label: "Fuel Estimator", href: "/fuel-estimator" },
+    { icon: MessageSquare, label: "AI Assistant", href: "/chatAI" }, // New AI Chatting Item
+
   ];
 
   // --- LOGOUT FUNCTION ---
