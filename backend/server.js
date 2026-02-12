@@ -24,7 +24,7 @@ const DESTINATION_DATA = [
   { Destination: "Kolli Hills", Adventure_Score: 5, Relaxation_Score: 3, Cultur_Score: 3, Scenic_Score: 4, Urban_Score: 1, Family_Score: 2, Romantic_Score: 3, Water_Activity_Tag: 0 },
   { Destination: "Yercaud", Adventure_Score: 3, Relaxation_Score: 4, Cultur_Score: 2, Scenic_Score: 4, Urban_Score: 2, Family_Score: 4, Romantic_Score: 4, Water_Activity_Tag: 1 },
   { Destination: "Chettinad", Adventure_Score: 1, Relaxation_Score: 2, Cultur_Score: 5, Scenic_Score: 2, Urban_Score: 1, Family_Score: 3, Romantic_Score: 2, Water_Activity_Tag: 0 },
-  { Destination: "Dhanushkodi", Adventure_Score: 2, Relaxation_Score: 4, Cultur_Score: 3, Scenic_Score: 5, Urban_Score: 1, Family_Score: 3, Romantic_Score: 5, Water_Activity_Tag: 0 },
+  
   { Destination: "Rameswaram", Adventure_Score: 1, Relaxation_Score: 1, Cultur_Score: 5, Scenic_Score: 2, Urban_Score: 1, Family_Score: 4, Romantic_Score: 1, Water_Activity_Tag: 1 }
 ];
 const FEATURES = ["Adventure_Score","Relaxation_Score","Cultur_Score","Scenic_Score","Urban_Score","Family_Score","Romantic_Score","Water_Activity_Tag"];
