@@ -303,7 +303,7 @@ const DestinationChooser = () => {
       const uniqueMoods = [...new Set(moodsList)];
 
       try {
-        const response = await fetch("http://localhost:8000/recommend", {
+        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/recommend`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ moods: uniqueMoods }),
@@ -330,7 +330,7 @@ const DestinationChooser = () => {
         detail: { destination },
       });
       window.dispatchEvent(ev);
-    } catch {}
+    } catch { }
     const el = document.querySelector("#get-started") as HTMLElement | null;
     if (el) el.scrollIntoView({ behavior: "smooth" });
   };
@@ -381,11 +381,10 @@ const DestinationChooser = () => {
                       <button
                         key={vibe.id}
                         onClick={() => toggleVibe(vibe.id)}
-                        className={`relative rounded-2xl overflow-hidden aspect-[4/3] group transition-all duration-200 outline-none ${
-                          isSelected
+                        className={`relative rounded-2xl overflow-hidden aspect-[4/3] group transition-all duration-200 outline-none ${isSelected
                             ? "ring-[3px] ring-emerald-500 shadow-lg shadow-emerald-500/25"
                             : "ring-1 ring-gray-200 hover:ring-2 hover:ring-emerald-300"
-                        }`}
+                          }`}
                       >
                         <img
                           src={vibe.image}
@@ -497,11 +496,10 @@ const DestinationChooser = () => {
                                 aria-label={`Favorite ${city}`}
                               >
                                 <Heart
-                                  className={`w-4 h-4 transition-colors ${
-                                    favorites.has(place)
+                                  className={`w-4 h-4 transition-colors ${favorites.has(place)
                                       ? "fill-red-500 text-red-500"
                                       : "text-gray-400 hover:text-red-400"
-                                  }`}
+                                    }`}
                                 />
                               </button>
                             </div>

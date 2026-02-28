@@ -101,7 +101,7 @@ const Hotels = () => {
       setHotels([]);
       try {
         const response = await fetch(
-          `http://localhost:8000/get-hotels?destination=${encodeURIComponent(
+          `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/get-hotels?destination=${encodeURIComponent(
             destination
           )}`
         );
@@ -189,13 +189,13 @@ const Hotels = () => {
 
     // ✨ Redirect to Route Planner after 1.5 seconds so user sees the message
     setTimeout(() => {
-        // We use window.location.href to ensure it forces a scroll to the hash on the main page
-        window.location.href = "/#routes"; 
+      // We use window.location.href to ensure it forces a scroll to the hash on the main page
+      window.location.href = "/#routes";
     }, 1500);
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20">
+    <div className="min-h-screen bg-background pb-20 pt-10">
       <Toaster position="top-center" reverseOrder={false} />
 
       <div className="container mx-auto px-4 py-8">
@@ -293,7 +293,7 @@ const Hotels = () => {
               </div>
               <div className="flex items-end">
                 <Button
-                  onClick={() => {}}
+                  onClick={() => { }}
                   disabled={true}
                   className="w-full"
                   variant="outline"

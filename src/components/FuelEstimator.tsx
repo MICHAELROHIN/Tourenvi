@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom"; 
+import { useSearchParams } from "react-router-dom";
 import {
   Card,
   CardContent,
@@ -20,9 +20,9 @@ import { Button } from "@/components/ui/button";
 import { Fuel, Car, Gauge, Loader2, Lock } from "lucide-react";
 import { toast } from "react-hot-toast";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
-const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY || "YOUR_RAPIDAPI_KEY"; 
+const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY || "YOUR_RAPIDAPI_KEY";
 const RAPIDAPI_HOST = "daily-petrol-diesel-lpg-cng-fuel-prices-in-india.p.rapidapi.com";
 
 const FuelEstimator = () => {
@@ -50,9 +50,9 @@ const FuelEstimator = () => {
   useEffect(() => {
     const distParam = searchParams.get("distance");
     if (distParam) {
-        setDistanceKm(distParam);
-        setIsDistanceLocked(true); // Lock it when auto-filled
-        toast.success(`Distance auto-filled: ${distParam} km`);
+      setDistanceKm(distParam);
+      setIsDistanceLocked(true); // Lock it when auto-filled
+      toast.success(`Distance auto-filled: ${distParam} km`);
     }
   }, [searchParams]);
 
@@ -65,51 +65,51 @@ const FuelEstimator = () => {
 
   const fetchLiveFuelPrice = async (selectedFuel: string) => {
     if (selectedFuel === "Electric") {
-        setFuelPrice("20");
-        toast.success("Auto-set EV rate: ₹20/kWh");
-        return;
+      setFuelPrice("20");
+      toast.success("Auto-set EV rate: ₹20/kWh");
+      return;
     }
 
     setPriceLoading(true);
     setFuelPrice("");
     try {
-        const fuelQuery = selectedFuel.toLowerCase(); 
-        const response = await fetch(
-            `https://${RAPIDAPI_HOST}/v1/fuel-prices?city=${city}&fuelType=${fuelQuery}`,
-            {
-                method: "GET",
-                headers: {
-                    "x-rapidapi-key": RAPIDAPI_KEY,
-                    "x-rapidapi-host": RAPIDAPI_HOST,
-                },
-            }
-        );
-
-        if (!response.ok) throw new Error("API Error");
-        
-        const data = await response.json();
-        const price = data?.retailPrice || data?.price; 
-
-        if (price) {
-            setFuelPrice(String(price));
-            toast.success(`Fetched live ${selectedFuel} price: ₹${price}`);
-        } else {
-            fallbackPrices(selectedFuel);
+      const fuelQuery = selectedFuel.toLowerCase();
+      const response = await fetch(
+        `https://${RAPIDAPI_HOST}/v1/fuel-prices?city=${city}&fuelType=${fuelQuery}`,
+        {
+          method: "GET",
+          headers: {
+            "x-rapidapi-key": RAPIDAPI_KEY,
+            "x-rapidapi-host": RAPIDAPI_HOST,
+          },
         }
-    } catch (err) {
-        console.error("Fuel API Error:", err);
+      );
+
+      if (!response.ok) throw new Error("API Error");
+
+      const data = await response.json();
+      const price = data?.retailPrice || data?.price;
+
+      if (price) {
+        setFuelPrice(String(price));
+        toast.success(`Fetched live ${selectedFuel} price: ₹${price}`);
+      } else {
         fallbackPrices(selectedFuel);
+      }
+    } catch (err) {
+      console.error("Fuel API Error:", err);
+      fallbackPrices(selectedFuel);
     } finally {
-        setPriceLoading(false);
+      setPriceLoading(false);
     }
   };
 
   const fallbackPrices = (fType: string) => {
-      let price = "102";
-      if (fType.toLowerCase() === "diesel") price = "94";
-      if (fType.toLowerCase() === "cng") price = "85";
-      setFuelPrice(price);
-      toast.error("Live fetch failed. Using standard estimate.");
+    let price = "102";
+    if (fType.toLowerCase() === "diesel") price = "94";
+    if (fType.toLowerCase() === "cng") price = "85";
+    setFuelPrice(price);
+    toast.error("Live fetch failed. Using standard estimate.");
   };
 
   const onBrandChange = async (value: string) => {
@@ -139,8 +139,8 @@ const FuelEstimator = () => {
   };
 
   const onFuelChange = (val: string) => {
-      setFuelType(val);
-      fetchLiveFuelPrice(val);
+    setFuelType(val);
+    fetchLiveFuelPrice(val);
   };
 
   const fetchMileage = async () => {
@@ -166,12 +166,12 @@ const FuelEstimator = () => {
   const onSearch = async () => {
     let m = mileage;
     if (!m) m = await fetchMileage();
-    
+
     if (m && distanceKm && fuelPrice) {
       const km = parseFloat(distanceKm);
       const price = parseFloat(fuelPrice);
       if (!isNaN(km) && !isNaN(price) && m > 0) {
-        const unitsNeeded = km / m; 
+        const unitsNeeded = km / m;
         const total = unitsNeeded * price;
         setCost(parseFloat(total.toFixed(2)));
       }
@@ -283,10 +283,10 @@ const FuelEstimator = () => {
 
                 <div className="space-y-2">
                   <Label htmlFor="city">City (for rates)</Label>
-                  <Input 
-                    id="city" 
-                    value={city} 
-                    onChange={(e) => setCity(e.target.value)} 
+                  <Input
+                    id="city"
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
                     placeholder="e.g. Chennai"
                   />
                 </div>
@@ -298,18 +298,18 @@ const FuelEstimator = () => {
                   {/* ✨ Locked/Auto-filled Distance Input */}
                   <div className="relative">
                     <Input
-                        id="distance"
-                        type="number"
-                        placeholder="500"
-                        value={distanceKm}
-                        onChange={(e) => setDistanceKm(e.target.value)}
-                        readOnly={isDistanceLocked}
-                        className={isDistanceLocked ? "pr-8 bg-muted text-muted-foreground cursor-not-allowed border-primary/20" : ""}
+                      id="distance"
+                      type="number"
+                      placeholder="500"
+                      value={distanceKm}
+                      onChange={(e) => setDistanceKm(e.target.value)}
+                      readOnly={isDistanceLocked}
+                      className={isDistanceLocked ? "pr-8 bg-muted text-muted-foreground cursor-not-allowed border-primary/20" : ""}
                     />
                     {isDistanceLocked && (
-                        <div className="absolute right-3 top-2.5 text-muted-foreground text-xs">
-                            <Lock className="w-3 h-3" />
-                        </div>
+                      <div className="absolute right-3 top-2.5 text-muted-foreground text-xs">
+                        <Lock className="w-3 h-3" />
+                      </div>
                     )}
                   </div>
                 </div>
@@ -317,21 +317,21 @@ const FuelEstimator = () => {
                 <div className="space-y-2">
                   <Label htmlFor="price" className="flex items-center justify-between">
                     <span>
-                        {fuelType === 'Electric' ? 'Cost per kWh' : 'Price / Litre'}
+                      {fuelType === 'Electric' ? 'Cost per kWh' : 'Price / Litre'}
                     </span>
                     {priceLoading && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
                   </Label>
                   <div className="relative">
                     <Input
-                        id="price"
-                        type="number"
-                        placeholder={priceLoading ? "Fetching..." : "Auto-filled"}
-                        value={fuelPrice}
-                        readOnly 
-                        className="pr-8 bg-muted text-muted-foreground cursor-not-allowed border-primary/20"
+                      id="price"
+                      type="number"
+                      placeholder={priceLoading ? "Fetching..." : "Auto-filled"}
+                      value={fuelPrice}
+                      readOnly
+                      className="pr-8 bg-muted text-muted-foreground cursor-not-allowed border-primary/20"
                     />
                     <div className="absolute right-3 top-2.5 text-muted-foreground text-xs">
-                        {priceLoading ? "" : <Lock className="w-3 h-3" />}
+                      {priceLoading ? "" : <Lock className="w-3 h-3" />}
                     </div>
                   </div>
                 </div>
@@ -367,13 +367,13 @@ const FuelEstimator = () => {
             <CardContent className="space-y-4">
               <div className="p-4 bg-muted/50 rounded-lg flex items-center justify-between">
                 <span className="font-medium">
-                    {fuelType === 'Electric' ? 'Range / Efficiency' : 'Mileage'}
+                  {fuelType === 'Electric' ? 'Range / Efficiency' : 'Mileage'}
                 </span>
                 <span className="text-lg font-bold">
                   {mileage ? `${mileage} ${fuelType === 'Electric' ? 'km/kWh' : 'km/l'}` : "—"}
                 </span>
               </div>
-              
+
               <div className="p-4 bg-muted/50 rounded-lg flex items-center justify-between">
                 <span className="font-medium">Fuel Rate Used</span>
                 <span className="text-lg font-bold">

@@ -11,7 +11,7 @@ import {
   updateProfile,
   getAdditionalUserInfo, 
   deleteUser,
-  sendPasswordResetEmail // ✨ Added for password reset
+  sendPasswordResetEmail 
 } from 'firebase/auth';
 import { auth, googleProvider } from '../firebase'; 
 
@@ -28,8 +28,6 @@ const GoogleIcon = () => (
 const Login: React.FC = () => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
-  
-  // ✨ New State for Forgot Password View
   const [isForgotPassword, setIsForgotPassword] = useState(false);
 
   const navigate = useNavigate();
@@ -40,7 +38,7 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState("");
   
   const [error, setError] = useState("");
-  const [successMessage, setSuccessMessage] = useState(""); // For "Email sent" msg
+  const [successMessage, setSuccessMessage] = useState(""); 
   
   const [showErrorModal, setShowErrorModal] = useState(false);
 
@@ -51,7 +49,7 @@ const Login: React.FC = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  // --- 1. SIGN UP ---
+  // --- HANDLERS (Unchanged logic) ---
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(""); 
@@ -67,7 +65,6 @@ const Login: React.FC = () => {
     }
   };
 
-  // --- 2. LOG IN ---
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -81,7 +78,6 @@ const Login: React.FC = () => {
     }
   };
 
-  // --- 3. GOOGLE AUTH ---
   const handleGoogleAuth = async (mode: 'login' | 'signup') => {
     setError("");
     try {
@@ -101,35 +97,30 @@ const Login: React.FC = () => {
     }
   };
 
-  // --- 4. ✨ HANDLE PASSWORD RESET ---
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccessMessage("");
-
     if (!email) {
       setError("Please enter your email address.");
       return;
     }
-
     try {
-      // Firebase sends a link. If you need OTP specifically, you need a custom backend function.
       await sendPasswordResetEmail(auth, email);
       setSuccessMessage("Password reset link sent! Check your inbox.");
     } catch (err: any) {
-      console.error(err);
       if (err.code === 'auth/user-not-found') setError("No account found with this email.");
       else setError("Failed to send reset email. Try again.");
     }
   };
 
   return (
-    <div className="relative flex h-screen w-full items-center justify-center overflow-hidden font-['Poppins']">
+    <div className="relative flex min-h-[100dvh] w-full items-center justify-center overflow-hidden font-['Poppins'] bg-[#1a3c35]">
       
       {/* Background */}
       <div className="absolute inset-0 z-0">
-        <img src={bgImage} alt="Background" className="h-full w-full object-cover blur-md scale-110" />
-        <div className="absolute inset-0 bg-black/10" />
+        <img src={bgImage} alt="Background" className="h-full w-full object-cover blur-md scale-110 opacity-60" />
+        <div className="absolute inset-0 bg-black/20" />
       </div>
 
       {/* Shutter Animation */}
@@ -141,12 +132,28 @@ const Login: React.FC = () => {
       </div>
 
       {/* --- MAIN CARD --- */}
-      <div className={`relative z-10 w-[1000px] max-w-[90%] h-[650px] bg-white rounded-[30px] shadow-[0_20px_60px_rgba(26,60,53,0.15)] overflow-hidden transition-all duration-1000 delay-[400ms] ease-out ${isLoaded ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-[100px] scale-95 opacity-0'}`}>
+      {/* Responsive Changes:
+          1. h-auto instead of fixed h-[650px]
+          2. min-h-[500px] to ensure it looks good on mobile
+          3. w-full max-w-md on mobile, expanding to w-[1000px] on desktop
+          4. Added flex-col-reverse for mobile (so form is always visible)
+      */}
+      <div className={`
+        relative z-10 bg-white shadow-2xl overflow-hidden transition-all duration-1000 delay-[400ms] ease-out
+        w-[90%] max-w-md md:max-w-[1000px] 
+        min-h-[550px] md:h-[650px]
+        rounded-2xl md:rounded-[30px]
+        flex flex-col md:block
+        ${isLoaded ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-[100px] scale-95 opacity-0'}
+      `}>
 
-        {/* --- FORM 1: SIGN UP (Left Panel) --- */}
-        <div className={`absolute top-0 left-0 h-full w-1/2 flex flex-col justify-center p-12 transition-all duration-700 ease-in-out bg-white ${isSignUp ? 'translate-x-full opacity-100 z-50' : 'opacity-0 z-10'}`}>
+        {/* --- FORM 1: SIGN UP (Desktop Left Panel / Mobile Full) --- */}
+        <div className={`
+          md:absolute md:top-0 md:left-0 md:h-full md:w-1/2 flex flex-col justify-center p-8 md:p-12 transition-all duration-700 ease-in-out bg-white
+          ${isSignUp ? 'md:translate-x-full opacity-100 z-50' : 'hidden md:flex md:opacity-0 md:z-10'}
+        `}>
           <div className="mb-6">
-            <h1 className="text-3xl font-bold text-[#1a3c35] mb-2">Create Account</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-[#1a3c35] mb-2">Create Account</h1>
             <p className="text-sm text-[#889898]">Join us for a sustainable future.</p>
           </div>
           <form className="flex flex-col gap-4" onSubmit={handleSignUp}>
@@ -169,6 +176,16 @@ const Login: React.FC = () => {
               Sign Up <ArrowRight className="h-4 w-4" />
             </button>
             
+            {/* Mobile Only Switch Link */}
+            <div className="mt-4 text-center md:hidden">
+              <p className="text-sm text-gray-600">
+                Already have an account?{' '}
+                <button type="button" onClick={() => setIsSignUp(false)} className="font-bold text-[#2ecc71]">
+                  Log In
+                </button>
+              </p>
+            </div>
+
             <div className="relative flex items-center justify-center my-2">
                 <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-200"></span></div>
                 <div className="relative bg-white px-2 text-xs text-gray-400 uppercase">Or</div>
@@ -180,19 +197,20 @@ const Login: React.FC = () => {
           </form>
         </div>
 
-        {/* --- FORM 2 & 3: LOG IN / FORGOT PASSWORD (Right Panel Container) --- */}
-        <div className={`absolute top-0 left-0 h-full w-1/2 flex flex-col justify-center p-12 transition-all duration-700 ease-in-out bg-white ${isSignUp ? 'translate-x-full opacity-0' : 'opacity-100 z-20'}`}>
-          
-          {/* ✨ CONDITIONAL RENDERING: LOGIN vs FORGOT PASSWORD */}
+        {/* --- FORM 2 & 3: LOG IN / FORGOT PASSWORD (Desktop Right / Mobile Full) --- */}
+        <div className={`
+          md:absolute md:top-0 md:left-0 md:h-full md:w-1/2 flex flex-col justify-center p-8 md:p-12 transition-all duration-700 ease-in-out bg-white
+          ${isSignUp ? 'md:translate-x-full hidden md:flex md:opacity-0' : 'opacity-100 z-20'}
+        `}>
           
           {!isForgotPassword ? (
             // --- VIEW A: NORMAL LOGIN ---
             <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-              <div className="mb-8">
-                <h1 className="text-3xl font-bold text-[#1a3c35] mb-2">Welcome Back</h1>
+              <div className="mb-6 md:mb-8">
+                <h1 className="text-2xl md:text-3xl font-bold text-[#1a3c35] mb-2">Welcome Back</h1>
                 <p className="text-sm text-[#889898]">Please enter your details to sign in.</p>
               </div>
-              <form className="flex flex-col gap-5" onSubmit={handleLogin}>
+              <form className="flex flex-col gap-4 md:gap-5" onSubmit={handleLogin}>
                 <div className="relative">
                   <input type="email" placeholder="Email Address" className="peer w-full rounded-xl border-2 border-transparent bg-[#f7f9f8] px-5 py-3 pl-12 text-sm text-[#1a3c35] outline-none transition-all focus:border-[#2ecc71] focus:bg-white" required value={email} onChange={(e) => setEmail(e.target.value)} />
                   <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#aebdbb] transition-colors peer-focus:text-[#2ecc71]" />
@@ -207,6 +225,16 @@ const Login: React.FC = () => {
                 <button className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-[#2ecc71] py-3 text-base font-semibold text-white shadow-lg hover:bg-[#219150] transition-all active:scale-95">
                   Log In <ArrowRight className="h-4 w-4" />
                 </button>
+
+                {/* Mobile Only Switch Link */}
+                <div className="mt-2 text-center md:hidden">
+                  <p className="text-sm text-gray-600">
+                    Don't have an account?{' '}
+                    <button type="button" onClick={() => setIsSignUp(true)} className="font-bold text-[#2ecc71]">
+                      Sign Up
+                    </button>
+                  </p>
+                </div>
 
                 <div className="relative flex items-center justify-center my-1">
                     <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-gray-200"></span></div>
@@ -225,13 +253,13 @@ const Login: React.FC = () => {
               </form>
             </div>
           ) : (
-            // --- VIEW B: FORGOT PASSWORD (Swapped in place) ---
+            // --- VIEW B: FORGOT PASSWORD ---
             <div className="animate-in fade-in slide-in-from-right-8 duration-500">
               <div className="mb-8">
                 <button onClick={() => { setIsForgotPassword(false); setError(""); setSuccessMessage(""); }} className="mb-4 flex items-center gap-1 text-xs font-semibold text-[#889898] hover:text-[#1a3c35] transition-colors">
                   <ArrowLeft className="h-4 w-4" /> Back to Login
                 </button>
-                <h1 className="text-3xl font-bold text-[#1a3c35] mb-2">Reset Password</h1>
+                <h1 className="text-2xl md:text-3xl font-bold text-[#1a3c35] mb-2">Reset Password</h1>
                 <p className="text-sm text-[#889898]">Enter your registered email to receive a reset link.</p>
               </div>
               
@@ -248,7 +276,6 @@ const Login: React.FC = () => {
                   <Mail className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#aebdbb] transition-colors peer-focus:text-[#2ecc71]" />
                 </div>
 
-                {/* Status Messages */}
                 {error && <p className="text-xs text-red-500 text-center">{error}</p>}
                 {successMessage && <p className="text-xs text-green-600 font-medium text-center">{successMessage}</p>}
 
@@ -258,11 +285,13 @@ const Login: React.FC = () => {
               </form>
             </div>
           )}
-
         </div>
 
-        {/* --- OVERLAY SLIDER --- */}
-        <div className={`absolute top-0 left-1/2 w-1/2 h-full overflow-hidden transition-transform duration-700 ease-in-out z-[100] ${isSignUp ? '-translate-x-full rounded-r-[30px]' : 'rounded-l-[30px]'}`}>
+        {/* --- OVERLAY SLIDER (HIDDEN ON MOBILE) --- */}
+        <div className={`
+          hidden md:block absolute top-0 left-1/2 w-1/2 h-full overflow-hidden transition-transform duration-700 ease-in-out z-[100] 
+          ${isSignUp ? '-translate-x-full rounded-r-[30px]' : 'rounded-l-[30px]'}
+        `}>
           <div className={`relative -left-full h-full w-[200%] bg-[#1a3c35] text-white transition-transform duration-700 ease-in-out ${isSignUp ? 'translate-x-1/2' : 'translate-x-0'}`}>
             <div className="absolute inset-0 z-0 opacity-40">
                <img src={bgImage} alt="Overlay" className="h-full w-full object-cover" />
