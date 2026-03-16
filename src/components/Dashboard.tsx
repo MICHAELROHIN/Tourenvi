@@ -1,10 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
-import { MapPin, Calendar, Bookmark, Target, Clock, Sparkles, Route as RouteIcon } from "lucide-react";
+import {
+  MapPin,
+  Calendar,
+  Bookmark,
+  Target,
+  Clock,
+  Sparkles,
+  Route as RouteIcon,
+} from "lucide-react";
 
 interface SavedRoute {
   id: string;
@@ -22,8 +36,18 @@ interface LastTripSummary {
 }
 
 const sampleRoutes: SavedRoute[] = [
-  { id: "1", origin: "Chennai", destination: "Madurai", savedAt: new Date().toISOString() },
-  { id: "2", origin: "Bengaluru", destination: "Coimbatore", savedAt: new Date(Date.now() - 86400000).toISOString() },
+  {
+    id: "1",
+    origin: "Chennai",
+    destination: "Madurai",
+    savedAt: new Date().toISOString(),
+  },
+  {
+    id: "2",
+    origin: "Bengaluru",
+    destination: "Coimbatore",
+    savedAt: new Date(Date.now() - 86400000).toISOString(),
+  },
 ];
 
 const Dashboard = () => {
@@ -32,10 +56,20 @@ const Dashboard = () => {
 
   useEffect(() => {
     try {
-      const storedRoutes = JSON.parse(localStorage.getItem("savedRoutes") || "null");
-      const storedLast = JSON.parse(localStorage.getItem("lastTripResults") || "null");
-      setRoutes(Array.isArray(storedRoutes) && storedRoutes.length ? storedRoutes : sampleRoutes);
-      setLastTrip(storedLast && typeof storedLast === "object" ? storedLast : null);
+      const storedRoutes = JSON.parse(
+        localStorage.getItem("savedRoutes") || "null",
+      );
+      const storedLast = JSON.parse(
+        localStorage.getItem("lastTripResults") || "null",
+      );
+      setRoutes(
+        Array.isArray(storedRoutes) && storedRoutes.length
+          ? storedRoutes
+          : sampleRoutes,
+      );
+      setLastTrip(
+        storedLast && typeof storedLast === "object" ? storedLast : null,
+      );
     } catch {
       setRoutes(sampleRoutes);
       setLastTrip(null);
@@ -60,11 +94,17 @@ const Dashboard = () => {
         <div className="text-center mb-12">
           <div className="inline-flex items-center space-x-2 bg-accent/10 rounded-full px-4 py-2 mb-4">
             <Sparkles className="w-4 h-4 text-accent" />
-            <span className="text-sm font-medium text-accent">Your Travel Dashboard</span>
+            <span className="text-sm font-medium text-accent">
+              Your Travel Dashboard
+            </span>
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">Plan, Save and Resume</h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">Quick access to your routes, recent costs, and handy actions.</p>
-        </div>  
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+            Plan, Save and Resume
+          </h2>
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Quick access to your routes, recent costs, and handy actions.
+          </p>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {/* Overview */}
@@ -78,24 +118,43 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Budget progress</span>
+                <span className="text-sm text-muted-foreground">
+                  Budget progress
+                </span>
                 <span className="text-sm font-medium">{budgetProgress}%</span>
               </div>
               <Progress value={budgetProgress} />
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-xs text-muted-foreground">Last total</p>
-                  <p className="text-lg font-semibold">${lastTrip?.totalCost ?? "—"}</p>
+                  <p className="text-lg font-semibold">
+                    ${lastTrip?.totalCost ?? "—"}
+                  </p>
                 </div>
                 <div className="p-3 rounded-lg bg-muted/50">
                   <p className="text-xs text-muted-foreground">CO₂</p>
-                  <p className="text-lg font-semibold">{lastTrip?.carbonFootprint ? `${lastTrip.carbonFootprint} kg` : "—"}</p>
+                  <p className="text-lg font-semibold">
+                    {lastTrip?.carbonFootprint
+                      ? `${lastTrip.carbonFootprint} kg`
+                      : "—"}
+                  </p>
                 </div>
               </div>
               <Separator />
               <div className="flex gap-2 flex-wrap">
-                <Button size="sm" onClick={() => window.location.assign('#calculator')}>Open Calculator</Button>
-                <Button size="sm" variant="outline" onClick={() => window.location.assign('#routes')}>Plan Route</Button>
+                <Button
+                  size="sm"
+                  onClick={() => window.location.assign("#calculator")}
+                >
+                  Open Calculator
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.location.assign("#routes")}
+                >
+                  Plan Route
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -107,11 +166,16 @@ const Dashboard = () => {
                 <RouteIcon className="w-5 h-5 text-primary" />
                 <span>Saved Routes</span>
               </CardTitle>
-              <CardDescription>Your recent and favorite directions</CardDescription>
+              <CardDescription>
+                Your recent and favorite directions
+              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {routes.map((r) => (
-                <div key={r.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                <div
+                  key={r.id}
+                  className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+                >
                   <div className="flex items-center gap-3">
                     <Badge variant="secondary">#{r.id}</Badge>
                     <div>
@@ -122,21 +186,41 @@ const Dashboard = () => {
                         {r.destination}
                       </p>
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Calendar className="w-3 h-3" /> {new Date(r.savedAt).toLocaleString()}
+                        <Calendar className="w-3 h-3" />{" "}
+                        {new Date(r.savedAt).toLocaleString()}
                       </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button size="sm" variant="outline" onClick={() => openInMaps(r.origin, r.destination)}>Open Maps</Button>
-                    <Button size="sm" onClick={() => {
-                      localStorage.setItem('draftRoute', JSON.stringify({ origin: r.origin, destination: r.destination }));
-                      window.location.assign('#routes');
-                    }}>Load</Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => openInMaps(r.origin, r.destination)}
+                    >
+                      Open Maps
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        localStorage.setItem(
+                          "draftRoute",
+                          JSON.stringify({
+                            origin: r.origin,
+                            destination: r.destination,
+                          }),
+                        );
+                        window.location.assign("#routes");
+                      }}
+                    >
+                      Load
+                    </Button>
                   </div>
                 </div>
               ))}
               {routes.length === 0 && (
-                <p className="text-sm text-muted-foreground">No routes yet. Plan your first route and save it.</p>
+                <p className="text-sm text-muted-foreground">
+                  No routes yet. Plan your first route and save it.
+                </p>
               )}
             </CardContent>
           </Card>
@@ -152,10 +236,38 @@ const Dashboard = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Button variant="outline" onClick={() => window.location.assign('#calculator')} className="justify-start"><Clock className="w-4 h-4 mr-2"/>Estimate Costs</Button>
-                <Button variant="outline" onClick={() => window.location.assign('#routes')} className="justify-start"><MapPin className="w-4 h-4 mr-2"/>New Route</Button>
-                <Button variant="outline" onClick={() => window.location.assign('#sustainability')} className="justify-start"><Target className="w-4 h-4 mr-2"/>Eco Insights</Button>
-                <Button variant="outline" onClick={() => window.location.assign('#locgenie')} className="justify-start"><Sparkles className="w-4 h-4 mr-2"/>Destination Genie</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.assign("#calculator")}
+                  className="justify-start"
+                >
+                  <Clock className="w-4 h-4 mr-2" />
+                  Estimate Costs
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.assign("#routes")}
+                  className="justify-start"
+                >
+                  <MapPin className="w-4 h-4 mr-2" />
+                  New Route
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.assign("#sustainability")}
+                  className="justify-start"
+                >
+                  <Target className="w-4 h-4 mr-2" />
+                  Eco Insights
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => window.location.assign("#locgenie")}
+                  className="justify-start"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Destination Genie
+                </Button>
               </div>
             </CardContent>
           </Card>

@@ -18,9 +18,8 @@ import {
 import { cn } from "@/lib/utils";
 
 // --- FIREBASE IMPORTS ---
-import { auth } from "@/firebase";
+import { auth, logout } from "@/firebase";
 import {
-  signOut,
   deleteUser,
   onAuthStateChanged,
   User as FirebaseUser,
@@ -77,18 +76,16 @@ const Navigation = () => {
   }, [isOpen]);
 
   const navItems = [
-    { icon: MapPin, label: "Route Planner", href: "/route-planner" },
-    { icon: Leaf, label: "Eco Insights", href: "/#sustainability" },
-    { icon: BarChart3, label: "Dashboard", href: "/#dashboard" },
-    { icon: Sparkles, label: "Destination Genie", href: "/destination-genie" },
-    { icon: Calculator, label: "Fuel Estimator", href: "/fuel-estimator" },
+    { icon: MapPin, label: "Route Planner", href: "/map" },
+    { icon: BarChart3, label: "Dashboard", href: "/dashboard" },
+    { icon: Sparkles, label: "Attractions", href: "/attractions" },
+    { icon: Calculator, label: "Trip Builder", href: "/trip/new" },
     { icon: MessageSquare, label: "AI Assistant", href: "/chatAI" },
   ];
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
-      localStorage.removeItem("isAuthenticated");
+      await logout();
       navigate("/login");
     } catch (error) {
       console.error("Error signing out:", error);
@@ -107,7 +104,7 @@ const Navigation = () => {
       setIsDeleteModalOpen(false);
       if (error.code === "auth/requires-recent-login") {
         alert(
-          "Security Check: Please Sign Out and Log In again before deleting your account."
+          "Security Check: Please Sign Out and Log In again before deleting your account.",
         );
       } else {
         alert("Failed to delete account. Please try again.");
@@ -117,7 +114,8 @@ const Navigation = () => {
 
   // Check if a nav item is active
   const isActive = (href: string) => {
-    if (href.startsWith("/#")) return location.pathname === "/" && location.hash === href.slice(1);
+    if (href.startsWith("/#"))
+      return location.pathname === "/" && location.hash === href.slice(1);
     return location.pathname === href;
   };
 
@@ -146,7 +144,7 @@ const Navigation = () => {
                     "flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200",
                     isActive(item.href)
                       ? "text-primary bg-primary/10"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted",
                   )}
                 >
                   <item.icon className="w-4 h-4 shrink-0" />
@@ -248,7 +246,7 @@ const Navigation = () => {
       <div
         className={cn(
           "fixed top-0 right-0 z-50 h-full w-[280px] sm:w-[320px] bg-background shadow-2xl border-l border-border lg:hidden transition-transform duration-300 ease-in-out",
-          isOpen ? "translate-x-0" : "translate-x-full"
+          isOpen ? "translate-x-0" : "translate-x-full",
         )}
       >
         {/* Mobile menu header */}
@@ -309,7 +307,7 @@ const Navigation = () => {
                   "flex items-center space-x-3 px-3 py-3 rounded-lg transition-colors duration-200",
                   isActive(item.href)
                     ? "text-primary bg-primary/10 font-medium"
-                    : "text-foreground hover:bg-muted"
+                    : "text-foreground hover:bg-muted",
                 )}
                 onClick={() => setIsOpen(false)}
               >

@@ -1,258 +1,179 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMemo, useState } from "react";
+import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Calculator, Car, Home, MapPin as Road, Fuel, DollarSign } from "lucide-react";
-
-interface TripData {
-  distance: number;
-  fuelEfficiency: number;
-  fuelPrice: number;
-  accommodationType: string;
-  accommodationNights: number;
-  tollCharges: number;
-  vehicleType: string;
-}
-
-interface ResultData {
-  fuelCost: string;
-  accommodationCost: string;
-  tollCharges: string;
-  totalCost: string;
-  carbonFootprint: string;
-}
+import TollEstimator from "@/components/cost/TollEstimator";
+import { calculateCO2, calculateFoodCost, calculateFuelCost, formatINR, getBudgetLevel } from "@/utils/costUtils";
+import { auth, db } from "@/firebase";
+import { useTrip } from "@/context/TripContext";
 
 const TripCalculator = () => {
-  const [tripData, setTripData] = useState<TripData>({
-    distance: 0,
-    fuelEfficiency: 25,
-    fuelPrice: 3.5,
-    accommodationType: "hotel",
-    accommodationNights: 2,
-    tollCharges: 0,
-    vehicleType: "gasoline"
-  });
+  const { trip, updateTrip } = useTrip();
+  const [distance, setDistance] = useState(300);
+  const [mileage, setMileage] = useState(15);
+  const [fuelPrice, setFuelPrice] = useState(102);
+  const [hotelCost, setHotelCost] = useState(5000);
+  const [misc, setMisc] = useState(1200);
+  const [vehicleType, setVehicleType] = useState("suv");
+  const [tollCost, setTollCost] = useState(0);
 
-  const [results, setResults] = useState<ResultData | null>(null);
+  const days = useMemo(() => {
+    if (!trip.startDate || !trip.endDate) {
+      return 1;
+    }
+    return Math.max(1, Math.ceil((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86400000));
+  }, [trip.endDate, trip.startDate]);
 
-  const accommodationPrices = {
-    budget: 60,
-    hotel: 120,
-    luxury: 250,
-    camping: 25
-  };
+  const fuelCost = calculateFuelCost(distance, mileage, fuelPrice, 1.15);
+  const foodCost = calculateFoodCost(trip.numberOfMembers || 1, days, 500);
+  const total = fuelCost + tollCost + hotelCost + foodCost + misc;
+  const perPerson = total / Math.max(1, trip.numberOfMembers || 1);
+  const co2kg = calculateCO2(distance, vehicleType as "twoWheeler" | "hatchback" | "sedan" | "suv" | "tempo" | "electric");
+  const budgetLevel = getBudgetLevel(perPerson);
 
-  const calculateTrip = () => {
-    const fuelCost = (tripData.distance / tripData.fuelEfficiency) * tripData.fuelPrice;
-    const accommodationCost = accommodationPrices[tripData.accommodationType as keyof typeof accommodationPrices] * tripData.accommodationNights;
-    const totalCost = fuelCost + accommodationCost + tripData.tollCharges;
-    
-    // Calculate carbon footprint (rough estimation)
-    const carbonFootprint = tripData.vehicleType === 'electric' ? 
-      tripData.distance * 0.1 : // kg CO2 per mile for electric
-      tripData.distance * 0.4;   // kg CO2 per mile for gasoline
+  const saveTrip = async () => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) {
+      return;
+    }
 
-    setResults({
-      fuelCost: fuelCost.toFixed(2),
-      accommodationCost: accommodationCost.toFixed(2),
-      tollCharges: tripData.tollCharges.toFixed(2),
-      totalCost: totalCost.toFixed(2),
-      carbonFootprint: carbonFootprint.toFixed(1)
+    await addDoc(collection(db, "trips"), {
+      userId: uid,
+      tripName: `${trip.startLocation || "My"} Trip`,
+      tripType: trip.tripType,
+      startDate: trip.startDate,
+      endDate: trip.endDate,
+      numberOfDays: days,
+      numberOfMembers: trip.numberOfMembers,
+      startLocation: trip.startLocation,
+      vehicleType,
+      fuelType: trip.fuelType,
+      fuelPrice,
+      mileage,
+      moods: trip.moods,
+      genres: trip.genres,
+      destinations: trip.destinations,
+      itinerary: trip.itinerary,
+      costBreakdown: {
+        fuel: fuelCost,
+        toll: tollCost,
+        hotel: hotelCost,
+        food: foodCost,
+        misc,
+        total,
+        perPerson,
+      },
+      ecoScore: {
+        co2kg,
+        tip: co2kg > 60 ? "Try a rail segment or EV for lower emissions" : "Great eco-friendly profile",
+      },
+      status: "draft",
+      memberIds: [uid],
+      createdAt: serverTimestamp(),
+    });
+
+    localStorage.setItem(
+      "tourenvi.offline.trip",
+      JSON.stringify({
+        tripName: `${trip.startLocation || "My"} Trip`,
+        destinations: trip.destinations,
+        updatedAt: new Date().toISOString(),
+      }),
+    );
+
+    updateTrip("costBreakdown", {
+      fuel: fuelCost,
+      toll: tollCost,
+      hotel: hotelCost,
+      food: foodCost,
+      misc,
+      total,
+      perPerson,
     });
   };
 
   return (
-    <section id="calculator" className="py-20 bg-gradient-card">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center space-x-2 bg-primary/10 rounded-full px-4 py-2 mb-4">
-            <Calculator className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Trip Cost Calculator</span>
-          </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
-            Plan Your Budget with Precision
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Get accurate cost estimates for your trip including fuel, accommodation, and additional expenses.
-          </p>
-        </div>
-
-        <div className={`max-w-6xl mx-auto gap-8 transition-all duration-300 ${results ? 'grid grid-cols-1 lg:grid-cols-2' : 'flex justify-center'}`}>          
-          {/* Input Form */}
-          <Card className={`shadow-card transition-all duration-300 ${!results ? 'w-full max-w-xl' : ''}`}>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Car className="w-5 h-5 text-primary" />
-                <span>Trip Details</span>
-              </CardTitle>
-              <CardDescription>
-                Enter your trip information to get a detailed cost breakdown
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="distance">Distance (miles)</Label>
-                  <Input
-                    id="distance"
-                    type="number"
-                    placeholder="500"
-                    value={tripData.distance || ''}
-                    onChange={(e) => setTripData({...tripData, distance: Number(e.target.value)})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fuel-efficiency">Fuel Efficiency (MPG)</Label>
-                  <Input
-                    id="fuel-efficiency"
-                    type="number"
-                    placeholder="25"
-                    value={tripData.fuelEfficiency || ''}
-                    onChange={(e) => setTripData({...tripData, fuelEfficiency: Number(e.target.value)})}
-                  />
-                </div>
+    <section className="py-8">
+      <div className="grid lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Cost Summary</CardTitle>
+            <CardDescription>Fuel + Toll + Hotel + Food + Misc with eco score.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div>
+                <Label>Distance (km)</Label>
+                <Input type="number" value={distance} onChange={(e) => setDistance(Number(e.target.value || 0))} />
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="fuel-price">Fuel Price ($/gallon)</Label>
-                  <Input
-                    id="fuel-price"
-                    type="number"
-                    step="0.01"
-                    placeholder="3.50"
-                    value={tripData.fuelPrice || ''}
-                    onChange={(e) => setTripData({...tripData, fuelPrice: Number(e.target.value)})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vehicle-type">Vehicle Type</Label>
-                  <Select value={tripData.vehicleType} onValueChange={(value) => setTripData({...tripData, vehicleType: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gasoline">Gasoline</SelectItem>
-                      <SelectItem value="hybrid">Hybrid</SelectItem>
-                      <SelectItem value="electric">Electric</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div>
+                <Label>Mileage (km/l)</Label>
+                <Input type="number" value={mileage} onChange={(e) => setMileage(Number(e.target.value || 0))} />
               </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="accommodation">Accommodation Type</Label>
-                  <Select value={tripData.accommodationType} onValueChange={(value) => setTripData({...tripData, accommodationType: value})}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="budget">Budget Hotel ($60/night)</SelectItem>
-                      <SelectItem value="hotel">Standard Hotel ($120/night)</SelectItem>
-                      <SelectItem value="luxury">Luxury Hotel ($250/night)</SelectItem>
-                      <SelectItem value="camping">Camping ($25/night)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="nights">Number of Stay</Label>
-                  <Input
-                    id="nights"
-                    type="number"
-                    placeholder="2"
-                    value={tripData.accommodationNights || ''}
-                    onChange={(e) => setTripData({...tripData, accommodationNights: Number(e.target.value)})}
-                  />
-                </div>
+              <div>
+                <Label>Fuel Price</Label>
+                <Input type="number" value={fuelPrice} onChange={(e) => setFuelPrice(Number(e.target.value || 0))} />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="tolls">Toll Charges ($)</Label>
-                <Input
-                  id="tolls"
-                  type="number"
-                  placeholder="25"
-                  value={tripData.tollCharges || ''}
-                  onChange={(e) => setTripData({...tripData, tollCharges: Number(e.target.value)})}
-                />
+              <div>
+                <Label>Vehicle Type</Label>
+                <Select value={vehicleType} onValueChange={setVehicleType}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="twoWheeler">Two Wheeler</SelectItem>
+                    <SelectItem value="hatchback">Hatchback</SelectItem>
+                    <SelectItem value="sedan">Sedan</SelectItem>
+                    <SelectItem value="suv">SUV</SelectItem>
+                    <SelectItem value="tempo">Tempo</SelectItem>
+                    <SelectItem value="electric">Electric</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+              <div>
+                <Label>Hotel Cost</Label>
+                <Input type="number" value={hotelCost} onChange={(e) => setHotelCost(Number(e.target.value || 0))} />
+              </div>
+              <div>
+                <Label>Miscellaneous</Label>
+                <Input type="number" value={misc} onChange={(e) => setMisc(Number(e.target.value || 0))} />
+              </div>
+            </div>
 
-              <Button onClick={calculateTrip} className="w-full" size="lg">
-                <Calculator className="w-4 h-4 mr-2" />
-                Calculate Trip Cost
-              </Button>
-            </CardContent>
-          </Card>
+            <TollEstimator
+              startLocation={trip.startLocation}
+              destinations={trip.destinations}
+              vehicleType={vehicleType}
+              onTollComputed={setTollCost}
+            />
 
-          {/* Results */}
-          {results && (
-            <Card className="shadow-card transition-opacity duration-300 animate-in fade-in">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <DollarSign className="w-5 h-5 text-success" />
-                  <span>Cost Breakdown</span>
-                </CardTitle>
-                <CardDescription>
-                  Your detailed trip cost analysis and environmental impact
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Fuel className="w-5 h-5 text-primary" />
-                      <span className="font-medium">Fuel Cost</span>
-                    </div>
-                    <span className="text-lg font-bold">${results.fuelCost}</span>
-                  </div>
+            <Button onClick={saveTrip} className="w-full">Save Trip</Button>
+          </CardContent>
+        </Card>
 
-                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Home className="w-5 h-5 text-accent" />
-                      <span className="font-medium">Accommodation</span>
-                    </div>
-                    <span className="text-lg font-bold">${results.accommodationCost}</span>
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <Road className="w-5 h-5 text-warning" />
-                      <span className="font-medium">Toll Charges</span>
-                    </div>
-                    <span className="text-lg font-bold">${results.tollCharges}</span>
-                  </div>
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between p-6 bg-gradient-sustainability/10 rounded-lg border-2 border-success/20">
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">${results.totalCost}</p>
-                    <p className="text-sm text-muted-foreground">Total Trip Cost</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg font-semibold text-eco-green">{results.carbonFootprint} kg CO₂</p>
-                    <p className="text-sm text-muted-foreground">Carbon Footprint</p>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-eco-green/10 rounded-lg border border-eco-green/20">
-                  <p className="text-sm text-eco-green font-medium mb-2">💚 Eco Tip</p>
-                  <p className="text-sm text-muted-foreground">
-                    {tripData.vehicleType === 'electric' 
-                      ? "Great choice! Electric vehicles significantly reduce your carbon footprint."
-                      : "Consider renting an electric or hybrid vehicle to reduce your environmental impact by up to 60%."
-                    }
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Budget Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <p className="flex justify-between"><span>Fuel</span><span>{formatINR(fuelCost)}</span></p>
+            <p className="flex justify-between"><span>Toll</span><span>{formatINR(tollCost)}</span></p>
+            <p className="flex justify-between"><span>Hotel</span><span>{formatINR(hotelCost)}</span></p>
+            <p className="flex justify-between"><span>Food</span><span>{formatINR(foodCost)}</span></p>
+            <p className="flex justify-between"><span>Misc</span><span>{formatINR(misc)}</span></p>
+            <hr />
+            <p className="flex justify-between font-semibold"><span>Total</span><span>{formatINR(total)}</span></p>
+            <p className="flex justify-between"><span>Per Person</span><span>{formatINR(perPerson)}</span></p>
+            <p className="flex justify-between"><span>Eco Score (CO2)</span><span>{co2kg.toFixed(1)} kg</span></p>
+            <Badge variant={budgetLevel === "budget" ? "secondary" : budgetLevel === "moderate" ? "default" : "destructive"}>
+              {budgetLevel === "budget" ? "Budget" : budgetLevel === "moderate" ? "Moderate" : "High"}
+            </Badge>
+          </CardContent>
+        </Card>
       </div>
     </section>
   );

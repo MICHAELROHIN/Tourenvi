@@ -22,7 +22,7 @@ import {
   MapPin,
   Info,
   ShoppingBag,
-  ShoppingCart // Imported ShoppingCart icon
+  ShoppingCart, // Imported ShoppingCart icon
 } from "lucide-react";
 import {
   Tooltip,
@@ -30,7 +30,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
 
 interface HotelDetails {
   id: string;
@@ -52,6 +51,14 @@ interface CartItem extends HotelDetails {
   checkOut: string;
 }
 
+interface PredictedPrice {
+  perNight: number;
+  totalCost: number;
+  season: string;
+  priceRange: string;
+  tip: string;
+}
+
 const toISODate = (d: Date) => d.toISOString().slice(0, 10);
 
 const Hotels = () => {
@@ -63,6 +70,10 @@ const Hotels = () => {
   const [hotels, setHotels] = useState<HotelDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [predicted, setPredicted] = useState<Record<string, PredictedPrice>>(
+    {},
+  );
+  const [predicting, setPredicting] = useState<Record<string, boolean>>({});
 
   // --- Search Parameters ---
   const today = new Date();
@@ -73,18 +84,18 @@ const Hotels = () => {
   const checkOutParam = searchParams.get("checkOut");
   const isISO = (s: string | null) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
   const [checkInDate, setCheckInDate] = useState(
-    isISO(checkInParam) ? (checkInParam as string) : toISODate(defaultIn)
+    isISO(checkInParam) ? (checkInParam as string) : toISODate(defaultIn),
   );
   const [checkOutDate, setCheckOutDate] = useState(
-    isISO(checkOutParam) ? (checkOutParam as string) : toISODate(defaultOut)
+    isISO(checkOutParam) ? (checkOutParam as string) : toISODate(defaultOut),
   );
   const adultsParam = Number(searchParams.get("adults"));
   const roomsParam = Number(searchParams.get("rooms"));
   const [adults, setAdults] = useState(
-    Number.isFinite(adultsParam) && adultsParam > 0 ? adultsParam : 2
+    Number.isFinite(adultsParam) && adultsParam > 0 ? adultsParam : 2,
   );
   const [rooms, setRooms] = useState(
-    Number.isFinite(roomsParam) && roomsParam > 0 ? roomsParam : 1
+    Number.isFinite(roomsParam) && roomsParam > 0 ? roomsParam : 1,
   );
 
   // --- Fetch Data ---
@@ -102,8 +113,8 @@ const Hotels = () => {
       try {
         const response = await fetch(
           `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/get-hotels?destination=${encodeURIComponent(
-            destination
-          )}`
+            destination,
+          )}`,
         );
         if (!response.ok) {
           const errData = await response.json();
@@ -160,7 +171,7 @@ const Hotels = () => {
 
   const createBookingLink = (hotelName: string) => {
     return `https://www.google.com/search?q=${encodeURIComponent(
-      hotelName + " " + destination + " booking"
+      hotelName + " " + destination + " booking",
     )}`;
   };
 
@@ -182,16 +193,51 @@ const Hotels = () => {
     const existingCart = JSON.parse(localStorage.getItem("tripCart") || "[]");
     localStorage.setItem(
       "tripCart",
-      JSON.stringify([...existingCart, newItem])
+      JSON.stringify([...existingCart, newItem]),
     );
 
-    toast.success(`${hotel.name} added to cart! Redirecting to Route Planner...`);
+    toast.success(
+      `${hotel.name} added to cart! Redirecting to Route Planner...`,
+    );
 
     // ✨ Redirect to Route Planner after 1.5 seconds so user sees the message
     setTimeout(() => {
       // We use window.location.href to ensure it forces a scroll to the hash on the main page
       window.location.href = "/#routes";
     }, 1500);
+  };
+
+  const handleGetPriceEstimate = async (hotel: HotelDetails) => {
+    try {
+      setPredicting((prev) => ({ ...prev, [hotel.id]: true }));
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/api/predict-hotel-cost`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            destination,
+            checkIn: checkInDate,
+            checkOut: checkOutDate,
+            members: adults,
+            budgetType:
+              hotel.price_level && hotel.price_level >= 3
+                ? "luxury"
+                : hotel.price_level === 1
+                  ? "budget"
+                  : "mid",
+          }),
+        },
+      );
+
+      const payload = (await response.json()) as PredictedPrice;
+      setPredicted((prev) => ({ ...prev, [hotel.id]: payload }));
+    } catch (predictErr) {
+      console.error("Prediction failed", predictErr);
+      toast.error("Unable to fetch seasonal estimate");
+    } finally {
+      setPredicting((prev) => ({ ...prev, [hotel.id]: false }));
+    }
   };
 
   return (
@@ -293,7 +339,7 @@ const Hotels = () => {
               </div>
               <div className="flex items-end">
                 <Button
-                  onClick={() => { }}
+                  onClick={() => {}}
                   disabled={true}
                   className="w-full"
                   variant="outline"
@@ -325,6 +371,7 @@ const Hotels = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {hotels.map((hotel) => {
               const priceDetails = getPriceDetails(hotel);
+              const estimate = predicted[hotel.id];
 
               return (
                 <Card
@@ -389,9 +436,46 @@ const Hotels = () => {
                         Per Night ({rooms} {rooms > 1 ? "Rooms" : "Room"},{" "}
                         {adults} {adults > 1 ? "Guests" : "Guest"})
                       </p>
+                      {estimate && (
+                        <div className="mt-2 rounded border border-primary/20 bg-primary/5 p-2">
+                          <p className="text-xs font-semibold text-primary">
+                            Predicted:{" "}
+                            {estimate.totalCost.toLocaleString("en-IN", {
+                              style: "currency",
+                              currency: "INR",
+                            })}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Per night:{" "}
+                            {estimate.perNight.toLocaleString("en-IN", {
+                              style: "currency",
+                              currency: "INR",
+                            })}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Range: {estimate.priceRange}
+                          </p>
+                          <p className="text-xs mt-1">
+                            Seasonal badge:{" "}
+                            <span className="font-semibold">
+                              {estimate.season}
+                            </span>
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        className="flex-1"
+                        onClick={() => handleGetPriceEstimate(hotel)}
+                        disabled={!!predicting[hotel.id]}
+                      >
+                        {predicting[hotel.id]
+                          ? "Estimating..."
+                          : "Get Price Estimate"}
+                      </Button>
                       <Button
                         variant="outline"
                         className="flex-1"

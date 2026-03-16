@@ -15,6 +15,7 @@ import {
   Sun,
   Star,
 } from "lucide-react";
+import { recommendByMoods } from "@/lib/recommender";
 
 interface Vibe {
   id: string;
@@ -272,6 +273,7 @@ const DestinationChooser = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [curatedSuggestions, setCuratedSuggestions] = useState<string[]>([]);
 
   const toggleVibe = (id: string) => {
     setSelectedVibes((prev) =>
@@ -305,27 +307,34 @@ const DestinationChooser = () => {
         .map((id) => vibes.find((v) => v.id === id)?.mood || "")
         .filter(Boolean);
       const uniqueMoods = [...new Set(moodsList)];
+      setCuratedSuggestions(recommendByMoods(uniqueMoods));
 
       try {
-        const response = await fetch(`${API_BASE}/recommend`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ moods: uniqueMoods }),
-        });
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:8000"}/recommend`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ moods: uniqueMoods }),
+          },
+        );
 
         if (!response.ok) throw new Error("Failed to fetch recommendations");
 
         const data = await response.json();
-        setRecommendations(data.recommendations);
-      } catch (err: any) {
-        if (err?.name === "TypeError") {
-          setError(
-            `Cannot connect to recommendation service. Start backend with \"npm run backend\" (API: ${API_BASE}).`
-          );
-        } else {
-          setError("Failed to get recommendations. Please try again.");
-        }
-        console.error("Error fetching recommendations:", err, "API:", `${API_BASE}/recommend`);
+        const merged = [
+          ...new Set([
+            ...(data.recommendations || []),
+            ...recommendByMoods(uniqueMoods),
+          ]),
+        ];
+        setRecommendations(merged);
+      } catch (err) {
+        setError(
+          "Failed to get live recommendations. Showing curated mood picks.",
+        );
+        setRecommendations(recommendByMoods(uniqueMoods));
+        console.error("Error fetching recommendations:", err);
       } finally {
         setIsLoading(false);
       }
@@ -342,10 +351,9 @@ const DestinationChooser = () => {
         detail: { destination: chosenDestination },
       });
       window.dispatchEvent(ev);
-    } catch { }
-    navigate(
-      `/destination-places?destination=${encodeURIComponent(chosenDestination)}`,
-    );
+    } catch {
+    const el = document.querySelector("#get-started") as HTMLElement | null;
+    if (el) el.scrollIntoView({ behavior: "smooth" });
   };
 
   const getVibeTag = (index: number) => {
@@ -394,10 +402,11 @@ const DestinationChooser = () => {
                       <button
                         key={vibe.id}
                         onClick={() => toggleVibe(vibe.id)}
-                        className={`relative rounded-2xl overflow-hidden aspect-[4/3] group transition-all duration-200 outline-none ${isSelected
+                        className={`relative rounded-2xl overflow-hidden aspect-[4/3] group transition-all duration-200 outline-none ${
+                          isSelected
                             ? "ring-[3px] ring-emerald-500 shadow-lg shadow-emerald-500/25"
                             : "ring-1 ring-gray-200 hover:ring-2 hover:ring-emerald-300"
-                          }`}
+                        }`}
                       >
                         <img
                           src={vibe.image}
@@ -461,6 +470,16 @@ const DestinationChooser = () => {
                 {/* Tailored Recommendations */}
                 {recommendations.length > 0 && !isLoading && (
                   <div>
+                    {curatedSuggestions.length > 0 && (
+                      <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                        <p className="text-xs font-semibold text-emerald-700 mb-1">
+                          Mood-based suggestions
+                        </p>
+                        <p className="text-sm text-emerald-900">
+                          {curatedSuggestions.join(", ")}
+                        </p>
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 mb-4">
                       <Globe className="w-4 h-4 text-gray-500" />
                       <span className="text-sm font-semibold text-gray-700">
@@ -509,10 +528,11 @@ const DestinationChooser = () => {
                                 aria-label={`Favorite ${city}`}
                               >
                                 <Heart
-                                  className={`w-4 h-4 transition-colors ${favorites.has(place)
+                                  className={`w-4 h-4 transition-colors ${
+                                    favorites.has(place)
                                       ? "fill-red-500 text-red-500"
                                       : "text-gray-400 hover:text-red-400"
-                                    }`}
+                                  }`}
                                 />
                               </button>
                             </div>
