@@ -397,6 +397,162 @@ app.get("/mileage", (req, res) => {
   res.json({ mileage: match ? match.mileage : null });
 });
 
+const tollRatesPer100km = {
+  twoWheeler: 30,
+  car: 80,
+  suv: 120,
+  tempo: 160,
+};
+
+const knownCorridors = [
+  { key: ["mumbai", "pune"], toll: 300, label: "Mumbai-Pune Corridor" },
+  { key: ["delhi", "jaipur"], toll: 420, label: "Delhi-Jaipur Corridor" },
+  { key: ["chennai", "bangalore"], toll: 380, label: "Chennai-Bangalore Corridor" },
+  { key: ["hyderabad", "bangalore"], toll: 540, label: "Hyderabad-Bangalore Corridor" },
+  { key: ["bangalore", "mysore"], toll: 165, label: "Bangalore-Mysore Corridor" },
+  { key: ["chennai", "pondicherry"], toll: 120, label: "Chennai-Pondicherry Corridor" },
+];
+
+async function geocodeLocation(place) {
+  const geoUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(place)}&limit=1`;
+  const geoResponse = await axios.get(geoUrl, {
+    headers: { "User-Agent": "Tourenvi/1.0 (student-project)" },
+    timeout: 10000,
+  });
+  if (!geoResponse.data || geoResponse.data.length === 0) {
+    throw new Error(`Place not found: ${place}`);
+  }
+  return {
+    lat: Number(geoResponse.data[0].lat),
+    lon: Number(geoResponse.data[0].lon),
+  };
+}
+
+async function getRouteDistanceKm(from, to) {
+  const url = `https://router.project-osrm.org/route/v1/driving/${from.lon},${from.lat};${to.lon},${to.lat}?overview=false`;
+  const routeResponse = await axios.get(url, { timeout: 15000 });
+  const route = routeResponse.data?.routes?.[0];
+  if (!route) {
+    throw new Error("Unable to calculate route distance");
+  }
+  return route.distance / 1000;
+}
+
+app.post("/api/toll-estimate", async (req, res) => {
+  const { startLocation, destinations = [], vehicleType = "car" } = req.body || {};
+
+  if (!startLocation || !Array.isArray(destinations) || destinations.length === 0) {
+    return res.status(400).json({ error: "startLocation and destinations[] are required" });
+  }
+
+  const rate = tollRatesPer100km[vehicleType] || tollRatesPer100km.car;
+  const breakdown = [];
+  let total = 0;
+
+  try {
+    let previous = startLocation;
+    for (const destination of destinations) {
+      const from = await geocodeLocation(previous);
+      const to = await geocodeLocation(destination);
+      const distanceKm = await getRouteDistanceKm(from, to);
+      const toll = Math.round((distanceKm / 100) * rate);
+      breakdown.push({
+        segment: `${previous} -> ${destination}`,
+        distanceKm: Number(distanceKm.toFixed(1)),
+        toll,
+      });
+      total += toll;
+      previous = destination;
+    }
+
+    const routeText = `${startLocation} ${destinations.join(" ")}`.toLowerCase();
+    knownCorridors.forEach((corridor) => {
+      const hit = corridor.key.every((k) => routeText.includes(k));
+      if (hit) {
+        breakdown.push({ segment: corridor.label, distanceKm: 0, toll: corridor.toll });
+        total += corridor.toll;
+      }
+    });
+
+    return res.json({
+      estimatedToll: total,
+      breakdown,
+      disclaimer: "Estimate based on OSRM distance and known corridor toll overrides. Actual toll may vary.",
+    });
+  } catch (error) {
+    return res.status(500).json({ error: error.message || "Unable to estimate toll" });
+  }
+});
+
+const metroCities = ["chennai", "mumbai", "delhi", "hyderabad", "bengaluru", "kolkata", "pune", "jaipur"];
+const hillStations = ["ooty", "manali", "coorg", "munnar", "kodaikanal", "wayanad"];
+const beaches = ["goa", "varkala", "rameswaram", "pondicherry"];
+const pilgrimages = ["varanasi", "tirupati", "shirdi", "madurai"];
+
+function resolveSeasonType(month, destinationType) {
+  if (destinationType === "hill") {
+    if ([10, 11, 12, 1].includes(month)) return { season: "Peak Season", multiplier: 1.5 };
+    if ([4, 5, 6].includes(month)) return { season: "Off Season", multiplier: 0.7 };
+    return { season: "Shoulder", multiplier: 1.0 };
+  }
+  if (destinationType === "beach") {
+    if ([11, 12, 1, 2].includes(month)) return { season: "Peak Season", multiplier: 1.4 };
+    if ([6, 7, 8, 9].includes(month)) return { season: "Off Season", multiplier: 0.8 };
+    return { season: "Shoulder", multiplier: 1.0 };
+  }
+  if (destinationType === "pilgrimage") {
+    if ([10, 11, 12, 1, 2, 3].includes(month)) return { season: "Peak Season", multiplier: 1.3 };
+    return { season: "Shoulder", multiplier: 1.0 };
+  }
+  return { season: "Shoulder", multiplier: 1.0 };
+}
+
+app.post("/api/predict-hotel-cost", (req, res) => {
+  const { destination = "", checkIn, checkOut, members = 2, budgetType = "mid" } = req.body || {};
+  const city = String(destination).toLowerCase();
+
+  let basePrice = 1000;
+  let destinationType = "other";
+  if (metroCities.includes(city)) {
+    basePrice = 2500;
+    destinationType = "metro";
+  } else if (hillStations.includes(city)) {
+    basePrice = 1800;
+    destinationType = "hill";
+  } else if (beaches.includes(city)) {
+    basePrice = 2000;
+    destinationType = "beach";
+  } else if (pilgrimages.includes(city)) {
+    basePrice = 1200;
+    destinationType = "pilgrimage";
+  }
+
+  const checkInDate = checkIn ? new Date(checkIn) : new Date();
+  const checkOutDate = checkOut ? new Date(checkOut) : new Date(checkInDate.getTime() + 86400000);
+  const nights = Math.max(1, Math.ceil((checkOutDate.getTime() - checkInDate.getTime()) / 86400000));
+
+  const seasonInfo = resolveSeasonType(checkInDate.getMonth() + 1, destinationType);
+  const budgetMultiplier = budgetType === "budget" ? 0.5 : budgetType === "luxury" ? 2.5 : 1.0;
+
+  const holidaySpikeMonths = [1, 10, 11, 12];
+  const holidayMultiplier = holidaySpikeMonths.includes(checkInDate.getMonth() + 1) ? 1.2 : 1.0;
+
+  const rooms = Math.max(1, Math.ceil(Number(members) / 2));
+  const perNight = Math.round(basePrice * seasonInfo.multiplier * budgetMultiplier * holidayMultiplier * rooms);
+  const totalCost = perNight * nights;
+
+  return res.json({
+    perNight,
+    totalCost,
+    season: seasonInfo.season,
+    priceRange: `${Math.round(perNight * 0.9)} - ${Math.round(perNight * 1.2)}`,
+    tip:
+      seasonInfo.season === "Peak Season"
+        ? "Book 3-4 weeks early for better rates"
+        : "You can usually find same-week deals in this season",
+  });
+});
+
 // --------------------------- HEALTH CHECK (for Render) ---------------------------
 app.get("/", (req, res) => {
   res.json({ status: "ok", message: "Tourenvi Backend is running!" });
