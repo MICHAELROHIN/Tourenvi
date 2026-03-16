@@ -185,6 +185,7 @@ app.get("/get-hotels", async (req, res) => {
     const geoUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destination)}&limit=1`;
     const geoResponse = await axios.get(geoUrl, {
       headers: { "User-Agent": "Tourenvi/1.0 (student-project)" },
+      timeout: 10000,
     });
 
     if (!geoResponse.data || geoResponse.data.length === 0) {
@@ -208,10 +209,29 @@ app.get("/get-hotels", async (req, res) => {
       out center body 20;
     `;
 
-    const overpassUrl = "https://overpass-api.de/api/interpreter";
-    const overpassResponse = await axios.post(overpassUrl, `data=${encodeURIComponent(overpassQuery)}`, {
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    });
+    // Try primary Overpass server, fallback to secondary
+    let overpassResponse;
+    const overpassServers = [
+      "https://overpass-api.de/api/interpreter",
+      "https://overpass.kumi.systems/api/interpreter",
+    ];
+
+    for (const overpassUrl of overpassServers) {
+      try {
+        overpassResponse = await axios.post(overpassUrl, `data=${encodeURIComponent(overpassQuery)}`, {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          timeout: 30000,
+        });
+        if (overpassResponse.data && overpassResponse.data.elements) break;
+      } catch (e) {
+        console.warn(`Overpass server ${overpassUrl} failed:`, e.message);
+        continue;
+      }
+    }
+
+    if (!overpassResponse || !overpassResponse.data) {
+      return res.status(503).json({ error: "Hotel search is temporarily unavailable. Please try again in a moment." });
+    }
 
     const elements = overpassResponse.data.elements || [];
 
@@ -223,74 +243,87 @@ app.get("/get-hotels", async (req, res) => {
     const hotelPromises = elements
       .filter((el) => el.tags && el.tags.name)
       .slice(0, 20)
-      .map(async (el, index) => {
-        const tags = el.tags;
-        const elLat = el.lat || (el.center && el.center.lat);
-        const elLon = el.lon || (el.center && el.center.lon);
+      .map(async (el) => {
+        try {
+          const tags = el.tags;
+          const elLat = el.lat || (el.center && el.center.lat);
+          const elLon = el.lon || (el.center && el.center.lon);
 
-        // Build address from OSM tags
-        const addrParts = [
-          tags["addr:street"],
-          tags["addr:city"] || tags["addr:suburb"],
-          tags["addr:state"],
-          tags["addr:postcode"],
-        ].filter(Boolean);
-        const address = addrParts.length > 0
-          ? addrParts.join(", ")
-          : `${destination} (${elLat?.toFixed(4)}, ${elLon?.toFixed(4)})`;
+          // Build address from OSM tags
+          const addrParts = [
+            tags["addr:street"],
+            tags["addr:city"] || tags["addr:suburb"],
+            tags["addr:state"],
+            tags["addr:postcode"],
+          ].filter(Boolean);
+          const latStr = elLat ? elLat.toFixed(4) : "?";
+          const lonStr = elLon ? elLon.toFixed(4) : "?";
+          const address = addrParts.length > 0
+            ? addrParts.join(", ")
+            : `${destination} (${latStr}, ${lonStr})`;
 
-        // Generate consistent rating based on the hotel name
-        const nameHash = (tags.name || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-        const stars = tags.stars ? parseFloat(tags.stars) : null;
-        const rating = stars || (3.5 + (nameHash % 15) / 10);
-        const reviewCount = 50 + (nameHash % 450);
+          // Generate consistent rating based on the hotel name
+          const nameHash = (tags.name || "").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+          const stars = tags.stars ? parseFloat(tags.stars) : null;
+          const rating = stars || (3.5 + (nameHash % 15) / 10);
+          const reviewCount = 50 + (nameHash % 450);
 
-        // Determine price level
-        let priceLevel = null;
-        if (stars) {
-          priceLevel = Math.min(4, Math.max(1, Math.round(stars - 1)));
-        } else if (tags.tourism === "resort") {
-          priceLevel = 3;
-        } else if (tags.tourism === "guest_house") {
-          priceLevel = 1;
-        } else {
-          priceLevel = 1 + (nameHash % 3);
+          // Determine price level
+          let priceLevel = null;
+          if (stars) {
+            priceLevel = Math.min(4, Math.max(1, Math.round(stars - 1)));
+          } else if (tags.tourism === "resort") {
+            priceLevel = 3;
+          } else if (tags.tourism === "guest_house") {
+            priceLevel = 1;
+          } else {
+            priceLevel = 1 + (nameHash % 3);
+          }
+
+          // ---- IMAGE RESOLUTION (multi-source) ----
+          let photoUrl = getHotelImage(tags, nameHash, priceLevel);
+
+          // Try Wikidata/Wikipedia only if no direct image
+          try {
+            if (!tags.image && !tags.wikimedia_commons && tags.wikidata) {
+              const wdImage = await resolveWikidataImage(tags.wikidata);
+              if (wdImage) photoUrl = wdImage;
+            }
+            if (!tags.image && !tags.wikimedia_commons && !tags.wikidata && tags.wikipedia) {
+              const wpImage = await resolveWikipediaImage(tags.wikipedia);
+              if (wpImage) photoUrl = wpImage;
+            }
+          } catch (imgErr) {
+            // Image resolution failed, use fallback — already set above
+          }
+
+          return {
+            id: `osm_${el.id}`,
+            name: tags.name,
+            address: address,
+            rating: parseFloat(rating.toFixed(1)),
+            user_ratings_total: reviewCount,
+            phone: tags.phone || tags["contact:phone"] || null,
+            photoUrl: photoUrl,
+            price_level: priceLevel,
+          };
+        } catch (hotelErr) {
+          console.warn("Error processing hotel:", el.tags?.name, hotelErr.message);
+          return null; // Skip this hotel
         }
-
-        // ---- IMAGE RESOLUTION (multi-source) ----
-        let photoUrl = null;
-
-        // Try 1: Direct image from OSM tags or wikimedia_commons
-        photoUrl = getHotelImage(tags, nameHash, priceLevel);
-
-        // Try 2: If hotel has wikidata tag, try to get real photo
-        if (!tags.image && !tags.wikimedia_commons && tags.wikidata) {
-          const wdImage = await resolveWikidataImage(tags.wikidata);
-          if (wdImage) photoUrl = wdImage;
-        }
-
-        // Try 3: If hotel has wikipedia tag, try to get real photo
-        if (!tags.image && !tags.wikimedia_commons && !tags.wikidata && tags.wikipedia) {
-          const wpImage = await resolveWikipediaImage(tags.wikipedia);
-          if (wpImage) photoUrl = wpImage;
-        }
-
-        return {
-          id: `osm_${el.id}`,
-          name: tags.name,
-          address: address,
-          rating: parseFloat(rating.toFixed(1)),
-          user_ratings_total: reviewCount,
-          phone: tags.phone || tags["contact:phone"] || null,
-          photoUrl: photoUrl,
-          price_level: priceLevel,
-        };
       });
 
-    const hotels = await Promise.all(hotelPromises);
+    const allHotels = await Promise.all(hotelPromises);
+    const hotels = allHotels.filter(Boolean); // Remove nulls from failed hotels
+
+    if (hotels.length === 0) {
+      return res.status(404).json({ error: "No hotels found in " + destination });
+    }
+
     res.json({ hotels });
   } catch (error) {
     console.error("Error fetching hotel data:", error.message);
+    console.error("Full error:", error.stack || error);
     res.status(500).json({ error: "Failed to fetch hotel data. Please try again." });
   }
 });
