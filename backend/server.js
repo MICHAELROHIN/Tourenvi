@@ -12,6 +12,405 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const INDIA_TOURISM_DATASET_PATH = path.join(__dirname, "india_tourism_dataset.json");
+
+function loadIndiaTourismDataset(datasetPath) {
+  try {
+    const raw = fs.readFileSync(datasetPath, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      console.warn("india_tourism_dataset.json is not an array.");
+      return [];
+    }
+    return parsed;
+  } catch (error) {
+    console.error("Failed to load india_tourism_dataset.json:", error.message);
+    return [];
+  }
+}
+
+const INDIA_TOURISM_DATASET = loadIndiaTourismDataset(INDIA_TOURISM_DATASET_PATH);
+
+const GENERIC_LOCATION_TOKENS = new Set([
+  "and",
+  "the",
+  "of",
+  "in",
+  "to",
+  "city",
+  "town",
+  "state",
+  "district",
+  "region",
+  "hills",
+  "hill",
+  "valley",
+  "beach",
+  "coast",
+  "lake",
+  "river",
+  "falls",
+  "waterfall",
+  "mountain",
+  "mountains",
+  "park",
+  "fort",
+  "temple",
+  "desert",
+  "island",
+  "route",
+]);
+
+const LEGACY_DESTINATION_ALIASES = {
+  ooty: "Ooty (Udhagamandalam)",
+  mahabalipuram: "Mamallapuram (Mahabalipuram) & Coromandel Heritage Coast",
+  rameswaram: "Rameswaram & Pamban Coast (Sacred Water Walk)",
+  yercaud: "Ooty (Udhagamandalam)",
+  kodaikanal: "Ooty (Udhagamandalam)",
+  valparai: "Ooty (Udhagamandalam)",
+  "kolli hills": "Ooty (Udhagamandalam)",
+  hogenakkal: "Ooty (Udhagamandalam)",
+  chennai: "Mamallapuram (Mahabalipuram) & Coromandel Heritage Coast",
+  madurai: "Tiruvannamalai & Arunachala (Inner Fire Journey)",
+  chettinad: "Tiruvannamalai & Arunachala (Inner Fire Journey)",
+};
+
+function normalizeLookupText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractLookupTokens(rawValue) {
+  const value = String(rawValue || "").trim();
+  if (!value) return [];
+
+  const tokenSet = new Set();
+  const addToken = (candidate) => {
+    const normalized = normalizeLookupText(candidate);
+    if (normalized) tokenSet.add(normalized);
+  };
+
+  addToken(value);
+  addToken(value.replace(/\([^)]*\)/g, " "));
+
+  const bracketMatches = value.match(/\(([^)]+)\)/g) || [];
+  for (const match of bracketMatches) {
+    addToken(match.replace(/[()]/g, ""));
+  }
+
+  for (const piece of value.split(/[,/&|-]/)) {
+    addToken(piece);
+  }
+
+  return Array.from(tokenSet);
+}
+
+function tokenizeMeaningful(value) {
+  return normalizeLookupText(value)
+    .split(" ")
+    .map((token) => token.trim())
+    .filter((token) => token && !GENERIC_LOCATION_TOKENS.has(token));
+}
+
+function buildDestinationTokens(record) {
+  const tokenSet = new Set();
+  const fields = [record.destination_name, record.state, record.district];
+  for (const field of fields) {
+    for (const token of extractLookupTokens(field)) {
+      tokenSet.add(token);
+    }
+  }
+  return Array.from(tokenSet);
+}
+
+const DATASET_MOOD_KEYWORDS = {
+  adventure: ["adventure", "trek", "wildlife", "mountain", "camp", "expedition", "road trip"],
+  relaxation: ["relaxation", "wellness", "beach", "backwater", "spa", "retreat", "nature"],
+  "culture history": ["cultural", "history", "heritage", "spiritual", "pilgrimage", "temple"],
+  scenary: ["scenic", "nature", "photography", "mountain", "hill", "lake", "valley"],
+  "urban life": ["food", "nightlife", "shopping", "urban", "city", "market"],
+  romantic: ["romantic", "honeymoon", "couple", "sunset", "beach", "hill"],
+  "water activity": ["beach", "water", "backwater", "river", "lake", "island", "cruise"],
+};
+
+const INDIA_DESTINATION_INDEX = INDIA_TOURISM_DATASET.map((record) => ({
+  record,
+  tokens: buildDestinationTokens(record),
+  meaningfulTokens: buildDestinationTokens(record).flatMap((token) => tokenizeMeaningful(token)),
+  searchBlob: normalizeLookupText(
+    [
+      ...(Array.isArray(record.trip_types) ? record.trip_types : []),
+      ...(Array.isArray(record.activities_available) ? record.activities_available : []),
+      ...(Array.isArray(record.primary_attractions) ? record.primary_attractions : []),
+      ...(Array.isArray(record.hidden_gems) ? record.hidden_gems : []),
+      record.unique_experiences,
+    ]
+      .filter(Boolean)
+      .join(" ")
+  ),
+}));
+
+function scoreDestinationMatch(query, destinationTokens) {
+  let bestScore = 0;
+
+  for (const token of destinationTokens) {
+    if (!token) continue;
+
+    if (token === query) {
+      bestScore = Math.max(bestScore, 100);
+      continue;
+    }
+
+    if (token.startsWith(query) || query.startsWith(token)) {
+      bestScore = Math.max(bestScore, 90);
+      continue;
+    }
+
+    if (token.includes(query) || query.includes(token)) {
+      bestScore = Math.max(bestScore, 75);
+      continue;
+    }
+
+    const queryWords = query.split(" ").filter(Boolean);
+    const tokenWords = new Set(token.split(" ").filter(Boolean));
+    if (queryWords.length === 0) continue;
+
+    let overlap = 0;
+    for (const word of queryWords) {
+      if (tokenWords.has(word)) overlap += 1;
+    }
+
+    if (overlap > 0) {
+      const overlapRatio = overlap / queryWords.length;
+      bestScore = Math.max(bestScore, 40 + overlapRatio * 30);
+    }
+  }
+
+  return bestScore;
+}
+
+function findDestinationInDataset(destination) {
+  const normalizedQuery = normalizeLookupText(destination);
+  if (!normalizedQuery) return null;
+
+  const exactMatch = INDIA_DESTINATION_INDEX.find((item) => {
+    const destinationName = normalizeLookupText(item.record.destination_name);
+    const stateName = normalizeLookupText(item.record.state);
+    return destinationName === normalizedQuery || stateName === normalizedQuery;
+  });
+
+  if (exactMatch) {
+    return {
+      ...exactMatch,
+      score: 100,
+      exactMatch: true,
+    };
+  }
+
+  const aliasTarget = LEGACY_DESTINATION_ALIASES[normalizedQuery];
+  if (aliasTarget) {
+    const normalizedAlias = normalizeLookupText(aliasTarget);
+    const aliasMatch = INDIA_DESTINATION_INDEX.find((item) => {
+      const destinationName = normalizeLookupText(item.record.destination_name);
+      return destinationName === normalizedAlias || item.tokens.includes(normalizedAlias);
+    });
+
+    if (aliasMatch) {
+      return {
+        ...aliasMatch,
+        score: 96,
+        aliasApplied: true,
+      };
+    }
+  }
+
+  let bestMatch = null;
+  for (const item of INDIA_DESTINATION_INDEX) {
+    const score = scoreDestinationMatch(normalizedQuery, item.tokens);
+    if (!bestMatch || score > bestMatch.score) {
+      bestMatch = { ...item, score };
+    }
+  }
+
+  if (!bestMatch || bestMatch.score < 45) return null;
+
+  const queryTokens = tokenizeMeaningful(normalizedQuery);
+  if (queryTokens.length > 0) {
+    const candidateTokenSet = new Set(bestMatch.meaningfulTokens || []);
+    const hasMeaningfulOverlap = queryTokens.some((token) => candidateTokenSet.has(token));
+    if (!hasMeaningfulOverlap && bestMatch.score < 90) {
+      return null;
+    }
+  }
+
+  return bestMatch;
+}
+
+function suggestDestinationsByText(destination, limit = 6) {
+  const normalizedQuery = normalizeLookupText(destination);
+  const meaningfulQueryTokens = tokenizeMeaningful(normalizedQuery);
+
+  const ranked = INDIA_DESTINATION_INDEX.map((item) => {
+    const name = item.record.destination_name || item.record.state;
+    const popularity = Number(item.record.popularity_score) || 0;
+    const score = scoreDestinationMatch(normalizedQuery, item.tokens);
+
+    const overlap = meaningfulQueryTokens.length
+      ? meaningfulQueryTokens.filter((token) => item.meaningfulTokens.includes(token)).length
+      : 0;
+
+    return {
+      name,
+      rankScore: score + overlap * 8 + popularity * 0.3,
+    };
+  }).filter((item) => item.name);
+
+  ranked.sort((a, b) => b.rankScore - a.rankScore || a.name.localeCompare(b.name));
+  return ranked.slice(0, limit).map((item) => item.name);
+}
+
+function scoreDatasetRecommendation(item, normalizedMoods) {
+  let score = Number(item.record.popularity_score) || 0;
+  score = score / 10;
+
+  for (const mood of normalizedMoods) {
+    const keywords = DATASET_MOOD_KEYWORDS[mood] || [mood];
+    let moodScore = 0;
+
+    for (const keyword of keywords) {
+      const normalizedKeyword = normalizeLookupText(keyword);
+      if (!normalizedKeyword) continue;
+
+      const tripTypes = Array.isArray(item.record.trip_types) ? item.record.trip_types : [];
+      const hasTripTypeMatch = tripTypes.some((tripType) => {
+        const normalizedTripType = normalizeLookupText(tripType);
+        return (
+          normalizedTripType.includes(normalizedKeyword) ||
+          normalizedKeyword.includes(normalizedTripType)
+        );
+      });
+
+      if (hasTripTypeMatch) {
+        moodScore = Math.max(moodScore, 1.5);
+      } else if (item.searchBlob.includes(normalizedKeyword)) {
+        moodScore = Math.max(moodScore, 1.0);
+      }
+    }
+
+    score += moodScore;
+  }
+
+  return score;
+}
+
+function recommendDestinationsFromDataset(moods, limit = 6) {
+  if (!INDIA_DESTINATION_INDEX.length) return [];
+
+  const normalizedMoods = Array.isArray(moods)
+    ? moods.map((mood) => normalizeLookupText(mood)).filter(Boolean)
+    : [];
+
+  const ranked = INDIA_DESTINATION_INDEX
+    .map((item) => ({
+      name: item.record.destination_name || item.record.state,
+      score: scoreDatasetRecommendation(item, normalizedMoods),
+      popularity: Number(item.record.popularity_score) || 0,
+    }))
+    .filter((item) => item.name);
+
+  ranked.sort(
+    (a, b) => b.score - a.score || b.popularity - a.popularity || a.name.localeCompare(b.name)
+  );
+
+  return ranked.slice(0, limit).map((item) => item.name);
+}
+
+function buildPlaceEntriesFromDataset(record, limit) {
+  const buckets = [
+    { values: record.primary_attractions, category: "Primary attraction" },
+    { values: record.hidden_gems, category: "Hidden gem" },
+    { values: record.activities_available, category: "Activity" },
+  ];
+
+  const places = [];
+  const seen = new Set();
+
+  for (const bucket of buckets) {
+    const values = Array.isArray(bucket.values) ? bucket.values : [];
+    values.forEach((entry, index) => {
+      const name = String(entry || "").trim();
+      if (!name) return;
+
+      const key = normalizeLookupText(name);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+
+      places.push({
+        id: `dataset_${record.id}_${bucket.category.replace(/\s+/g, "_").toLowerCase()}_${index + 1}`,
+        name,
+        category: bucket.category,
+        openStatus: "Not specified in dataset",
+        operationalStatus: "Not specified in dataset",
+        entryFee: "Not specified in dataset",
+        entryFeeAmount: null,
+        entryFeeCurrency: "INR",
+        source: "india_tourism_dataset",
+      });
+    });
+
+    if (places.length >= limit) break;
+  }
+
+  return places.slice(0, limit);
+}
+
+function buildDestinationMeta(record) {
+  const asRange = (value) => {
+    if (!Array.isArray(value) || value.length < 2) return null;
+    const [min, max] = value;
+    const minNum = Number(min);
+    const maxNum = Number(max);
+    if (!Number.isFinite(minNum) || !Number.isFinite(maxNum)) return null;
+    return [minNum, maxNum];
+  };
+
+  return {
+    destinationName: record.destination_name || null,
+    state: record.state || null,
+    district: record.district || null,
+    region: record.region || null,
+    accessibility: record.accessibility || null,
+    popularityScore: Number(record.popularity_score) || null,
+    bestSeasons: Array.isArray(record.best_seasons) ? record.best_seasons : [],
+    avoidSeasons: Array.isArray(record.avoid_seasons) ? record.avoid_seasons : [],
+    peakTouristSeason: record.peak_tourist_season || null,
+    offSeason: record.off_season || null,
+    minimumDays: Number(record.minimum_days) || null,
+    idealDays: Number(record.ideal_days) || null,
+    maximumDays: Number(record.maximum_days) || null,
+    permitsRequired: Boolean(record.permits_required),
+    permitsDetails: record.permits_details || null,
+    nearestAirport: record.nearest_airport || null,
+    nearestRailwayStation: record.nearest_railway_station || null,
+    nearestMajorCity: record.nearest_major_city || null,
+    budgetDailyRange: asRange(record?.budget_category?.total_daily_range),
+    midDailyRange: asRange(record?.mid_range_category?.total_daily_range),
+    luxuryDailyRange: asRange(record?.luxury_category?.total_daily_range),
+    foodScene: record.food_scene || null,
+    specialConsiderations: record.special_considerations || null,
+    uniqueExperiences: record.unique_experiences || null,
+    suggestedItinerary: record.suggested_itinerary || null,
+    safetyRating: Number(record.safety_rating) || null,
+    safetyNotes: record.safety_notes || null,
+  };
+}
+
 // --------------------------- DESTINATION RECOMMENDER ---------------------------
 const DESTINATION_DATA = [
   { Destination: "Ooty", Adventure_Score: 4, Relaxation_Score: 3, Cultur_Score: 2, Scenic_Score: 5, Urban_Score: 3, Family_Score: 5, Romantic_Score: 4, Water_Activity_Tag: 1 },
@@ -29,10 +428,10 @@ const DESTINATION_DATA = [
 ];
 const FEATURES = ["Adventure_Score", "Relaxation_Score", "Cultur_Score", "Scenic_Score", "Urban_Score", "Family_Score", "Romantic_Score", "Water_Activity_Tag"];
 const moodMap = { "Adventure": "Adventure_Score", "Relaxation": "Relaxation_Score", "Culture/History": "Cultur_Score", "scenary": "Scenic_Score", "Urban Life": "Urban_Score", "Romantic": "Romantic_Score", "Water activity": "Water_Activity_Tag" };
-function createUserVector(moods) {
+function createUserVector(moods = []) {
   let userVec = {};
   FEATURES.forEach(f => userVec[f] = 1);
-  moods.forEach(m => {
+  (Array.isArray(moods) ? moods : []).forEach(m => {
     let key = moodMap[m];
     if (key === "Water_Activity_Tag") userVec[key] = 1;
     else if (key) userVec[key] = 5;
@@ -49,7 +448,14 @@ function cosineSimilarity(a, b) {
   return (magA === 0 || magB === 0) ? 0 : dot / (Math.sqrt(magA) * Math.sqrt(magB));
 }
 app.post("/recommend", (req, res) => {
-  const userVec = createUserVector(req.body.moods);
+  const moods = Array.isArray(req.body?.moods) ? req.body.moods : [];
+
+  if (INDIA_DESTINATION_INDEX.length > 0) {
+    const recommendations = recommendDestinationsFromDataset(moods, 6);
+    return res.json({ recommendations });
+  }
+
+  const userVec = createUserVector(moods);
   const scores = DESTINATION_DATA.map(place => {
     let placeVec = {};
     FEATURES.forEach(f => placeVec[f] = place[f]);
@@ -172,6 +578,49 @@ async function resolveWikipediaImage(wikiTitle) {
   }
   return null;
 }
+
+// --------------------------- DESTINATION PLACES (India Tourism Dataset) ---------------------------
+app.get("/get-destination-places", (req, res) => {
+  const destination = String(req.query.destination || "").trim();
+  const requestedLimit = Number(req.query.limit);
+  const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
+    ? Math.min(500, Math.floor(requestedLimit))
+    : Number.MAX_SAFE_INTEGER;
+
+  if (!destination) {
+    return res.status(400).json({ error: "Destination is required" });
+  }
+
+  if (!INDIA_DESTINATION_INDEX.length) {
+    return res.status(503).json({ error: "Tourism dataset is unavailable." });
+  }
+
+  const match = findDestinationInDataset(destination);
+  if (!match) {
+    return res.status(404).json({
+      error: `No matching destination found in india_tourism_dataset for '${destination}'.`,
+      suggestions: suggestDestinationsByText(destination, 6),
+    });
+  }
+
+  const places = buildPlaceEntriesFromDataset(match.record, limit);
+  if (!places.length) {
+    return res.status(404).json({
+      error: `No places available in india_tourism_dataset for '${match.record.destination_name || destination}'.`,
+    });
+  }
+
+  return res.json({
+    destination,
+    matchedDestination: match.record.destination_name || match.record.state || destination,
+    matchScore: Number(match.score.toFixed(1)),
+    totalPlaces: places.length,
+    source: "india_tourism_dataset",
+    fetchedAt: new Date().toISOString(),
+    destinationMeta: buildDestinationMeta(match.record),
+    places,
+  });
+});
 
 // --------------------------- HOTEL SEARCH (OpenStreetMap - FREE, no API key) ---------------------------
 // Uses Nominatim for geocoding + Overpass API for hotel data + Wikidata/Wikipedia for real images
@@ -329,8 +778,6 @@ app.get("/get-hotels", async (req, res) => {
 });
 
 // --------------------------- FUEL ESTIMATOR (Unchanged) ---------------------------
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const CSV_PATH = path.join(__dirname, "brand_model_fuel_mileage.csv");
 function loadCarsFromCSV(csvPath) {
   try {

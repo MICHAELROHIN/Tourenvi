@@ -15,11 +15,14 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Leaf, MapPin, Calendar as CalendarIcon } from "lucide-react";
+import {
+  Calendar as CalendarIcon,
+  Leaf,
+  MapPin,
+} from "lucide-react";
 import HeroVideo from "./HeroVideo";
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Popover,
   PopoverContent,
@@ -30,6 +33,7 @@ import { format } from "date-fns";
 
 const GetStarted = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [started, setStarted] = useState(false);
   const [travelType, setTravelType] = useState<string>("");
   const [preference, setPreference] = useState<string>("");
@@ -41,17 +45,7 @@ const GetStarted = () => {
   const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
   const [highlightDest, setHighlightDest] = useState(false);
 
-  const onDatesChange = (s: string, e: string) => {
-    setStartDate(s);
-    setEndDate(e);
-    if (s && e) {
-      const sd = new Date(s);
-      const ed = new Date(e);
-      const diff =
-        Math.ceil((ed.getTime() - sd.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      if (!isNaN(diff) && diff > 0) setDays(diff);
-    }
-  };
+  const destinationQuery = destination.trim();
 
   // Update derived values when selecting a range from the calendar
   useEffect(() => {
@@ -87,6 +81,26 @@ const GetStarted = () => {
         handler as any
       );
   }, []);
+
+  // Prefill destination when navigating from the places page.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const fromQuery = (params.get("destination") || "").trim();
+    const fromStorage = (localStorage.getItem("tourenvi:selectedDestination") || "").trim();
+    const chosenDestination = fromQuery || fromStorage;
+
+    if (!chosenDestination) return;
+
+    if (fromQuery) {
+      localStorage.setItem("tourenvi:selectedDestination", chosenDestination);
+    }
+
+    setStarted(true);
+    setDestination(chosenDestination);
+    setHighlightDest(true);
+    const timer = setTimeout(() => setHighlightDest(false), 1200);
+    return () => clearTimeout(timer);
+  }, [location.search]);
 
   return (
     <section id="get-started" className="mt-16 py-10 bg-background">
@@ -271,7 +285,16 @@ const GetStarted = () => {
                       <Input
                         placeholder="Search or enter destination"
                         value={destination}
-                        onChange={(e) => setDestination(e.target.value)}
+                        onChange={(e) => {
+                          const nextValue = e.target.value;
+                          setDestination(nextValue);
+                          if (nextValue.trim()) {
+                            localStorage.setItem(
+                              "tourenvi:selectedDestination",
+                              nextValue.trim()
+                            );
+                          }
+                        }}
                         className={`mt-1 ${
                           highlightDest
                             ? "ring-2 ring-primary/60 transition-shadow"
@@ -283,6 +306,25 @@ const GetStarted = () => {
                           <a href="#locgenie">Choose according to your mood</a>
                         </Button>
                       </div>
+                      <Button
+                        variant="secondary"
+                        className="w-full mt-2"
+                        disabled={!destinationQuery}
+                        onClick={() => {
+                          if (!destinationQuery) return;
+                          localStorage.setItem(
+                            "tourenvi:selectedDestination",
+                            destinationQuery
+                          );
+                          navigate(
+                            `/destination-places?destination=${encodeURIComponent(
+                              destinationQuery
+                            )}`
+                          );
+                        }}
+                      >
+                        View Places From Tourism Dataset
+                      </Button>
                     </div>
 
                     <div>
@@ -292,6 +334,7 @@ const GetStarted = () => {
                           <Button
                             variant="outline"
                             className="w-full justify-start text-left font-normal mt-1"
+                            disabled={!destinationQuery}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
                             {dateRange.from && dateRange.to ? (
@@ -300,7 +343,11 @@ const GetStarted = () => {
                                 {format(dateRange.to, "MMM d, yyyy")}
                               </span>
                             ) : (
-                              <span>Pick a date range</span>
+                              <span>
+                                {!destinationQuery
+                                  ? "Pick destination first"
+                                  : "Pick a date range"}
+                              </span>
                             )}
                           </Button>
                         </PopoverTrigger>

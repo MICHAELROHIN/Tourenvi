@@ -13,6 +13,7 @@ import FuelEstimator from "@/components/FuelEstimator";
 import DestinationChooser from "@/components/DestinationChooser";
 import AIChat from "./pages/AIChat";
 import Login from "./pages/Login";
+import DestinationPlaces from "./pages/DestinationPlaces";
 
 const queryClient = new QueryClient();
 
@@ -91,6 +92,14 @@ const AppContent = () => {
               <DestinationChooser />
             </ProtectedRoute>
           } 
+        />
+        <Route
+          path="/destination-places"
+          element={
+            <ProtectedRoute>
+              <DestinationPlaces />
+            </ProtectedRoute>
+          }
         />
         <Route 
   path="/chatAI" 

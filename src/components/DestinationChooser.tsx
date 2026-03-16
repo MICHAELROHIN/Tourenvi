@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Compass,
   Landmark,
@@ -22,6 +23,8 @@ interface Vibe {
   image: string;
   mood: string;
 }
+
+const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:8000").trim();
 
 const vibes: Vibe[] = [
   {
@@ -263,6 +266,7 @@ const getPlaceImage = (city: string) => {
 };
 
 const DestinationChooser = () => {
+  const navigate = useNavigate();
   const [selectedVibes, setSelectedVibes] = useState<string[]>([]);
   const [recommendations, setRecommendations] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -303,7 +307,7 @@ const DestinationChooser = () => {
       const uniqueMoods = [...new Set(moodsList)];
 
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/recommend`, {
+        const response = await fetch(`${API_BASE}/recommend`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ moods: uniqueMoods }),
@@ -313,9 +317,15 @@ const DestinationChooser = () => {
 
         const data = await response.json();
         setRecommendations(data.recommendations);
-      } catch (err) {
-        setError("Failed to get recommendations. Please try again.");
-        console.error("Error fetching recommendations:", err);
+      } catch (err: any) {
+        if (err?.name === "TypeError") {
+          setError(
+            `Cannot connect to recommendation service. Start backend with \"npm run backend\" (API: ${API_BASE}).`
+          );
+        } else {
+          setError("Failed to get recommendations. Please try again.");
+        }
+        console.error("Error fetching recommendations:", err, "API:", `${API_BASE}/recommend`);
       } finally {
         setIsLoading(false);
       }
@@ -325,14 +335,17 @@ const DestinationChooser = () => {
   }, [selectedVibes]);
 
   const handleDestinationClick = (destination: string) => {
+    const chosenDestination = destination.trim();
     try {
+      localStorage.setItem("tourenvi:selectedDestination", chosenDestination);
       const ev = new CustomEvent("tourenvi:setDestination", {
-        detail: { destination },
+        detail: { destination: chosenDestination },
       });
       window.dispatchEvent(ev);
     } catch { }
-    const el = document.querySelector("#get-started") as HTMLElement | null;
-    if (el) el.scrollIntoView({ behavior: "smooth" });
+    navigate(
+      `/destination-places?destination=${encodeURIComponent(chosenDestination)}`,
+    );
   };
 
   const getVibeTag = (index: number) => {

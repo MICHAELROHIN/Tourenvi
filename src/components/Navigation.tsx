@@ -128,8 +128,8 @@ const Navigation = () => {
           <div className="flex items-center justify-between h-16 w-full">
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-2 shrink-0">
-              <div className="w-8 h-8 bg-gradient-hero rounded-lg flex items-center justify-center">
-                <Leaf className="w-5 h-5 text-primary-foreground" />
+              <div className="w-20 h-20 font-xl flex items-center justify-center">
+                <img src="/Transparent logo.png" alt="TOURENVI" />
               </div>
               <span className="text-xl font-bold text-foreground">
                 TOURENVI
