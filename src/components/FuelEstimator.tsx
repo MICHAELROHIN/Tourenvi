@@ -85,7 +85,10 @@ const FuelEstimator = () => {
         }
       );
 
-      if (!response.ok) throw new Error("API Error");
+      if (!response.ok) {
+        fallbackPrices(selectedFuel);
+        return;
+      }
 
       const data = await response.json();
       const price = data?.retailPrice || data?.price;

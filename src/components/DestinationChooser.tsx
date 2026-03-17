@@ -351,7 +351,7 @@ const DestinationChooser = () => {
         detail: { destination: chosenDestination },
       });
       window.dispatchEvent(ev);
-    } catch {
+    } catch {}
     const el = document.querySelector("#get-started") as HTMLElement | null;
     if (el) el.scrollIntoView({ behavior: "smooth" });
   };

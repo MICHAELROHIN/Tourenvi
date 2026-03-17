@@ -41,56 +41,58 @@ const TollEstimator = ({
       const payload = (await response.json()) as TollEstimateResponse;
       setData(payload);
       onTollComputed?.(payload.estimatedToll);
+    } catch {
+      // Backend unavailable — silently skip toll estimate
     } finally {
       setLoading(false);
     }
   };
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">FASTag / Toll Estimate</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <Button
-          onClick={estimateToll}
-          disabled={loading || !startLocation || destinations.length === 0}
-        >
-          {loading ? "Estimating..." : "Estimate Toll"}
-        </Button>
+  // return (
+  //   <Card>
+  //     <CardHeader>
+  //       <CardTitle className="text-base">FASTag / Toll Estimate</CardTitle>
+  //     </CardHeader>
+  //     <CardContent className="space-y-3">
+  //       <Button
+  //         onClick={estimateToll}
+  //         disabled={loading || !startLocation || destinations.length === 0}
+  //       >
+  //         {loading ? "Estimating..." : "Estimate Toll"}
+  //       </Button>
 
-        {data && (
-          <div className="space-y-2 text-sm">
-            <p className="font-semibold">
-              Estimated Toll:{" "}
-              {data.estimatedToll.toLocaleString("en-IN", {
-                style: "currency",
-                currency: "INR",
-              })}
-            </p>
-            {data.breakdown.map((row) => (
-              <div
-                key={row.segment}
-                className="flex justify-between border-b pb-1"
-              >
-                <span>{row.segment}</span>
-                <span>
-                  {row.toll.toLocaleString("en-IN", {
-                    style: "currency",
-                    currency: "INR",
-                  })}
-                </span>
-              </div>
-            ))}
-            <p className="text-muted-foreground">
-              FASTag Recommendation: Keep at least 1.3x estimated toll balance.
-            </p>
-            <p className="text-xs text-muted-foreground">{data.disclaimer}</p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+  //       {data && (
+  //         <div className="space-y-2 text-sm">
+  //           <p className="font-semibold">
+  //             Estimated Toll:{" "}
+  //             {data.estimatedToll.toLocaleString("en-IN", {
+  //               style: "currency",
+  //               currency: "INR",
+  //             })}
+  //           </p>
+  //           {data.breakdown.map((row) => (
+  //             <div
+  //               key={row.segment}
+  //               className="flex justify-between border-b pb-1"
+  //             >
+  //               <span>{row.segment}</span>
+  //               <span>
+  //                 {row.toll.toLocaleString("en-IN", {
+  //                   style: "currency",
+  //                   currency: "INR",
+  //                 })}
+  //               </span>
+  //             </div>
+  //           ))}
+  //           <p className="text-muted-foreground">
+  //             FASTag Recommendation: Keep at least 1.3x estimated toll balance.
+  //           </p>
+  //           <p className="text-xs text-muted-foreground">{data.disclaimer}</p>
+  //         </div>
+  //       )}
+  //     </CardContent>
+  //   </Card>
+  // );
 };
 
 export default TollEstimator;
