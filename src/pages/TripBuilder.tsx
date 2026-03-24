@@ -7,15 +7,15 @@ import TripTypeStep from "@/components/trip/steps/TripType";
 import MoodSelector from "@/components/trip/steps/MoodSelector";
 import ItineraryBuilder from "@/components/trip/steps/ItineraryBuilder";
 import TripDetails from "@/components/trip/steps/TripDetails";
-import DestinationChooser from "@/components/DestinationChooser";
+import DestinationStep from "@/components/trip/steps/DestinationStep";
 import TripCalculator from "@/components/TripCalculator";
 import { useTrip } from "@/context/TripContext";
 
 const steps = [
   "Trip Type",
-  "Details",
   "Mood",
   "Destination",
+  "Details",
   "Itinerary",
   "Cost Summary",
 ];
@@ -105,7 +105,23 @@ const TripBuilder = () => {
           />
         </TabsContent>
 
-        <TabsContent value="1" className="space-y-4">
+        <TabsContent value="1">
+          <MoodSelector
+            selectedMoods={trip.moods}
+            selectedGenres={trip.genres}
+            onMoodsChange={(moods) => updateTrip("moods", moods)}
+            onGenresChange={(genres) => updateTrip("genres", genres)}
+            onSuggestions={(destinations) =>
+              updateTrip("destinations", destinations)
+            }
+          />
+        </TabsContent>
+
+        <TabsContent value="2">
+          <DestinationStep />
+        </TabsContent>
+
+        <TabsContent value="3" className="space-y-4">
           <div className="grid sm:grid-cols-2 gap-3">
             <Input
               type="date"
@@ -135,22 +151,6 @@ const TripBuilder = () => {
             />
           </div>
           <TripDetails />
-        </TabsContent>
-
-        <TabsContent value="2">
-          <MoodSelector
-            selectedMoods={trip.moods}
-            selectedGenres={trip.genres}
-            onMoodsChange={(moods) => updateTrip("moods", moods)}
-            onGenresChange={(genres) => updateTrip("genres", genres)}
-            onSuggestions={(destinations) =>
-              updateTrip("destinations", destinations)
-            }
-          />
-        </TabsContent>
-
-        <TabsContent value="3">
-          <DestinationChooser />
         </TabsContent>
 
         <TabsContent value="4">

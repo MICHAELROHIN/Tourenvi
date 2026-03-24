@@ -228,6 +228,14 @@ interface VerifiedAttraction {
   lng: number;
 }
 
+type RoutePlannerProps = {
+  initialOrigin?: string;
+  initialDestination?: string;
+  autoPlanOnPrefill?: boolean;
+  hideHeader?: boolean;
+  onRouteComputed?: (data: { distanceKm: number; tollCost: number }) => void;
+};
+
 const dangerZones = [
   {
     name: "Bandipur",
@@ -401,7 +409,13 @@ const FitBounds = ({ coordinates }: { coordinates: [number, number][] }) => {
   return null;
 };
 
-const RoutePlanner = () => {
+const RoutePlanner = ({
+  initialOrigin = "",
+  initialDestination = "",
+  autoPlanOnPrefill = false,
+  hideHeader = false,
+  onRouteComputed,
+}: RoutePlannerProps) => {
   const navigate = useNavigate();
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
@@ -426,6 +440,7 @@ const RoutePlanner = () => {
   >([]);
   const { isOnline, bannerText, cacheTrip } = useOfflineMap();
   const [myLocation, setMyLocation] = useState<[number, number] | null>(null);
+  const lastAutoPlanKey = useRef("");
 
   // Geocode a place name using Nominatim (free, no API key)
   const geocode = async (
@@ -536,6 +551,10 @@ const RoutePlanner = () => {
       };
 
       setRoutes([routeOption]);
+      onRouteComputed?.({
+        distanceKm: Number((bestRoute.distance / 1000).toFixed(1)),
+        tollCost: tollData.cost,
+      });
       cacheTrip({
         tripName: `${originGeo.display.split(",")[0]} to ${destGeo.display.split(",")[0]}`,
         destinations: [destGeo.display.split(",")[0]],
@@ -571,6 +590,30 @@ const RoutePlanner = () => {
     : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
   const defaultCenter: [number, number] = [20.5937, 78.9629];
+
+  useEffect(() => {
+    if (initialOrigin && initialOrigin !== origin) {
+      setOrigin(initialOrigin);
+    }
+  }, [initialOrigin, origin]);
+
+  useEffect(() => {
+    if (initialDestination && initialDestination !== destination) {
+      setDestination(initialDestination);
+    }
+  }, [initialDestination, destination]);
+
+  useEffect(() => {
+    if (!autoPlanOnPrefill) return;
+    const routeKey = `${origin.trim().toLowerCase()}::${destination
+      .trim()
+      .toLowerCase()}`;
+    if (!origin.trim() || !destination.trim()) return;
+    if (routeKey === lastAutoPlanKey.current) return;
+
+    lastAutoPlanKey.current = routeKey;
+    void getDistanceData();
+  }, [autoPlanOnPrefill, destination, origin]);
 
   useEffect(() => {
     const q = query(
@@ -626,24 +669,26 @@ const RoutePlanner = () => {
   return (
     <section id="routes" className="py-20 bg-background">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <Badge
-            variant="outline"
-            className="mb-4 py-1 px-4 border-primary/30 bg-primary/5 text-primary"
-          >
-            <MapPin className="w-3 h-3 mr-2" /> Smart Navigation
-          </Badge>
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Route & Toll Planner
-          </h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Get accurate driving directions and{" "}
-            <span className="text-primary font-semibold">
-              real 2024 toll gate costs
-            </span>
-            .
-          </p>
-        </div>
+        {!hideHeader ? (
+          <div className="text-center mb-12">
+            <Badge
+              variant="outline"
+              className="mb-4 py-1 px-4 border-primary/30 bg-primary/5 text-primary"
+            >
+              <MapPin className="w-3 h-3 mr-2" /> Smart Navigation
+            </Badge>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Route & Toll Planner
+            </h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Get accurate driving directions and{" "}
+              <span className="text-primary font-semibold">
+                real 2024 toll gate costs
+              </span>
+              .
+            </p>
+          </div>
+        ) : null}
 
         <div className="max-w-4xl mx-auto">
           {!isOnline && bannerText && (

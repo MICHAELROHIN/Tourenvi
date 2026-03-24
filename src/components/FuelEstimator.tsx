@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Fuel, Car, Gauge, Loader2, Lock } from "lucide-react";
 import { toast } from "react-hot-toast";
+import { useTrip } from "@/context/TripContext";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -26,6 +27,7 @@ const RAPIDAPI_KEY = import.meta.env.VITE_RAPIDAPI_KEY || "YOUR_RAPIDAPI_KEY";
 const RAPIDAPI_HOST = "daily-petrol-diesel-lpg-cng-fuel-prices-in-india.p.rapidapi.com";
 
 const FuelEstimator = () => {
+  const { updateTrip } = useTrip();
   const [searchParams] = useSearchParams();
   const [brands, setBrands] = useState<string[]>([]);
   const [models, setModels] = useState<string[]>([]);
@@ -66,6 +68,7 @@ const FuelEstimator = () => {
   const fetchLiveFuelPrice = async (selectedFuel: string) => {
     if (selectedFuel === "Electric") {
       setFuelPrice("20");
+      updateTrip("fuelPrice", 20);
       toast.success("Auto-set EV rate: ₹20/kWh");
       return;
     }
@@ -95,6 +98,7 @@ const FuelEstimator = () => {
 
       if (price) {
         setFuelPrice(String(price));
+        updateTrip("fuelPrice", Number(price));
         toast.success(`Fetched live ${selectedFuel} price: ₹${price}`);
       } else {
         fallbackPrices(selectedFuel);
@@ -112,6 +116,7 @@ const FuelEstimator = () => {
     if (fType.toLowerCase() === "diesel") price = "94";
     if (fType.toLowerCase() === "cng") price = "85";
     setFuelPrice(price);
+    updateTrip("fuelPrice", Number(price));
     toast.error("Live fetch failed. Using standard estimate.");
   };
 
@@ -143,6 +148,7 @@ const FuelEstimator = () => {
 
   const onFuelChange = (val: string) => {
     setFuelType(val);
+    updateTrip("fuelType", val.toLowerCase());
     fetchLiveFuelPrice(val);
   };
 
@@ -157,6 +163,9 @@ const FuelEstimator = () => {
       const data = await res.json();
       const m = typeof data?.mileage === "number" ? data.mileage : null;
       setMileage(m);
+      if (m) {
+        updateTrip("mileage", m);
+      }
       return m;
     } catch (e) {
       setError("Failed to fetch mileage");
@@ -177,6 +186,9 @@ const FuelEstimator = () => {
         const unitsNeeded = km / m;
         const total = unitsNeeded * price;
         setCost(parseFloat(total.toFixed(2)));
+        updateTrip("routeDistanceKm", km);
+        updateTrip("mileage", m);
+        updateTrip("fuelPrice", price);
       }
     }
   };

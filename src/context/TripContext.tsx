@@ -42,6 +42,8 @@ export type TripDraft = {
   fuelType: string;
   fuelPrice: number;
   mileage: number;
+  routeDistanceKm: number;
+  routeToll: number;
   moods: TripMood[];
   genres: string[];
   destinations: string[];
@@ -51,6 +53,7 @@ export type TripDraft = {
     toll: number;
     hotel: number;
     food: number;
+    places: number;
     misc: number;
     total: number;
     perPerson: number;
@@ -74,6 +77,8 @@ const DEFAULT_TRIP: TripDraft = {
   fuelType: "petrol",
   fuelPrice: 102,
   mileage: 15,
+  routeDistanceKm: 0,
+  routeToll: 0,
   moods: [],
   genres: ["Budget"],
   destinations: [],
@@ -83,6 +88,7 @@ const DEFAULT_TRIP: TripDraft = {
     toll: 0,
     hotel: 0,
     food: 0,
+    places: 0,
     misc: 0,
     total: 0,
     perPerson: 0,
