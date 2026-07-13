@@ -48,6 +48,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
 
+      // Render protected routes immediately once auth is known.
+      // The user document snapshot can update the role/profile after paint.
+      setLoading(false);
+
       unsubscribeUserDoc = onSnapshot(
         doc(db, "users", user.uid),
         (snap) => {

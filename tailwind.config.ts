@@ -71,6 +71,13 @@ export default {
         "ocean-blue": "hsl(var(--ocean-blue))",
         "forest-dark": "hsl(var(--forest-dark))",
         "nature-light": "hsl(var(--nature-light))",
+        "gt-blue": "#0B2B5C",
+        "gt-gold": "#D4AF37",
+        "gt-offwhite": "#F8F9FA",
+      },
+      fontFamily: {
+        sans: ["Inter", "sans-serif"],
+        serif: ["Playfair Display", "serif"],
       },
       backgroundImage: {
         "gradient-hero": "var(--gradient-hero)",

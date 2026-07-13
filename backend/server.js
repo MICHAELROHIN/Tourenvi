@@ -75,6 +75,8 @@ const LEGACY_DESTINATION_ALIASES = {
   chennai: "Mamallapuram (Mahabalipuram) & Coromandel Heritage Coast",
   madurai: "Tiruvannamalai & Arunachala (Inner Fire Journey)",
   chettinad: "Tiruvannamalai & Arunachala (Inner Fire Journey)",
+  pondicherry: "Pondicherry (Puducherry)",
+  puducherry: "Pondicherry (Puducherry)",
 };
 
 function normalizeLookupText(value) {
@@ -84,6 +86,56 @@ function normalizeLookupText(value) {
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function hashText(value) {
+  return normalizeLookupText(value).split("").reduce((hash, char) => {
+    return ((hash << 5) - hash + char.charCodeAt(0)) | 0;
+  }, 0);
+}
+
+const ATTRACTION_IMAGE_HINTS = {
+  "french quarter white town": ["White Town, Puducherry", "French Quarter, Puducherry", "Puducherry"],
+  "seafront promenade": ["Promenade Beach, Puducherry", "Puducherry"],
+  "sri aurobindo ashram": ["Sri Aurobindo Ashram", "Puducherry"],
+  auroville: ["Auroville", "Puducherry"],
+  "rock beach": ["Rock Beach, Puducherry", "Puducherry"],
+  "baga beach": ["Baga Beach", "Goa"],
+  "calangute beach": ["Calangute Beach", "Goa"],
+  "old goa churches": ["Basilica of Bom Jesus", "Se Cathedral, Goa", "Old Goa"],
+  "fort aguada": ["Fort Aguada", "Goa"],
+  "dudhsagar falls": ["Dudhsagar Falls", "Goa"],
+  "spice plantations": ["Goa", "Spice plantation"],
+  "ooty lake": ["Ooty Lake", "Udhagamandalam"],
+  "botanical gardens": ["Government Botanical Garden, Ooty", "Ooty"],
+  "doddabetta peak": ["Doddabetta", "Ooty"],
+  "rose garden": ["Government Rose Garden, Ooty", "Ooty"],
+  "pykara waterfalls": ["Pykara Falls", "Ooty"],
+  "avalanche lake": ["Avalanche Lake", "Ooty"],
+};
+
+const ATTRACTION_IMAGE_CACHE = new Map();
+
+async function fetchWikipediaImageForQuery(query) {
+  const normalizedQuery = String(query || "").trim();
+  if (!normalizedQuery) return null;
+
+  const searchUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(normalizedQuery)}&format=json&origin=*`;
+  const searchResponse = await axios.get(searchUrl, {
+    headers: { "User-Agent": "Tourenvi/1.0 (student-project)" },
+    timeout: 10000,
+  });
+
+  const title = searchResponse.data?.query?.search?.[0]?.title;
+  if (!title) return null;
+
+  const summaryUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+  const summaryResponse = await axios.get(summaryUrl, {
+    headers: { "User-Agent": "Tourenvi/1.0 (student-project)" },
+    timeout: 10000,
+  });
+
+  return summaryResponse.data?.thumbnail?.source || summaryResponse.data?.originalimage?.source || null;
 }
 
 function extractLookupTokens(rawValue) {
@@ -331,7 +383,7 @@ function recommendDestinationsFromDataset(moods, limit = 6) {
   return ranked.slice(0, limit).map((item) => item.name);
 }
 
-function buildPlaceEntriesFromDataset(record, limit) {
+async function buildPlaceEntriesFromDataset(record, limit) {
   const buckets = [
     { values: record.primary_attractions, category: "Primary attraction" },
     { values: record.hidden_gems, category: "Hidden gem" },
@@ -360,6 +412,8 @@ function buildPlaceEntriesFromDataset(record, limit) {
         entryFee: "Not specified in dataset",
         entryFeeAmount: null,
         entryFeeCurrency: "INR",
+        imageUrl: getAttractionImageUrl(name, record.destination_name || record.state || ""),
+        description: `Recommended ${bucket.category.toLowerCase()} in ${record.destination_name || record.state || "this destination"}.`,
         source: "india_tourism_dataset",
       });
     });
@@ -368,6 +422,119 @@ function buildPlaceEntriesFromDataset(record, limit) {
   }
 
   return places.slice(0, limit);
+}
+
+async function getAttractionImageUrl(placeName, destinationKey = "") {
+  const lowercasePlace = normalizeLookupText(placeName);
+  const lowercaseDestination = normalizeLookupText(destinationKey);
+  const seed = Math.abs(hashText(`${lowercaseDestination}|${lowercasePlace}`));
+
+  const imagePools = {
+    lake: [
+      "https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1200&auto=format&fit=crop&q=80",
+    ],
+    garden: [
+      "https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=1200&auto=format&fit=crop&q=80",
+    ],
+    beach: [
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1519046904884-53103b34b206?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=1200&auto=format&fit=crop&q=80",
+    ],
+    heritage: [
+      "https://images.unsplash.com/photo-1590050752117-238cb0fb12b1?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1524492412937-4961afc8e3f3?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1545239351-1141bd82e8a6?w=1200&auto=format&fit=crop&q=80",
+    ],
+    waterfall: [
+      "https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1511818966892-d7d671e672a2?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=1200&auto=format&fit=crop&q=80",
+    ],
+    mountains: [
+      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1500048993953-d23a436266cf?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1519985176271-adb1088fa94c?w=1200&auto=format&fit=crop&q=80",
+    ],
+    fort: [
+      "https://images.unsplash.com/photo-1589308078059-be1415eab4c3?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1506891463900-479c5e1f9f5b?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?w=1200&auto=format&fit=crop&q=80",
+    ],
+    default: [
+      "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1505228395891-9a51e7e86bf6?w=1200&auto=format&fit=crop&q=80",
+      "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=1200&auto=format&fit=crop&q=80",
+    ],
+  };
+
+  const resolveFromPool = (pool) => pool[seed % pool.length];
+
+  const cacheKey = `${lowercaseDestination}|${lowercasePlace}`;
+  if (ATTRACTION_IMAGE_CACHE.has(cacheKey)) {
+    return ATTRACTION_IMAGE_CACHE.get(cacheKey);
+  }
+
+  const queryCandidates = [
+    ...(ATTRACTION_IMAGE_HINTS[lowercasePlace] || []),
+    placeName,
+    `${placeName}, ${destinationKey}`,
+    destinationKey,
+  ].filter(Boolean);
+
+  for (const candidate of queryCandidates) {
+    try {
+      const wikiImage = await fetchWikipediaImageForQuery(candidate);
+      if (wikiImage) {
+        ATTRACTION_IMAGE_CACHE.set(cacheKey, wikiImage);
+        return wikiImage;
+      }
+    } catch {
+      // Try the next candidate.
+    }
+  }
+
+  if (lowercasePlace.includes("lake")) return resolveFromPool(imagePools.lake);
+  if (lowercasePlace.includes("garden") || lowercasePlace.includes("park") || lowercasePlace.includes("rose")) return resolveFromPool(imagePools.garden);
+  if (lowercasePlace.includes("beach") || lowercaseDestination.includes("goa") || lowercaseDestination.includes("puducherry") || lowercaseDestination.includes("pondicherry")) return resolveFromPool(imagePools.beach);
+  if (lowercasePlace.includes("temple") || lowercasePlace.includes("church") || lowercasePlace.includes("mosque") || lowercasePlace.includes("monument")) return resolveFromPool(imagePools.heritage);
+  if (lowercasePlace.includes("waterfall") || lowercasePlace.includes("falls")) return resolveFromPool(imagePools.waterfall);
+  if (lowercasePlace.includes("peak") || lowercasePlace.includes("hill") || lowercasePlace.includes("mountain") || lowercasePlace.includes("doddabetta")) return resolveFromPool(imagePools.mountains);
+  if (lowercasePlace.includes("fort")) return resolveFromPool(imagePools.fort);
+  const fallback = resolveFromPool(imagePools.default);
+  ATTRACTION_IMAGE_CACHE.set(cacheKey, fallback);
+  return fallback;
+}
+
+async function buildAttractionCards(placeNames, destinationKey, sourceLabel, limit = 6) {
+  const seen = new Set();
+  const entries = (Array.isArray(placeNames) ? placeNames : [])
+    .map((entry, index) => String(entry || "").trim())
+    .filter(Boolean)
+    .filter((entry) => {
+      const normalized = normalizeLookupText(entry);
+      if (!normalized || seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    })
+    .slice(0, limit);
+
+  const cards = [];
+  for (let index = 0; index < entries.length; index++) {
+    const name = entries[index];
+    cards.push({
+      id: `${normalizeLookupText(sourceLabel || destinationKey || "destination") || "destination"}_${index + 1}`,
+      name,
+      image: await getAttractionImageUrl(name, destinationKey),
+      description: `Recommended from ${sourceLabel || "the tourism dataset"} for ${destinationKey || "this destination"}.`,
+    });
+  }
+
+  return cards;
 }
 
 function buildDestinationMeta(record) {
@@ -583,7 +750,7 @@ async function resolveWikipediaImage(wikiTitle) {
 }
 
 // --------------------------- DESTINATION PLACES (India Tourism Dataset) ---------------------------
-app.get("/get-destination-places", (req, res) => {
+app.get("/get-destination-places", async (req, res) => {
   const destination = String(req.query.destination || "").trim();
   const requestedLimit = Number(req.query.limit);
   const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
@@ -606,7 +773,7 @@ app.get("/get-destination-places", (req, res) => {
     });
   }
 
-  const places = buildPlaceEntriesFromDataset(match.record, limit);
+  const places = await buildPlaceEntriesFromDataset(match.record, limit);
   if (!places.length) {
     return res.status(404).json({
       error: `No places available in india_tourism_dataset for '${match.record.destination_name || destination}'.`,
@@ -1001,6 +1168,244 @@ app.post("/api/predict-hotel-cost", (req, res) => {
         ? "Book 3-4 weeks early for better rates"
         : "You can usually find same-week deals in this season",
   });
+});
+
+// Helper to geocode a place name using Nominatim
+async function geocodePlace(name) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(name)}&limit=1`;
+    const res = await axios.get(url, {
+      headers: { "User-Agent": "Tourenvi/1.0 (student-project)" },
+      timeout: 5000,
+    });
+    if (res.data && res.data.length > 0) {
+      return {
+        lat: parseFloat(res.data[0].lat),
+        lon: parseFloat(res.data[0].lon),
+        display_name: res.data[0].display_name
+      };
+    }
+  } catch (err) {
+    console.warn("Geocoding failed for:", name, err.message);
+  }
+  return null;
+}
+
+// Great-circle distance between two coordinates in km
+function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // radius of Earth in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
+// --------------------------- ELITE ITINERARY BUILDER ---------------------------
+app.post("/api/build-itinerary", async (req, res) => {
+  const { tripData } = req.body;
+  
+  if (!tripData) {
+    return res.status(400).json({ error: "No trip data provided" });
+  }
+
+  // 1. EXTRACT PARAMETERS WITH FALLBACK TO CURRENT TRIP DATA
+  const source = req.body.source || tripData.startLocation || "Chennai";
+  const destination = req.body.destination || tripData.destinations?.[0] || "Ooty";
+  
+  // Parse Start Date and End Date to calculate totalDays dynamically
+  const startDateStr = req.body.startDate || tripData.startDate;
+  const endDateStr = req.body.endDate || tripData.endDate;
+  let totalDays = req.body.totalDays || 3;
+  
+  if (startDateStr && endDateStr) {
+    const startD = new Date(startDateStr);
+    const endD = new Date(endDateStr);
+    const diffTime = Math.abs(endD.getTime() - startD.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // inclusive
+    if (diffDays > 0) {
+      totalDays = diffDays;
+    }
+  }
+
+  const vehicleMileage = req.body.vehicleMileage || tripData.mileage || 15;
+  const fuelType = req.body.fuelType || tripData.fuelType || "petrol";
+  const budgetLimit = req.body.budgetLimit || tripData.budgetCap || 50000;
+  
+  const rawPreference = req.body.hotelPreference || tripData.lodgingType?.[0] || "Premium";
+  let hotelPreference = "Premium";
+  if (rawPreference.toLowerCase().includes("luxury")) hotelPreference = "Luxury";
+  if (rawPreference.toLowerCase().includes("eco") || rawPreference.toLowerCase().includes("budget") || rawPreference.toLowerCase().includes("economy")) hotelPreference = "Economy";
+  
+  const tripType = tripData.tripType || "family";
+  const groupSize = req.body.groupSize || tripData.numberOfMembers || (tripType === "solo" ? 1 : tripType === "family" ? 4 : 8);
+
+  // Geocode locations to get coordinates
+  const startCoords = await geocodePlace(source) || { lat: 13.0827, lon: 80.2707 }; // Chennai fallback
+  const endCoords = await geocodePlace(destination) || { lat: 11.4102, lon: 76.6950 }; // Ooty fallback
+
+  // Calculate Great-Circle road distance
+  const aerialDistance = calculateDistanceKm(startCoords.lat, startCoords.lon, endCoords.lat, endCoords.lon);
+  const mockDistanceKm = Math.round(aerialDistance * 1.3) || 450; 
+  const roundTripDistance = mockDistanceKm * 2; // Round-trip distance
+
+  // 2. COMPUTE INDIVIDUAL COST NODES
+  
+  // Fuel (Petrol/Diesel/EV) Cost
+  const regionalFuelPrice = fuelType === "diesel" ? 92 : fuelType === "ev" ? 2.0 : 103;
+  const fuelCost = Math.round((roundTripDistance / vehicleMileage) * regionalFuelPrice);
+  
+  // Hotel Cost
+  const roomsRequired = Math.ceil(groupSize / 2);
+  const dailyBaseRate = hotelPreference === "Luxury" ? 12000 : hotelPreference === "Premium" ? 6000 : 2500;
+  const hotelCost = dailyBaseRate * (totalDays - 1) * roomsRequired;
+
+  // Car Rental Cost
+  const vehicleType = tripData.vehicleType || "car";
+  const dailyRentalFee = vehicleType === "bike" ? 1500 : vehicleType === "car" ? 4500 : 3500;
+  const carRentalCost = dailyRentalFee * totalDays;
+
+  // Food Cost
+  const foodCost = 800 * groupSize * totalDays;
+
+  // Places to Visit (Sightseeing)
+  const sightseeingCost = 300 * groupSize * totalDays;
+
+  // Compute Total
+  const totalCalculatedTripCost = fuelCost + hotelCost + carRentalCost + foodCost + sightseeingCost;
+
+  // 3. STRICT BUDGET VALIDATION CHECK
+  if (totalCalculatedTripCost > budgetLimit) {
+    return res.status(422).json({
+      success: false,
+      error: "Cannot estimate within the given budget.",
+      financials: {
+        fuelCost,
+        hotelCost,
+        carRentalCost,
+        foodCost,
+        sightseeingCost,
+        totalCost: totalCalculatedTripCost
+      },
+      budgetLimit,
+      message: `Cannot estimate within the given budget. Total estimate is ₹${totalCalculatedTripCost.toLocaleString()} (Fuel: ₹${fuelCost.toLocaleString()}, Hotel: ₹${hotelCost.toLocaleString()}, Rental: ₹${carRentalCost.toLocaleString()}, Food: ₹${foodCost.toLocaleString()}, Sightseeing: ₹${sightseeingCost.toLocaleString()}), which exceeds your limit of ₹${budgetLimit.toLocaleString()}. Please increase your budget limit or modify your travel preferences.`
+    });
+  }
+
+  // Green Emission Score
+  let emissionPerKm = 0.12; 
+  if (fuelType === "diesel") emissionPerKm = 0.15;
+  if (fuelType === "ev") emissionPerKm = 0.0;
+  const greenEmissionScore = mockDistanceKm * emissionPerKm;
+  
+  const destinationNodes = Array.isArray(tripData.destinations) && tripData.destinations.length > 0
+    ? tripData.destinations.map((entry) => String(entry || "").trim()).filter(Boolean)
+    : [destination];
+
+  const destinationAttractions = await Promise.all(destinationNodes.map(async (destinationNode, index) => {
+    const normalizedDestination = normalizeLookupText(destinationNode);
+    const matchedRecord = (typeof INDIA_TOURISM_DATASET !== "undefined" ? INDIA_TOURISM_DATASET : []).find((record) => {
+      const destinationName = normalizeLookupText(record.destination_name || "");
+      const stateName = normalizeLookupText(record.state || "");
+      const districtName = normalizeLookupText(record.district || "");
+
+      return (
+        destinationName === normalizedDestination ||
+        stateName === normalizedDestination ||
+        districtName.includes(normalizedDestination) ||
+        normalizedDestination.includes(destinationName)
+      );
+    });
+
+    const primary = Array.isArray(matchedRecord?.primary_attractions) ? matchedRecord.primary_attractions : [];
+    const hidden = Array.isArray(matchedRecord?.hidden_gems) ? matchedRecord.hidden_gems : [];
+    const activitySeeds = [...primary, ...hidden];
+
+    const fallbackAttractions = normalizedDestination.includes("goa")
+      ? ["Baga Beach", "Calangute Beach", "Old Goa Churches", "Fort Aguada", "Dudhsagar Falls", "Spice Plantations"]
+      : normalizedDestination.includes("ooty")
+        ? ["Ooty Lake", "Botanical Gardens", "Doddabetta Peak", "Rose Garden", "Pykara Waterfalls", "Avalanche Lake"]
+        : normalizedDestination.includes("madurai")
+          ? ["Meenakshi Amman Temple", "Thirumalai Nayakkar Mahal", "Gandhi Memorial Museum", "Alagar Kovil", "Samanar Hills", "Vaigai Riverfront"]
+          : ["City Center Exploration", "Local Heritage Walk", "Scenic Viewpoint Visit", "Traditional Culinary Experience", "Local Market Shopping"];
+
+    const attractionCards = await buildAttractionCards(
+      activitySeeds.length > 0 ? activitySeeds : fallbackAttractions,
+      matchedRecord?.destination_name || matchedRecord?.state || destinationNode,
+      matchedRecord?.destination_name || destinationNode,
+      6,
+    );
+
+    return {
+      id: `destination-node-${index + 1}`,
+      destination: destinationNode,
+      matchedDestination: matchedRecord?.destination_name || matchedRecord?.state || destinationNode,
+      region: matchedRecord?.region || null,
+      attractions: attractionCards,
+    };
+  }));
+
+  const richPlaces = destinationAttractions.flatMap((group) =>
+    group.attractions.map((place, placeIndex) => ({
+      ...place,
+      id: `${group.id}-${placeIndex + 1}`,
+      destination: group.destination,
+      matchedDestination: group.matchedDestination,
+      region: group.region,
+    }))
+  );
+
+  return res.json({
+    success: true,
+    financials: {
+      fuelCost,
+      tollCost: 0, 
+      lodgingCost: hotelCost,
+      carRentalCost,
+      foodCost,
+      placesCost: sightseeingCost,
+      totalCost: totalCalculatedTripCost
+    },
+    ecoData: {
+      co2Emissions: Math.round(greenEmissionScore),
+      ecoFriendly: fuelType === "ev" || greenEmissionScore < 50
+    },
+    routeDetails: {
+      distanceKm: mockDistanceKm,
+      priority: tripData.routePriority || "fastest",
+      totalDays
+    },
+    coordinates: {
+      start: startCoords,
+      end: endCoords
+    },
+    destinationAttractions,
+    places: richPlaces
+  });
+});
+
+// --------------------------- CAR SUGGESTIONS API ---------------------------
+app.get("/api/cars", (req, res) => {
+  try {
+    const raw = fs.readFileSync(path.join(__dirname, "data", "cars.json"), "utf8");
+    res.json(JSON.parse(raw));
+  } catch (err) {
+    console.error("Failed to load cars.json, returning fallbacks:", err.message);
+    res.json([
+      { "brand": "honda", "model": "city", "fuel": "petrol", "mileage": 17.8 },
+      { "brand": "honda", "model": "city", "fuel": "diesel", "mileage": 24.1 },
+      { "brand": "honda", "model": "civic", "fuel": "petrol", "mileage": 16.5 },
+      { "brand": "toyota", "model": "corolla", "fuel": "petrol", "mileage": 16.7 },
+      { "brand": "toyota", "model": "innova", "fuel": "diesel", "mileage": 15.0 },
+      { "brand": "hyundai", "model": "i20", "fuel": "petrol", "mileage": 19.0 },
+      { "brand": "hyundai", "model": "verna", "fuel": "diesel", "mileage": 22.0 },
+      { "brand": "maruti", "model": "swift", "fuel": "petrol", "mileage": 22.5 },
+      { "brand": "maruti", "model": "baleno", "fuel": "petrol", "mileage": 22.9 }
+    ]);
+  }
 });
 
 // --------------------------- HEALTH CHECK (for Render) ---------------------------

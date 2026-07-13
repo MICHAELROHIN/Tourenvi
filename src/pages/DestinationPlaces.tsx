@@ -28,6 +28,8 @@ interface DestinationPlace {
   entryFeeAmount: number | null;
   entryFeeCurrency: string;
   source: string;
+  imageUrl?: string;
+  description?: string;
 }
 
 interface DestinationMeta {
@@ -358,18 +360,42 @@ const DestinationPlaces = () => {
           {!loading && !error && places.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {places.map((place) => (
-                <Card key={place.id} className="border border-border">
+                <Card key={place.id} className="overflow-hidden border border-border shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
+                  {place.imageUrl ? (
+                    <div className="relative h-52 w-full overflow-hidden">
+                      <img src={place.imageUrl} alt={place.name} className="h-full w-full object-cover transition duration-500 hover:scale-105" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
+                      <div className="absolute bottom-4 left-4 right-4">
+                        <span className="inline-flex rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gt-blue">
+                          {place.category}
+                        </span>
+                        <h3 className="mt-2 text-2xl font-serif font-semibold text-white drop-shadow-sm leading-tight">
+                          {place.name}
+                        </h3>
+                      </div>
+                    </div>
+                  ) : null}
                   <CardContent className="p-4 space-y-3">
                     <div className="flex items-start gap-3">
                       <div>
-                        <h3 className="font-semibold text-foreground leading-tight">
-                          {place.name}
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {place.category}
-                        </p>
+                        {!place.imageUrl ? (
+                          <>
+                            <h3 className="font-semibold text-foreground leading-tight">
+                              {place.name}
+                            </h3>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {place.category}
+                            </p>
+                          </>
+                        ) : null}
                       </div>
                     </div>
+
+                    {place.description ? (
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {place.description}
+                      </p>
+                    ) : null}
 
                     <div className="flex flex-wrap gap-2">
                       <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground">

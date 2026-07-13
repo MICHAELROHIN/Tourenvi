@@ -7,7 +7,7 @@ createRoot(document.getElementById("root")!).render(<App />);
 if ("serviceWorker" in navigator) {
   if (import.meta.env.PROD) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("/sw.js").catch((error) => {
+      navigator.serviceWorker.register("/service-worker.js").catch((error) => {
         console.error("SW registration failed", error);
       });
     });

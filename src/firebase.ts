@@ -88,6 +88,10 @@ export const onAuthChange = (
       return;
     }
 
+    // Publish the authenticated user immediately so protected routes can render.
+    // The Firestore role lookup below refines permissions after the page is visible.
+    callback(user, null);
+
     try {
       const userSnap = await getDoc(doc(db, "users", user.uid));
       const role = userSnap.exists()

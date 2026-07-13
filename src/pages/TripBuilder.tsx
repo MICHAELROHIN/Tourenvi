@@ -105,7 +105,7 @@ const TripBuilder = () => {
           />
         </TabsContent>
 
-        <TabsContent value="1">
+        <TabsContent value="1"> 
           <MoodSelector
             selectedMoods={trip.moods}
             selectedGenres={trip.genres}

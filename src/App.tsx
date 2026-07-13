@@ -10,7 +10,8 @@ import ProtectedRoute from "@/components/shared/ProtectedRoute";
 import { AuthProvider } from "@/context/AuthContext";
 import { TripProvider } from "@/context/TripContext";
 import Navigation from "@/components/Navigation";
-import TripBuilder from "@/pages/TripBuilder";
+import ElitePlanner from "@/pages/ElitePlanner";
+import EliteDashboard from "@/pages/EliteDashboard";
 import Hotels from "@/pages/Hotels";
 import Cart from "@/pages/Cart";
 import AIChat from "@/pages/AIChat";
@@ -89,7 +90,17 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute allowedRoles={["user"]}>
             <AppLayout>
-              <TripBuilder />
+              <ElitePlanner />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/elite-dashboard"
+        element={
+          <ProtectedRoute allowedRoles={["user"]}>
+            <AppLayout>
+              <EliteDashboard />
             </AppLayout>
           </ProtectedRoute>
         }
