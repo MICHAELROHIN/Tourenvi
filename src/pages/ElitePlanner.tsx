@@ -26,7 +26,9 @@ import {
   CheckCircle2,
   ArrowRight,
   ArrowLeft,
-  Fuel
+  Fuel,
+  IndianRupee,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
@@ -66,9 +68,75 @@ const ElitePlanner = () => {
   const [brands, setBrands] = useState<string[]>([]);
   const [models, setModels] = useState<string[]>([]);
   const [fuels, setFuels] = useState<string[]>([]);
+  const [liveFuelPrice, setLiveFuelPrice] = useState<number | null>(null);
+  const [fuelPriceLoading, setFuelPriceLoading] = useState(false);
   
   const [carBrand, setCarBrand] = useState("");
   const [carModel, setCarModel] = useState("");
+
+  const sourceCity = trip.startLocation.trim();
+  const defaultFuelPrice = trip.fuelType === "diesel" ? 94 : 102.5;
+
+  const fetchLiveFuelPrice = async (city: string, fuelType: string, signal?: AbortSignal) => {
+    const normalizedFuel = fuelType.toLowerCase();
+    const fallbackPrice = normalizedFuel === "diesel" ? 94 : 102.5;
+
+    if (!city.trim()) {
+      setLiveFuelPrice(fallbackPrice);
+      return;
+    }
+
+    setFuelPriceLoading(true);
+
+    try {
+      const response = await fetch(
+        `https://daily-petrol-diesel-lpg-cng-fuel-prices-in-india.p.rapidapi.com/v1/fuel-prices?city=${encodeURIComponent(city)}&fuelType=${encodeURIComponent(normalizedFuel)}`,
+        {
+          method: "GET",
+          signal,
+          headers: {
+            "x-rapidapi-key": import.meta.env.VITE_RAPIDAPI_KEY || "YOUR_RAPIDAPI_KEY",
+            "x-rapidapi-host": "daily-petrol-diesel-lpg-cng-fuel-prices-in-india.p.rapidapi.com",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        setLiveFuelPrice(fallbackPrice);
+        return;
+      }
+
+      const data = await response.json();
+      const price = Number(data?.retailPrice ?? data?.price);
+
+      if (Number.isFinite(price) && price > 0) {
+        setLiveFuelPrice(price);
+      } else {
+        setLiveFuelPrice(fallbackPrice);
+      }
+    } catch (error) {
+      console.error("Fuel price fetch failed:", error);
+      setLiveFuelPrice(fallbackPrice);
+    } finally {
+      if (!signal?.aborted) {
+        setFuelPriceLoading(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    const selectedFuel = trip.vehicleType === "bike" ? "petrol" : trip.fuelType;
+    if (!selectedFuel) {
+      setLiveFuelPrice(null);
+      setFuelPriceLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    void fetchLiveFuelPrice(sourceCity, selectedFuel, controller.signal);
+
+    return () => controller.abort();
+  }, [sourceCity, trip.fuelType, trip.vehicleType]);
 
   useEffect(() => {
     const fetchCars = async () => {
@@ -132,8 +200,50 @@ const ElitePlanner = () => {
   };
 
   const onFuelChange = (val: string) => {
-    updateTrip("fuelType", val.toLowerCase() as any);
+    const normalized = val.toLowerCase();
+    if (trip.vehicleType === "bike") {
+      updateTrip("fuelType", "petrol" as any);
+      fetchMileage("petrol");
+      return;
+    }
+
+    updateTrip("fuelType", normalized as any);
     fetchMileage(val);
+  };
+
+  const FuelPriceCard = () => {
+    const displayedPrice = liveFuelPrice ?? defaultFuelPrice;
+
+    return (
+      <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4 shadow-sm">
+        <div className="flex items-center gap-2 text-sm font-semibold text-gt-blue">
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-white text-amber-600 shadow-sm">
+            <IndianRupee size={16} />
+          </span>
+          Current Fuel Price (₹/L)
+        </div>
+
+        <div className="mt-3 min-h-[56px] rounded-xl border border-white/80 bg-white/80 px-4 py-3">
+          {fuelPriceLoading ? (
+            <div className="flex items-center gap-3 text-sm text-gray-500">
+              <Loader2 className="h-4 w-4 animate-spin text-gt-gold" />
+              Fetching live rate for {sourceCity || "your source city"}...
+            </div>
+          ) : (
+            <div className="flex items-end gap-2">
+              <span className="text-2xl font-bold text-gt-blue">
+                ₹{displayedPrice.toFixed(2)}
+              </span>
+              <span className="pb-1 text-sm font-medium text-gray-500">/ L</span>
+            </div>
+          )}
+
+          <p className="mt-2 text-xs text-gray-500">
+            {sourceCity ? `Updated for ${sourceCity}` : "Using fallback until a source city is entered."}
+          </p>
+        </div>
+      </div>
+    );
   };
 
   const isSoloTrip = trip.tripType === "solo";
@@ -551,7 +661,7 @@ const ElitePlanner = () => {
                       </div>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4 items-start">
                       <div>
                         <label className="block text-sm font-semibold text-gt-blue mb-2">Expected Mileage (km/L)</label>
                         <div className="relative">
@@ -564,10 +674,14 @@ const ElitePlanner = () => {
                           />
                         </div>
                       </div>
+
+                      <div className="lg:pt-[31px]">
+                        <FuelPriceCard />
+                      </div>
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4 items-start">
                     <div>
                       <label className="block text-sm font-semibold text-gt-blue mb-2">Fuel Type</label>
                       <div className="flex gap-4">
@@ -596,6 +710,10 @@ const ElitePlanner = () => {
                           className="pl-12 h-12 text-lg bg-gray-50 focus:border-gt-gold focus:ring-gt-gold/20"
                         />
                       </div>
+                    </div>
+
+                    <div className="lg:pt-[31px]">
+                      <FuelPriceCard />
                     </div>
                   </div>
                 )}

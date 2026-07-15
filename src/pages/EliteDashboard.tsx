@@ -1,11 +1,36 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTrip } from "@/context/TripContext";
 import { useNavigate } from "react-router-dom";
-import { GoogleMap, useJsApiLoader, Polyline, Marker } from "@react-google-maps/api";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { Leaf, MapPin, Coffee, Camera, Bed, CheckCircle2, Navigation } from "lucide-react";
 import { getRoute } from "@/utils/osmRouteService";
-import { ActiveNavigationMap } from "@/components/ActiveNavigationMap";
+import { MapContainer, Marker, Popup, Polyline, TileLayer, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
+  iconUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
+  shadowUrl:
+    "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+});
+
+type RoutePoint = { lat: number; lng: number };
+
+const FitRouteBounds = ({ points }: { points: RoutePoint[] }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (points.length < 2) return;
+    const bounds = L.latLngBounds(points.map((point) => [point.lat, point.lng] as [number, number]));
+    map.fitBounds(bounds, { padding: [32, 32] });
+  }, [map, points]);
+
+  return null;
+};
 
 // Mock coordinates for India
 const center = { lat: 20.5937, lng: 78.9629 };
@@ -14,22 +39,13 @@ const EliteDashboard = () => {
   const { trip } = useTrip();
   const navigate = useNavigate();
 
-  // Load Google Maps script
-  const { isLoaded } = useJsApiLoader({
-    id: "google-map-script",
-    // Replace with real API key in production, leaving it empty or using a dummy can sometimes show a development map or error
-    googleMapsApiKey: "", 
-  });
-
   // Load real calculation data from localStorage (populated by backend)
   const calcData = useMemo(() => {
     const saved = localStorage.getItem("tourenvi.trip.calculations");
     return saved ? JSON.parse(saved) : null;
   }, []);
 
-  const [routePath, setRoutePath] = useState<Array<{ lat: number; lng: number }>>([]);
-  const [mapInstance, setMapInstance] = useState<any>(null);
-  const [showActiveNavigation, setShowActiveNavigation] = useState(false);
+  const [routePath, setRoutePath] = useState<RoutePoint[]>([]);
 
   const mockDistanceKm = calcData?.routeDetails?.distanceKm || 450; 
   const fuelExpenditure = calcData?.financials?.fuelCost || 0;
@@ -86,16 +102,6 @@ const EliteDashboard = () => {
       lng: calcData.coordinates.end.lon
     };
   }, [calcData]);
-
-  useEffect(() => {
-    if (!mapInstance || routePath.length === 0 || !window.google) {
-      return;
-    }
-
-    const bounds = new window.google.maps.LatLngBounds();
-    routePath.forEach((point) => bounds.extend(point));
-    mapInstance.fitBounds(bounds);
-  }, [mapInstance, routePath]);
 
   useEffect(() => {
     let cancelled = false;
@@ -412,36 +418,41 @@ const EliteDashboard = () => {
 
         {/* Column B: The Map Infrastructure (Center) */}
         <div className="w-full lg:w-1/3 bg-gray-100 relative h-[400px] lg:h-full flex flex-col">
-          <>
-            {isLoaded ? (
-              <GoogleMap
-                mapContainerStyle={{ width: "100%", height: "100%" }}
-                center={mapCenter}
-                zoom={6}
-                onLoad={setMapInstance}
-                options={{ disableDefaultUI: false }}
-              >
-                {startLatLng && <Marker position={startLatLng} label="A" title="Start Point" />}
-                {endLatLng && <Marker position={endLatLng} label="B" title="Destination" />}
-                {routePath.length > 0 && (
-                  <Polyline
-                    path={routePath}
-                    options={{
-                      strokeColor: "#D4AF37", // gt-gold
-                      strokeOpacity: 0.9,
-                      strokeWeight: 5,
-                      geodesic: true,
-                    }}
-                  />
-                )}
-              </GoogleMap>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center bg-gray-200">
-                <p className="text-gray-500 font-medium">Loading Map Infrastructure...</p>
-              </div>
-            )}
-            
-            <div className="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-lg border border-white flex justify-between items-center z-10 pointer-events-none">
+          <div className="relative h-full w-full">
+            <MapContainer
+              center={mapCenter}
+              zoom={6}
+              className="h-full w-full"
+              scrollWheelZoom
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+              <FitRouteBounds points={routePath} />
+              {startLatLng ? (
+                <Marker position={startLatLng}>
+                  <Popup>Start point: {trip.startLocation || "Selected origin"}</Popup>
+                </Marker>
+              ) : null}
+              {endLatLng ? (
+                <Marker position={endLatLng}>
+                  <Popup>Destination: {trip.destinations[0] || "Selected destination"}</Popup>
+                </Marker>
+              ) : null}
+              {routePath.length > 0 ? (
+                <Polyline
+                  positions={routePath}
+                  pathOptions={{
+                    color: "#D4AF37",
+                    weight: 5,
+                    opacity: 0.9,
+                  }}
+                />
+              ) : null}
+            </MapContainer>
+
+            <div className="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-lg border border-white flex justify-between items-center z-[1000] pointer-events-none">
               <div>
                 <p className="text-xs text-gray-500 uppercase tracking-wide">Distance</p>
                 <p className="font-bold text-gt-blue text-lg">~{mockDistanceKm} km</p>
@@ -457,7 +468,7 @@ const EliteDashboard = () => {
                 <p className="font-bold text-gt-blue text-lg capitalize">{trip.fuelType}</p>
               </div>
             </div>
-          </>
+          </div>
         </div>
 
         {/* Column C: Financial & Eco Analysis (Right) */}
