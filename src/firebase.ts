@@ -6,17 +6,25 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  signInWithPopup,
   signInWithEmailAndPassword,
+  signInWithPhoneNumber,
   signOut,
+  RecaptchaVerifier,
   type User,
   type Unsubscribe,
+  type ConfirmationResult as FirebaseConfirmationResult,
 } from "firebase/auth";
 import {
+  collection,
   doc,
   getDoc,
+  getDocs,
   getFirestore,
+  query,
   serverTimestamp,
   setDoc,
+  where,
 } from "firebase/firestore";
 import { getDatabase } from "firebase/database";
 import { getStorage } from "firebase/storage";
@@ -49,6 +57,7 @@ export const signUpWithEmail = async (
   password: string,
   role: UserRole,
   name: string,
+  phone?: string,
 ) => {
   const credential = await createUserWithEmailAndPassword(auth, email, password);
 
@@ -57,6 +66,7 @@ export const signUpWithEmail = async (
     {
       name,
       email,
+      phone: phone?.trim() || "",
       role,
       createdAt: serverTimestamp(),
       isActive: true,
@@ -73,6 +83,10 @@ export const signUpWithEmail = async (
 export const loginWithEmail = async (email: string, password: string) => {
   const credential = await signInWithEmailAndPassword(auth, email, password);
   return credential;
+};
+
+export const loginWithGoogle = async () => {
+  return signInWithPopup(auth, googleProvider);
 };
 
 export const logout = async () => {
@@ -107,4 +121,32 @@ export const onAuthChange = (
 
 export const sendPasswordReset = async (email: string) => {
   await sendPasswordResetEmail(auth, email);
+};
+
+// --- Phone OTP helpers ---
+
+export type ConfirmationResult = FirebaseConfirmationResult;
+
+let recaptchaVerifier: RecaptchaVerifier | null = null;
+
+export const sendPhoneOtp = async (
+  phoneNumber: string,
+  recaptchaContainerId: string,
+): Promise<ConfirmationResult> => {
+  // Create or reuse the invisible reCAPTCHA verifier
+  if (!recaptchaVerifier) {
+    recaptchaVerifier = new RecaptchaVerifier(auth, recaptchaContainerId, {
+      size: "invisible",
+    });
+  }
+  return signInWithPhoneNumber(auth, phoneNumber, recaptchaVerifier);
+};
+
+export const findUserByPhone = async (
+  phoneNumber: string,
+): Promise<boolean> => {
+  const usersRef = collection(db, "users");
+  const q = query(usersRef, where("phone", "==", phoneNumber));
+  const snap = await getDocs(q);
+  return !snap.empty;
 };
