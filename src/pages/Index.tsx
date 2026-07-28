@@ -9,6 +9,7 @@ import FuelEstimator from "@/components/FuelEstimator";
 
 const Index = () => {
   const { hash } = useLocation();
+  const showFeatureSections = false;
 
   useEffect(() => {
     if (hash) {
@@ -25,16 +26,20 @@ const Index = () => {
     <div className="min-h-screen bg-background">
       <Navigation />
       <Hero />
-      <section id="features">
-        <FuelEstimator />
-        <DestinationChooser />
-      </section>
-      <section id="danger">
-        <RoutePlanner />
-      </section>
-      <section id="sustainability">
-        <Dashboard />
-      </section>
+      {showFeatureSections && (
+        <>
+          <section id="features">
+            <FuelEstimator />
+            <DestinationChooser />
+          </section>
+          <section id="danger">
+            <RoutePlanner />
+          </section>
+          <section id="sustainability">
+            <Dashboard />
+          </section>
+        </>
+      )}
     </div>
   );
 };

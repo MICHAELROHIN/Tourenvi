@@ -365,7 +365,9 @@ const TripCalculator = () => {
               </p>
             </div>
 
-            <Button onClick={saveTrip} className="w-full">Save Trip</Button>
+            <Button onClick={saveTrip} className="w-full bg-emerald-600 text-white hover:bg-emerald-700">
+              Save Trip
+            </Button>
           </CardContent>
         </Card>
 
@@ -374,7 +376,15 @@ const TripCalculator = () => {
             <CardTitle>Budget Breakdown</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
-            <p className="flex justify-between"><span>Fuel</span><span>{formatINR(fuelCost)}</span></p>
+            <p className="flex justify-between gap-3">
+              <span>Fuel</span>
+              <span className="text-right">
+                <span>{formatINR(fuelCost)}</span>
+                <span className="ml-2 text-xs text-muted-foreground">
+                  ({formatINR(fuelPrice)}/L live)
+                </span>
+              </span>
+            </p>
             <p className="flex justify-between"><span>Toll</span><span>{formatINR(tollCost)}</span></p>
             <p className="flex justify-between"><span>Hotel</span><span>{formatINR(hotelCost)}</span></p>
             <p className="flex justify-between"><span>Food</span><span>{formatINR(foodCost)}</span></p>

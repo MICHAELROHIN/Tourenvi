@@ -30,7 +30,7 @@ const TripTypeStep = ({ value, onChange }: Props) => {
             className={cn(
               "cursor-pointer border transition-all",
               selected
-                ? "border-primary ring-2 ring-primary/20"
+                ? "border-emerald-600 ring-2 ring-emerald-200"
                 : "border-border",
             )}
             onClick={() => onChange(type.value)}

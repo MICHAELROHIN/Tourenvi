@@ -79,19 +79,19 @@ const TripBuilder = () => {
         <p className="text-muted-foreground">Plan your trip in 6 steps</p>
       </div>
 
-      <Progress value={progress} />
+      <Progress value={progress} indicatorClassName="bg-emerald-600" />
 
       <Tabs
         value={activeStep}
         onValueChange={setActiveStep}
         className="space-y-6"
       >
-        <TabsList className="grid grid-cols-2 md:grid-cols-6 h-auto gap-2">
+        <TabsList className="grid h-auto grid-cols-2 gap-2 md:grid-cols-6">
           {steps.map((step, index) => (
             <TabsTrigger
               key={step}
               value={String(index)}
-              className="text-xs md:text-sm"
+              className="text-xs md:text-sm data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm"
             >
               {index + 1}. {step}
             </TabsTrigger>
@@ -183,6 +183,7 @@ const TripBuilder = () => {
           onClick={() =>
             setActiveStep(String(Math.max(0, Number(activeStep) - 1)))
           }
+          className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
         >
           Back
         </Button>
@@ -193,6 +194,7 @@ const TripBuilder = () => {
               String(Math.min(steps.length - 1, Number(activeStep) + 1)),
             )
           }
+          className="bg-emerald-600 text-white hover:bg-emerald-700"
         >
           Next
         </Button>

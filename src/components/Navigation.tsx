@@ -9,7 +9,6 @@ import {
   Calculator,
   BarChart3,
   Sparkles,
-  ShoppingCart,
   User,
   LogOut,
   AlertTriangle,
@@ -155,17 +154,6 @@ const Navigation = () => {
 
             {/* Right side actions — Desktop */}
             <div className="hidden lg:flex items-center space-x-2 shrink-0">
-              <Button
-                asChild
-                size="sm"
-                className="shadow-card bg-primary text-primary-foreground hover:shadow-xl transition-all"
-              >
-                <Link to="/cart">
-                  <ShoppingCart className="w-4 h-4 mr-1.5" />
-                  View Cart
-                </Link>
-              </Button>
-
               {/* User Profile Dropdown */}
               <div className="relative" ref={profileRef}>
                 <Button
@@ -319,17 +307,6 @@ const Navigation = () => {
 
           {/* Bottom actions */}
           <div className="px-3 pb-6 pt-3 border-t border-border space-y-2 mt-auto">
-            <Button
-              asChild
-              className="w-full justify-center shadow-card"
-              onClick={() => setIsOpen(false)}
-            >
-              <Link to="/cart">
-                <ShoppingCart className="w-4 h-4 mr-2" />
-                View Cart
-              </Link>
-            </Button>
-
             <Button
               variant="outline"
               className="w-full justify-center border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"

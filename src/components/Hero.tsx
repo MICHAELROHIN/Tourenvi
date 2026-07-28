@@ -1,105 +1,35 @@
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Leaf, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, DollarSign, Leaf, MapPin, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import HeroVideo from "./HeroVideo";
 
-const plannerLabelClass =
-  "mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-foreground/70";
-
-const plannerFieldClass =
-  "w-full rounded-xl border border-emerald-100 bg-white/92 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground shadow-sm transition focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/15";
-
-const mileageByVehicle: Record<string, number> = {
-  twoWheeler: 45,
-  hatchback: 18,
-  sedan: 18,
-  suv: 12,
-  tempo: 10,
-  bus: 4,
-};
+const startTripFeatures = [
+  {
+    icon: DollarSign,
+    title: "Cost Estimation",
+    subtitle: "Precise trip budgeting",
+  },
+  {
+    icon: MapPin,
+    title: "Smart Routes",
+    subtitle: "Optimized pathfinding",
+  },
+  {
+    icon: Sparkles,
+    title: "Eco-Friendly",
+    subtitle: "Sustainable travel",
+  },
+];
 
 const Hero = () => {
   const navigate = useNavigate();
   const [isReady, setIsReady] = useState(false);
-  const [tripType, setTripType] = useState<"solo" | "family" | "group">("solo");
-  const [from, setFrom] = useState("");
-  const [destination, setDestination] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [members, setMembers] = useState(1);
-  const [vehicle, setVehicle] = useState("hatchback");
-  const [moods, setMoods] = useState<string[]>([]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setIsReady(true), 30);
     return () => window.clearTimeout(timer);
   }, []);
-
-  useEffect(() => {
-    if (tripType === "solo") {
-      setMembers(1);
-    } else if (members < 2) {
-      setMembers(2);
-    }
-  }, [tripType, members]);
-
-  const sendToSection = (sectionId: string) => {
-    if (window.location.pathname !== "/") {
-      navigate(`/#${sectionId}`);
-      return;
-    }
-
-    const target = document.getElementById(sectionId);
-    if (target) {
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-    } else {
-      navigate(`/#${sectionId}`);
-    }
-  };
-
-  const quickDaysNights = useMemo(() => {
-    if (!startDate || !endDate) return "";
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    const ms = end.getTime() - start.getTime();
-    const days =
-      Number.isFinite(ms) && ms >= 0
-        ? Math.max(1, Math.round(ms / 86400000) + 1)
-        : 1;
-    const nights = Math.max(0, days - 1);
-    return `${days} days, ${nights} nights`;
-  }, [startDate, endDate]);
-
-  const distanceKm = 200;
-  const fuelPrice = 102;
-
-  const fuelCost = useMemo(() => {
-    const mileage = mileageByVehicle[vehicle] ?? 18;
-    return Math.round((distanceKm / mileage) * fuelPrice);
-  }, [vehicle]);
-
-  const hotelPerNight = 1200;
-  const foodPerPersonPerDay = 500;
-
-  const totalEstimate = useMemo(() => {
-    const days = quickDaysNights
-      ? Math.max(1, Number.parseInt(quickDaysNights.split(" ")[0] ?? "1", 10))
-      : 2;
-    const nights = Math.max(1, days - 1);
-    const travelerCount = tripType === "solo" ? 1 : Math.max(2, members);
-    const foodTotal = travelerCount * days * foodPerPersonPerDay;
-    return fuelCost + 180 + nights * hotelPerNight + foodTotal;
-  }, [fuelCost, members, quickDaysNights, tripType]);
-
-  const moodOptions = [
-    "🏔️ Trek",
-    "🏖️ Beach",
-    "🌿 Nature",
-    "🏛️ Heritage",
-    "🍜 Food",
-    "🕌 Pilgrim",
-  ];
 
   const featureCards = [
     {
@@ -166,34 +96,6 @@ const Hero = () => {
       onClick: () => navigate("/chatAI"),
     },
   ];
-
-  const quickDestinations = ["Goa 🏖️", "Ooty 🌿", "Manali 🏔️", "Jaipur 🏛️"];
-
-  const saveAndContinue = () => {
-    const mappedMood: Record<string, string> = {
-      "🏔️ Trek": "Adventure",
-      "🏖️ Beach": "Beach",
-      "🌿 Nature": "Nature",
-      "🏛️ Heritage": "Heritage",
-      "🍜 Food": "Food",
-      "🕌 Pilgrim": "Pilgrimage",
-    };
-
-    const draft = {
-      tripType,
-      from,
-      destination,
-      startDate,
-      endDate,
-      members: tripType === "solo" ? 1 : Math.max(2, members),
-      vehicle,
-      moods,
-      mappedMoods: moods.map((mood) => mappedMood[mood]).filter(Boolean),
-    };
-
-    localStorage.setItem("tripDraft", JSON.stringify(draft));
-    navigate("/trip/new");
-  };
 
   return (
     <section className="relative overflow-hidden bg-background pt-24 pb-10 md:pb-14">
@@ -315,211 +217,52 @@ const Hero = () => {
               isReady ? "translate-x-0 opacity-100" : "translate-x-5 opacity-0"
             }`}
           >
-            <div className="w-full rounded-[2rem] border border-emerald-100/90 bg-white p-5 shadow-[0_24px_80px_-48px_rgba(15,118,110,0.65)] backdrop-blur-md">
-              <div>
-                <span className="inline-flex font-serif w-fit rounded-full bg-primary px-3 py-1 text-xs font-semibold text-white shadow-sm">
+            <div className="w-full rounded-[2rem] border border-emerald-100/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(243,250,243,0.96))] p-5 shadow-[0_24px_80px_-48px_rgba(15,118,110,0.65)] backdrop-blur-md sm:p-6">
+              <div className="rounded-[1.5rem] border border-emerald-100 bg-white/80 p-5 shadow-sm">
+                <span className="inline-flex w-fit items-center rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 shadow-sm">
                   🚀 Start Your Trip
                 </span>
-                <h3 className="mt-2 text-2xl font-serif font-bold text-foreground">
+
+                <h3 className="mt-4 text-2xl font-serif font-bold leading-tight text-foreground">
                   Plan in 2 minutes
                 </h3>
-                <p className="text-sm font-serif text-muted-foreground">
+                <p className="mt-2 text-sm font-serif text-muted-foreground">
                   No account needed to get your estimate
                 </p>
-              </div>
 
-              <div className="mt-5">
-                <label className={plannerLabelClass}>Trip Type</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(["solo", "family", "group"] as const).map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      onClick={() => setTripType(type)}
-                      className={`rounded-xl px-3 py-2 text-xs font-serif font-semibold capitalize transition-all ${
-                        tripType === type
-                          ? "bg-primary text-white shadow-sm"
-                          : "border border-emerald-100 bg-emerald-50/70 text-foreground/65 hover:bg-emerald-50"
-                      }`}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <label className={plannerLabelClass}>From</label>
-                <input
-                  value={from}
-                  onChange={(event) => setFrom(event.target.value)}
-                  placeholder="📍 Your starting location"
-                  className={plannerFieldClass}
-                />
-              </div>
-
-              <div className="mt-4">
-                <label className={plannerLabelClass}>Destination</label>
-                <div className="relative">
-                  <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    value={destination}
-                    onChange={(event) => setDestination(event.target.value)}
-                    placeholder="🏁 Where are you headed?"
-                    className={`${plannerFieldClass} pr-9`}
-                  />
-                </div>
-                {!destination && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {quickDestinations.map((city) => (
-                      <button
-                        key={city}
-                        type="button"
-                        onClick={() => setDestination(city)}
-                        className="rounded-full border border-emerald-100 bg-emerald-50/80 px-2.5 py-1 text-xs text-foreground/70 transition hover:bg-emerald-100/80"
-                      >
-                        {city}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4">
-                <label className={plannerLabelClass}>Travel Dates</label>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(event) => setStartDate(event.target.value)}
-                    placeholder="Start"
-                    className={`${plannerFieldClass} flex-1 px-2 text-xs [color-scheme:light]`}
-                  />
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(event) => setEndDate(event.target.value)}
-                    placeholder="End"
-                    className={`${plannerFieldClass} flex-1 px-2 text-xs [color-scheme:light]`}
-                  />
-                </div>
-                {quickDaysNights && (
-                  <p className="mt-1 text-xs text-primary">{quickDaysNights}</p>
-                )}
-              </div>
-
-              {tripType !== "solo" && (
-                <div className="mt-4">
-                  <label className={plannerLabelClass}>No. of Members</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-foreground/65">
-                      👥
-                    </span>
-                    <input
-                      type="number"
-                      min={2}
-                      aria-label="Number of members"
-                      value={members}
-                      onChange={(event) =>
-                        setMembers(Math.max(2, Number(event.target.value || "2")))
-                      }
-                      className={`${plannerFieldClass} pl-8`}
-                    />
-                  </div>
-                </div>
-              )}
-
-              <div className="mt-4">
-                <label className={plannerLabelClass}>Vehicle Type</label>
-                <select
-                  aria-label="Vehicle type"
-                  value={vehicle}
-                  onChange={(event) => setVehicle(event.target.value)}
-                  className={`${plannerFieldClass} [&>option]:bg-white [&>option]:text-foreground`}
+                <Button
+                  size="lg"
+                  className="mt-6 w-full justify-center rounded-xl bg-primary px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/20 transition-all hover:bg-primary-hover"
+                  onClick={() => navigate("/trip/new")}
                 >
-                  <option value="twoWheeler">🏍️ Two-Wheeler</option>
-                  <option value="sedan">🚙 Sedan</option>
-                  <option value="suv">🛻 SUV</option>
-                  <option value="bus">🚌 Bus</option>
-                </select>
-              </div>
+                  Get Started
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
 
-              <div className="mt-4">
-                <label className={plannerLabelClass}>
-                  Travel Mood <span className="text-foreground/45">(pick your vibe)</span>
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {moodOptions.map((mood) => {
-                    const selected = moods.includes(mood);
+                <div className="mt-5 space-y-3">
+                  {startTripFeatures.map((feature) => {
+                    const Icon = feature.icon;
                     return (
-                      <button
-                        key={mood}
-                        type="button"
-                        onClick={() => {
-                          setMoods((prev) => {
-                            if (prev.includes(mood)) {
-                              return prev.filter((item) => item !== mood);
-                            }
-                            if (prev.length >= 2) return prev;
-                            return [...prev, mood];
-                          });
-                        }}
-                        className={`rounded-full border px-2.5 py-1 text-xs transition-all ${
-                          selected
-                            ? "border-primary/30 bg-primary/10 text-foreground"
-                            : "border-emerald-100 bg-emerald-50/80 text-foreground/60 hover:bg-emerald-100/80"
-                        }`}
+                      <div
+                        key={feature.title}
+                        className="flex items-center gap-4 rounded-2xl border border-emerald-100 bg-emerald-50/50 px-4 py-4"
                       >
-                        {mood}
-                      </button>
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-100 bg-white text-emerald-600 shadow-sm">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="font-serif text-base font-semibold text-foreground">
+                            {feature.title}
+                          </p>
+                          <p className="font-serif text-sm text-muted-foreground">
+                            {feature.subtitle}
+                          </p>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
               </div>
-
-              {from && destination && (
-                <div className="mt-4 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3 transition-all duration-300 animate-in slide-in-from-bottom-2 fade-in-0">
-                  <p className="mb-2 text-xs font-semibold text-foreground/80">
-                    Quick Estimate
-                  </p>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div className="space-y-1">
-                      <p className="text-foreground/70">
-                        ⛽ Fuel: <span className="text-foreground">~₹ {fuelCost.toLocaleString("en-IN")}</span>
-                      </p>
-                      <p className="text-foreground/70">
-                        🛣️ Toll: <span className="text-foreground">~₹ 180</span>
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-foreground/70">
-                        🏨 Hotel/night: <span className="text-foreground">~₹ 1,200</span>
-                      </p>
-                      <p className="text-foreground/70">
-                        🍴 Food/day: <span className="text-foreground">~₹ 500/person</span>
-                      </p>
-                    </div>
-                  </div>
-                  <p className="mt-2 text-sm font-bold text-primary">
-                    Total estimate: ~₹ {totalEstimate.toLocaleString("en-IN")}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    * Rough estimate. Get exact cost in trip builder
-                  </p>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={saveAndContinue}
-                className="mt-5 flex w-full font-serif items-center justify-center gap-2 rounded-xl bg-primary py-3 text-sm font-bold text-white shadow-lg shadow-green-500/20 transition-all hover:bg-primary-hover active:scale-[0.99]"
-              >
-                Plan My Trip <ArrowRight className="w-4 h-4" />
-              </button>
-
-              <p className="mt-3 text-center text-xs text-muted-foreground">
-                🔒 Free to use · No credit card
-              </p>
             </div>
           </aside>
         </div>
