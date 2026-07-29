@@ -52,7 +52,7 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
     }
 
     if (!allowedRoles.includes(provisionalRole)) {
-      return <Navigate to="/dashboard" replace />;
+      return <Navigate to="/hero" replace />;
     }
   }
 

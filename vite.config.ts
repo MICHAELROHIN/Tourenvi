@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => ({
       protocol: "ws",
       clientPort: 8080,
     },
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
+    },
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

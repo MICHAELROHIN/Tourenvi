@@ -9,7 +9,7 @@ import {
   User2,
 } from "lucide-react";
 import { toast } from "sonner";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import {
   sendPasswordReset,
   db,
@@ -26,7 +26,7 @@ import PasswordRecoveryDialog from "@/components/auth/PasswordRecoveryDialog";
 import bgImage from "@/assets/background.jpg";
 
 const roleRoutes: Record<UserRole, string> = {
-  user: "/dashboard",
+  user: "/hero",
   admin: "/admin/dashboard",
   guide: "/guide/dashboard",
   support: "/support/dashboard",
@@ -70,16 +70,49 @@ const Login: React.FC = () => {
       navigate(from, { replace: true });
       return;
     }
-    navigate(role ? roleRoutes[role] : "/dashboard", { replace: true });
+    navigate(role ? roleRoutes[role] : "/hero", { replace: true });
   };
 
-  const resolveExistingAccount = async (uid: string) => {
-    const snap = await getDoc(doc(db, "users", uid));
-    if (!snap.exists()) {
-      throw new Error("Account not found. Please sign up first.");
+  const getAuthErrorMessage = (error: unknown): string => {
+    const code = (error as { code?: string })?.code || "";
+    switch (code) {
+      case "auth/invalid-credential":
+      case "auth/wrong-password":
+      case "auth/user-not-found":
+        return "Invalid email or password. Please check your credentials.";
+      case "auth/invalid-email":
+        return "Please enter a valid email address.";
+      case "auth/email-already-in-use":
+        return "An account with this email address already exists. Please log in.";
+      case "auth/weak-password":
+        return "Password should be at least 6 characters long.";
+      case "auth/too-many-requests":
+        return "Access to this account is temporarily disabled due to many failed login attempts. Reset your password or try again later.";
+      default:
+        return error instanceof Error ? error.message : "Authentication error.";
     }
+  };
 
-    return (snap.data().role as UserRole | undefined) ?? "user";
+  const resolveExistingAccount = async (firebaseUser: User): Promise<UserRole> => {
+    try {
+      const userRef = doc(db, "users", firebaseUser.uid);
+      const snap = await getDoc(userRef);
+      if (!snap.exists()) {
+        await setDoc(userRef, {
+          uid: firebaseUser.uid,
+          name: firebaseUser.displayName || firebaseUser.email?.split("@")[0] || "User",
+          email: firebaseUser.email || "",
+          phone: firebaseUser.phoneNumber || "",
+          role: "user",
+          createdAt: serverTimestamp(),
+        }).catch((err) => console.warn("Could not create user document:", err));
+        return "user";
+      }
+      return (snap.data().role as UserRole | undefined) ?? "user";
+    } catch (e) {
+      console.warn("Could not fetch user document, defaulting to user role:", e);
+      return "user";
+    }
   };
 
   // --- Auth Handlers ---
@@ -89,15 +122,11 @@ const Login: React.FC = () => {
     try {
       await logout().catch(() => undefined);
       const credential = await loginWithEmail(email, password);
-      const resolvedRole = await resolveExistingAccount(credential.user.uid);
+      const resolvedRole = await resolveExistingAccount(credential.user);
       toast.success("Signed in successfully");
       routeAfterAuth(resolvedRole);
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Unable to sign in. Please check your account.";
-      toast.error(message);
+      toast.error(getAuthErrorMessage(error));
       await logout().catch(() => undefined);
     } finally {
       setLoading(false);
@@ -110,12 +139,10 @@ const Login: React.FC = () => {
     try {
       await signUpWithEmail(email, password, "user", name.trim(), phone.trim());
 
-      toast.success("Account created");
+      toast.success("Account created successfully");
       routeAfterAuth("user");
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unable to create account.";
-      toast.error(message);
+      toast.error(getAuthErrorMessage(error));
     } finally {
       setLoading(false);
     }
@@ -140,9 +167,25 @@ const Login: React.FC = () => {
     setLoading(true);
     try {
       const credential = await loginWithGoogle();
-      const resolvedRole = await resolveExistingAccount(credential.user.uid);
-      toast.success("Signed in with Google");
-      routeAfterAuth(resolvedRole);
+      if (credential?.user) {
+        const userRef = doc(db, "users", credential.user.uid);
+        const snap = await getDoc(userRef);
+        let resolvedRole: UserRole = "user";
+        if (!snap.exists()) {
+          await setDoc(userRef, {
+            uid: credential.user.uid,
+            name: credential.user.displayName || "Google User",
+            email: credential.user.email || "",
+            phone: credential.user.phoneNumber || "",
+            role: "user",
+            createdAt: serverTimestamp(),
+          });
+        } else {
+          resolvedRole = (snap.data().role as UserRole | undefined) ?? "user";
+        }
+        toast.success("Signed in with Google");
+        routeAfterAuth(resolvedRole);
+      }
     } catch (error) {
       const message =
         error instanceof Error

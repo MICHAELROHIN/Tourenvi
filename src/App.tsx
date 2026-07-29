@@ -36,11 +36,27 @@ import ErrorBoundary from "@/components/shared/ErrorBoundary";
 const queryClient = new QueryClient();
 
 const AuthGate = ({ children }: { children: React.ReactNode }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, loading } = useAuth();
+  if (loading) return null;
   if (currentUser) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/hero" replace />;
   }
   return <>{children}</>;
+};
+
+const RootRedirect = () => {
+  const { currentUser, loading, userRole } = useAuth();
+  if (loading) return null;
+  if (currentUser) {
+    const roleRoutes: Record<string, string> = {
+      user: "/hero",
+      admin: "/admin/dashboard",
+      guide: "/guide/dashboard",
+      support: "/support/dashboard",
+    };
+    return <Navigate to={userRole ? roleRoutes[userRole] ?? "/hero" : "/hero"} replace />;
+  }
+  return <Navigate to="/login" replace />;
 };
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
@@ -65,13 +81,21 @@ const PortalSafe = ({
 const AppRoutes = () => {
   return (
     <Routes>
-      <Route path="/" element={<Index />} />
+      <Route path="/" element={<RootRedirect />} />
       <Route
         path="/login"
         element={
           <AuthGate>
             <Login />
           </AuthGate>
+        }
+      />
+      <Route
+        path="/hero"
+        element={
+          <ProtectedRoute allowedRoles={["user", "admin", "guide", "support"]}>
+            <Index />
+          </ProtectedRoute>
         }
       />
 

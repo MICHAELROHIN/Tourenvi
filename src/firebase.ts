@@ -7,9 +7,12 @@ import {
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithEmailAndPassword,
   signInWithPhoneNumber,
   signOut,
+  updateProfile,
   RecaptchaVerifier,
   type User,
   type Unsubscribe,
@@ -59,34 +62,72 @@ export const signUpWithEmail = async (
   name: string,
   phone?: string,
 ) => {
-  const credential = await createUserWithEmailAndPassword(auth, email, password);
+  const cleanEmail = email.trim().toLowerCase();
+  const credential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
 
-  await setDoc(
-    doc(db, "users", credential.user.uid),
-    {
-      name,
-      email,
-      phone: phone?.trim() || "",
-      role,
-      createdAt: serverTimestamp(),
-      isActive: true,
-      tripsCreated: 0,
-      totalDistance: 0,
-      profileComplete: false,
-    },
-    { merge: true },
-  );
+  // Set display name in Firebase Auth profile
+  if (name?.trim()) {
+    try {
+      await updateProfile(credential.user, { displayName: name.trim() });
+    } catch (e) {
+      console.warn("Failed to set Auth displayName:", e);
+    }
+  }
+
+  // Store clean user document structure in Firestore
+  try {
+    await setDoc(
+      doc(db, "users", credential.user.uid),
+      {
+        uid: credential.user.uid,
+        name: name.trim(),
+        email: cleanEmail,
+        phone: phone?.trim() || "",
+        role: role || "user",
+        createdAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  } catch (firestoreError) {
+    console.warn("Firestore document write failed (check Firestore Security Rules):", firestoreError);
+  }
 
   return credential;
 };
 
 export const loginWithEmail = async (email: string, password: string) => {
-  const credential = await signInWithEmailAndPassword(auth, email, password);
+  const cleanEmail = email.trim().toLowerCase();
+  const credential = await signInWithEmailAndPassword(auth, cleanEmail, password);
   return credential;
 };
 
 export const loginWithGoogle = async () => {
-  return signInWithPopup(auth, googleProvider);
+  try {
+    return await signInWithPopup(auth, googleProvider);
+  } catch (error: unknown) {
+    // If the popup was blocked (e.g. by COOP policy or popup-blocker),
+    // fall back to redirect-based sign-in.
+    const code = (error as { code?: string })?.code;
+    if (
+      code === "auth/popup-blocked" ||
+      code === "auth/popup-closed-by-user" ||
+      code === "auth/cancelled-popup-request"
+    ) {
+      await signInWithRedirect(auth, googleProvider);
+      // After redirect, the result is picked up by getGoogleRedirectResult()
+      // which should be called on app initialisation.
+      return null as never; // redirect navigates away; execution won't reach here
+    }
+    throw error;
+  }
+};
+
+/**
+ * Call once on app start (e.g. in AuthContext) to capture the result
+ * when the user returns from a redirect-based Google sign-in.
+ */
+export const getGoogleRedirectResult = async () => {
+  return getRedirectResult(auth);
 };
 
 export const logout = async () => {

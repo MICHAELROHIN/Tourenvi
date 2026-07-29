@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { doc, onSnapshot, type DocumentData } from "firebase/firestore";
-import { auth, db, onAuthChange, type UserRole } from "@/firebase";
+import { auth, db, onAuthChange, getGoogleRedirectResult, type UserRole } from "@/firebase";
 import type { User } from "firebase/auth";
 
 type AuthContextValue = {
@@ -73,6 +73,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         unsubscribeUserDoc();
       }
     };
+  }, []);
+
+  // Capture redirect-based Google sign-in result on app load
+  useEffect(() => {
+    getGoogleRedirectResult().catch(() => {
+      // Silently ignore — no redirect was pending
+    });
   }, []);
 
   const value = useMemo(
