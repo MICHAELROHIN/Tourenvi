@@ -20,7 +20,9 @@ import Attractions from "@/pages/Attractions";
 import Favourites from "@/pages/Favourites";
 import LiveTracking from "@/pages/LiveTracking";
 import AddAttraction from "@/pages/AddAttraction";
-import AdminDashboard from "@/portals/admin/Dashboard";
+import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminLogin from "@/pages/admin/AdminLogin";
+import AdminProtectedRoute from "@/components/admin/AdminProtectedRoute";
 import AttractionVerifier from "@/portals/admin/AttractionVerifier";
 import UserManagement from "@/portals/admin/UserManagement";
 import GuideDashboard from "@/portals/guide/Dashboard";
@@ -50,7 +52,7 @@ const RootRedirect = () => {
   if (currentUser) {
     const roleRoutes: Record<string, string> = {
       user: "/hero",
-      admin: "/admin/dashboard",
+      admin: "/admin",
       guide: "/guide/dashboard",
       support: "/support/dashboard",
     };
@@ -211,17 +213,25 @@ const AppRoutes = () => {
       />
       <Route path="/tracking" element={<Navigate to="/live" replace />} />
 
+      <Route 
+        path="/admin" 
+        element={
+          <AdminProtectedRoute>
+            <AdminDashboard />
+          </AdminProtectedRoute>
+        } 
+      />
+
+      <Route
+        path="/admin/login"
+        element={
+          <AdminLogin />
+        }
+      />
+
       <Route
         path="/admin/dashboard"
-        element={
-          <ProtectedRoute allowedRoles={["admin"]}>
-            <AppLayout>
-              <PortalSafe title="Admin portal is temporarily unavailable">
-                <AdminDashboard />
-              </PortalSafe>
-            </AppLayout>
-          </ProtectedRoute>
-        }
+        element={<Navigate to="/admin" replace />}
       />
       <Route
         path="/admin/verify"

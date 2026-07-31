@@ -27,7 +27,7 @@ import bgImage from "@/assets/background.jpg";
 
 const roleRoutes: Record<UserRole, string> = {
   user: "/hero",
-  admin: "/admin/dashboard",
+  admin: "/admin",
   guide: "/guide/dashboard",
   support: "/support/dashboard",
 };
