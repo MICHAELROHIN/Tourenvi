@@ -26,13 +26,16 @@ const AdminProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       setCurrentUser(user);
 
       try {
-        const userDocRef = doc(db, "users", user.uid);
-        const userDocSnap = await getDoc(userDocRef);
-        if (userDocSnap.exists()) {
-          const role = userDocSnap.data().role || "user";
-          setUserRole(role);
+        const adminDocSnap = await getDoc(doc(db, "admins", user.uid));
+        if (adminDocSnap.exists()) {
+          setUserRole(adminDocSnap.data().role || "admin");
         } else {
-          setUserRole(null);
+          const userDocSnap = await getDoc(doc(db, "users", user.uid));
+          if (userDocSnap.exists()) {
+            setUserRole(userDocSnap.data().role || "user");
+          } else {
+            setUserRole(null);
+          }
         }
       } catch (error) {
         console.error("Firestore user role query failed in AdminProtectedRoute:", error);

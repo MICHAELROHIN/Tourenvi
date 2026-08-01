@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { doc, onSnapshot, type DocumentData } from "firebase/firestore";
+import { doc, onSnapshot, setDoc, deleteDoc, type DocumentData } from "firebase/firestore";
 import { auth, db, onAuthChange, getGoogleRedirectResult, type UserRole } from "@/firebase";
 import type { User } from "firebase/auth";
 
@@ -35,7 +35,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const unsubscribeAuth = onAuthChange((user, role) => {
       setCurrentUser(user);
-      setUserRole(role ?? null);
 
       if (unsubscribeUserDoc) {
         unsubscribeUserDoc();
@@ -49,21 +48,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       // Render protected routes immediately once auth is known.
-      // The user document snapshot can update the role/profile after paint.
       setLoading(false);
 
+      // Check admins collection first, then fallback to users collection
       unsubscribeUserDoc = onSnapshot(
-        doc(db, "users", user.uid),
-        (snap) => {
-          const data = snap.exists() ? snap.data() : null;
-          setUserDoc(data);
-          setUserRole((data?.role as UserRole | undefined) ?? role ?? "user");
-          setLoading(false);
+        doc(db, "admins", user.uid),
+        (adminSnap) => {
+          if (adminSnap.exists()) {
+            const data = adminSnap.data();
+            setUserDoc(data);
+            setUserRole("admin");
+            setLoading(false);
+          } else {
+            onSnapshot(
+              doc(db, "users", user.uid),
+              (userSnap) => {
+                const data = userSnap.exists() ? userSnap.data() : null;
+                if (data && data.role === "admin") {
+                  // Auto-migrate legacy admin document to admins collection
+                  setDoc(doc(db, "admins", user.uid), { ...data, role: "admin" }).then(() => {
+                    deleteDoc(doc(db, "users", user.uid));
+                  });
+                  setUserDoc({ ...data, role: "admin" });
+                  setUserRole("admin");
+                } else {
+                  setUserDoc(data);
+                  setUserRole((data?.role as UserRole | undefined) ?? role ?? "user");
+                }
+                setLoading(false);
+              },
+              () => {
+                setUserDoc(null);
+                setLoading(false);
+              }
+            );
+          }
         },
         () => {
           setUserDoc(null);
           setLoading(false);
-        },
+        }
       );
     });
 

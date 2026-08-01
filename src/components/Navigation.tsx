@@ -13,8 +13,10 @@ import {
   LogOut,
   AlertTriangle,
   MessageSquare,
+  LifeBuoy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import HelpSupportModal from "@/components/shared/HelpSupportModal";
 
 // --- FIREBASE IMPORTS ---
 import { auth, logout } from "@/firebase";
@@ -28,6 +30,7 @@ const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [user, setUser] = useState<FirebaseUser | null>(null);
 
   const navigate = useNavigate();
@@ -150,6 +153,15 @@ const Navigation = () => {
                   <span className="whitespace-nowrap">{item.label}</span>
                 </Link>
               ))}
+
+              {/* Help & Support Nav Button */}
+              <button
+                onClick={() => setIsHelpModalOpen(true)}
+                className="flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 hover:bg-[#D4AF37]/20 transition-colors duration-200 cursor-pointer"
+              >
+                <LifeBuoy className="w-4 h-4 shrink-0 animate-pulse text-[#D4AF37]" />
+                <span className="whitespace-nowrap font-semibold">Help & Support</span>
+              </button>
             </div>
 
             {/* Right side actions — Desktop */}
@@ -303,6 +315,17 @@ const Navigation = () => {
                 <span className="text-sm">{item.label}</span>
               </Link>
             ))}
+
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                setIsHelpModalOpen(true);
+              }}
+              className="w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 hover:bg-[#D4AF37]/20 transition-colors duration-200 text-left font-semibold"
+            >
+              <LifeBuoy className="w-5 h-5 shrink-0 animate-pulse text-[#D4AF37]" />
+              <span className="text-sm">Help & Support</span>
+            </button>
           </div>
 
           {/* Bottom actions */}
@@ -321,6 +344,12 @@ const Navigation = () => {
           </div>
         </div>
       </div>
+
+      {/* --- HELP & SUPPORT MODAL --- */}
+      <HelpSupportModal
+        isOpen={isHelpModalOpen}
+        onClose={() => setIsHelpModalOpen(false)}
+      />
 
       {/* --- DELETE CONFIRMATION MODAL --- */}
       {isDeleteModalOpen && (

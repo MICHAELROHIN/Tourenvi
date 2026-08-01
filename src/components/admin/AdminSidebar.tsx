@@ -14,9 +14,23 @@ import {
   LogOut,
   Compass,
   UserCheck,
+  Headphones,
+  DollarSign,
+  Activity,
+  History,
 } from "lucide-react";
 
-export type AdminTab = "overview" | "users" | "admins" | "fleet" | "fuel" | "logs";
+export type AdminTab =
+  | "overview"
+  | "users"
+  | "admins"
+  | "fleet"
+  | "fuel"
+  | "logs"
+  | "support"
+  | "revenue"
+  | "health"
+  | "audit";
 
 interface AdminSidebarProps {
   activeTab: AdminTab;
@@ -45,11 +59,21 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab }) 
         return;
       }
 
-      // Setup a real-time listener on the isolated admin's profile document
+      // Setup a real-time listener on the isolated admin's profile document (check admins collection first)
       unsubscribeDoc = onSnapshot(
-        doc(db, "users", user.uid),
+        doc(db, "admins", user.uid),
         (snap) => {
-          setAdminProfile(snap.exists() ? snap.data() : null);
+          if (snap.exists()) {
+            setAdminProfile(snap.data());
+          } else {
+            onSnapshot(
+              doc(db, "users", user.uid),
+              (uSnap) => {
+                setAdminProfile(uSnap.exists() ? uSnap.data() : null);
+              },
+              () => setAdminProfile(null)
+            );
+          }
         },
         () => {
           setAdminProfile(null);
@@ -104,6 +128,26 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab }) 
       id: "logs" as AdminTab,
       label: "Budget Exceptions",
       icon: FileWarning,
+    },
+    {
+      id: "support" as AdminTab,
+      label: "Support & Inquiries",
+      icon: Headphones,
+    },
+    {
+      id: "revenue" as AdminTab,
+      label: "Revenue & Monetization",
+      icon: DollarSign,
+    },
+    {
+      id: "health" as AdminTab,
+      label: "System Health",
+      icon: Activity,
+    },
+    {
+      id: "audit" as AdminTab,
+      label: "System Audit Log",
+      icon: History,
     },
   ];
 

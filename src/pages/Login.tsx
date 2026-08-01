@@ -95,6 +95,13 @@ const Login: React.FC = () => {
 
   const resolveExistingAccount = async (firebaseUser: User): Promise<UserRole> => {
     try {
+      // 1. Check admins collection first
+      const adminSnap = await getDoc(doc(db, "admins", firebaseUser.uid));
+      if (adminSnap.exists()) {
+        return (adminSnap.data().role as UserRole | undefined) ?? "admin";
+      }
+
+      // 2. Check users collection
       const userRef = doc(db, "users", firebaseUser.uid);
       const snap = await getDoc(userRef);
       if (!snap.exists()) {
@@ -108,7 +115,16 @@ const Login: React.FC = () => {
         }).catch((err) => console.warn("Could not create user document:", err));
         return "user";
       }
-      return (snap.data().role as UserRole | undefined) ?? "user";
+
+      const data = snap.data();
+      if (data.role === "admin") {
+        // Auto-migrate admin record into admins collection
+        await setDoc(doc(db, "admins", firebaseUser.uid), { ...data, role: "admin", updatedAt: serverTimestamp() });
+        await deleteDoc(userRef);
+        return "admin";
+      }
+
+      return (data.role as UserRole | undefined) ?? "user";
     } catch (e) {
       console.warn("Could not fetch user document, defaulting to user role:", e);
       return "user";
@@ -168,10 +184,21 @@ const Login: React.FC = () => {
     try {
       const credential = await loginWithGoogle();
       if (credential?.user) {
+        const adminSnap = await getDoc(doc(db, "admins", credential.user.uid));
         const userRef = doc(db, "users", credential.user.uid);
-        const snap = await getDoc(userRef);
+        const userSnap = await getDoc(userRef);
         let resolvedRole: UserRole = "user";
-        if (!snap.exists()) {
+
+        if (adminSnap.exists()) {
+          resolvedRole = (adminSnap.data().role as UserRole) || "admin";
+        } else if (userSnap.exists()) {
+          const data = userSnap.data();
+          resolvedRole = (data.role as UserRole) || "user";
+          if (resolvedRole === "admin") {
+            await setDoc(doc(db, "admins", credential.user.uid), { ...data, role: "admin", updatedAt: serverTimestamp() });
+            await deleteDoc(userRef);
+          }
+        } else {
           await setDoc(userRef, {
             uid: credential.user.uid,
             name: credential.user.displayName || "Google User",
@@ -180,8 +207,6 @@ const Login: React.FC = () => {
             role: "user",
             createdAt: serverTimestamp(),
           });
-        } else {
-          resolvedRole = (snap.data().role as UserRole | undefined) ?? "user";
         }
         toast.success("Signed in with Google");
         routeAfterAuth(resolvedRole);

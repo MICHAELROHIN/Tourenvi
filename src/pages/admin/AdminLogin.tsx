@@ -19,8 +19,8 @@ const AdminLogin: React.FC = () => {
     const unsubscribe = onAuthStateChanged(adminAuth, async (user) => {
       if (user) {
         try {
-          const userDocRef = doc(db, "users", user.uid);
-          const userDocSnap = await getDoc(userDocRef);
+          const adminSnap = await getDoc(doc(db, "admins", user.uid));
+          const userDocSnap = adminSnap.exists() ? adminSnap : await getDoc(doc(db, "users", user.uid));
           if (userDocSnap.exists() && userDocSnap.data().role === "admin") {
             const from = (location.state as { from?: string } | null)?.from || "/admin";
             navigate(from, { replace: true });
@@ -45,9 +45,9 @@ const AdminLogin: React.FC = () => {
       // 1. Sign in with isolated adminAuth instance
       const credential = await signInWithEmailAndPassword(adminAuth, email.trim(), password);
       
-      // 2. Fetch User Profile from Firestore to check Role
-      const userDocRef = doc(db, "users", credential.user.uid);
-      const userDocSnap = await getDoc(userDocRef);
+      // 2. Fetch User Profile from Firestore to check Role (Check admins collection first)
+      const adminSnap = await getDoc(doc(db, "admins", credential.user.uid));
+      const userDocSnap = adminSnap.exists() ? adminSnap : await getDoc(doc(db, "users", credential.user.uid));
       
       if (!userDocSnap.exists()) {
         await signOut(adminAuth);
