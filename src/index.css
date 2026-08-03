@@ -6,86 +6,49 @@
 
 @layer base {
   :root {
-    /* Light green background across the app */
-    --background: 120 50% 96%;
-    --foreground: 160 40% 12%;
+    /* Global color system (enterprise SaaS tokens) */
+    --primary: 142 62% 39%; /* #16A34A */
+    --secondary: 137 74% 47%; /* #22C55E */
+    --accent: 158 63% 44%; /* #10B981 */
 
-    --card: 0 0% 100%;
-    --card-foreground: 160 40% 12%;
+    --background: 210 60% 98%; /* #F8FAFC */
+    --foreground: 222 14% 9%; /* #111827 */
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 160 40% 12%;
+    --card: 0 0% 100%; /* #FFFFFF */
+    --card-foreground: 222 14% 9%;
 
-    --primary: 142 70% 45%;
-    --primary-foreground: 0 0% 100%;
-    --primary-hover: 142 70% 40%;
+    --border: 210 16% 92%; /* #E5E7EB */
+    --input: 210 16% 96%;
+    --ring: 142 62% 39%;
 
-    --secondary: 200 80% 85%;
-    --secondary-foreground: 160 40% 12%;
+    --success: 137 74% 47%;
+    --warning: 36 96% 55%; /* #F59E0B */
+    --danger: 1 78% 56%; /* #EF4444 */
 
-    --muted: 120 20% 95%;
-    --muted-foreground: 160 20% 50%;
-
-    --accent: 185 75% 50%;
-    --accent-foreground: 0 0% 100%;
-
-    --success: 120 60% 50%;
-    --success-foreground: 0 0% 100%;
-
-    --warning: 45 90% 60%;
-    --warning-foreground: 160 40% 12%;
-
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 120 20% 90%;
-    --input: 120 20% 95%;
-    --ring: 142 70% 45%;
-
-    /* Travel-specific colors */
-    --eco-green: 142 70% 45%;
-    --ocean-blue: 200 80% 60%;
-    --forest-dark: 160 40% 12%;
-    --nature-light: 120 50% 96%;
+    /* Brand-specific tokens kept for compatibility */
+    --eco-green: 142 62% 39%;
+    --forest-dark: 222 14% 9%;
 
     /* Gradients */
-    --gradient-hero: linear-gradient(
-      135deg,
-      hsl(142 70% 45%),
-      hsl(200 80% 60%)
-    );
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(120 20% 98%));
-    --gradient-sustainability: linear-gradient(
-      90deg,
-      hsl(142 70% 45%),
-      hsl(120 60% 50%)
-    );
+    --gradient-hero: linear-gradient(135deg, hsl(142 62% 39%), hsl(158 63% 44%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(210 16% 96%));
 
-    /* Shadows */
-    --shadow-card: 0 4px 20px -2px hsl(160 40% 12% / 0.08);
-    --shadow-hero: 0 10px 40px -10px hsl(142 70% 45% / 0.3);
+    /* Shadows - soft */
+    --shadow-card: 0 8px 24px -8px rgba(17,24,39,0.06);
+    --shadow-hero: 0 12px 34px -10px rgba(16,185,129,0.08);
 
     /* Animations */
-    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-bounce: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-bounce: all 0.28s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 
-    --radius: 0.5rem;
+    /* Larger radius for premium feel (16px) */
+    --radius: 1rem;
 
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* Sidebar defaults now neutral white */
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222 14% 9%;
+    --sidebar-border: 210 16% 92%;
+    --sidebar-ring: 142 62% 39%;
   }
 
   .dark {

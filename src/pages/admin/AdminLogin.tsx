@@ -83,27 +83,24 @@ const AdminLogin: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#051124] p-4 relative overflow-hidden font-sans">
-      {/* Decorative Gradients */}
-      <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-[#0B2B5C]/40 blur-[150px] pointer-events-none" />
-      <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] rounded-full bg-[#D4AF37]/5 blur-[150px] pointer-events-none" />
+    <div className="min-h-screen w-full flex items-center justify-center bg-background p-6 relative overflow-hidden font-sans">
 
-      {/* Main Login Card */}
-      <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl p-8 shadow-[0_12px_40px_rgba(5,17,36,0.8)] relative z-10 transition-all duration-300 hover:border-white/15">
-        
-        {/* Top Branding */}
-        <div className="text-center mb-8">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#D4AF37] text-[#0B2B5C] shadow-[0_0_20px_rgba(212,175,55,0.4)] mb-4">
-            <Compass className="h-8 w-8 animate-spin-slow" />
+      <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Illustration / Brand panel */}
+        <div className="hidden md:flex flex-col items-center justify-center rounded-[1rem] p-8 bg-gradient-to-br from-primary/10 to-accent/6">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent shadow-card mb-6">
+            <Compass className="h-10 w-10 text-white" />
           </div>
-          <h2 className="text-2xl font-bold tracking-tight text-white">Tourenvi Admin</h2>
-          <p className="text-xs text-gray-400 mt-1">Authorized Operations Login Only</p>
+          <h2 className="text-2xl font-semibold text-foreground">Tourenvi Admin</h2>
+          <p className="text-sm text-secondary mt-2 text-center">Authorized operations console — restricted access only.</p>
         </div>
 
+        {/* Main Login Card */}
+        <div className="w-full rounded-[1rem] border border-border bg-card p-8 shadow-card">
         {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-1">
-            <label className="text-xs font-semibold uppercase tracking-wider text-gray-300">Admin Email</label>
+            <label className="text-xs font-medium uppercase tracking-wider text-secondary">Admin Email</label>
             <div className="relative">
               <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-gray-400" />
               <input
@@ -112,13 +109,13 @@ const AdminLogin: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="commander@tourenvi.com"
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all duration-300"
+                className="w-full pl-11 pr-4 py-3 rounded-lg border border-border bg-card text-sm text-foreground placeholder-gray-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40 transition-all duration-200"
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold uppercase tracking-wider text-gray-300">Operations Key</label>
+            <label className="text-xs font-medium uppercase tracking-wider text-secondary">Operations Key</label>
             <div className="relative">
               <KeyRound className="absolute left-3.5 top-3.5 h-4 w-4 text-gray-400" />
               <input
@@ -127,7 +124,7 @@ const AdminLogin: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all duration-300"
+                className="w-full pl-11 pr-4 py-3 rounded-lg border border-border bg-card text-sm text-foreground placeholder-gray-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40 transition-all duration-200"
               />
             </div>
           </div>
@@ -135,12 +132,12 @@ const AdminLogin: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 mt-2 py-3 px-4 rounded-xl text-sm font-bold uppercase tracking-wider text-[#0B2B5C] bg-[#D4AF37] hover:bg-[#D4AF37]/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_4px_15px_rgba(212,175,55,0.2)] hover:shadow-[0_4px_20px_rgba(212,175,55,0.35)] transition-all duration-300 active:scale-[0.98] cursor-pointer"
+            className="w-full flex items-center justify-center gap-2 mt-2 py-3 px-4 rounded-lg text-sm font-semibold uppercase tracking-wider text-card bg-primary hover:brightness-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm transition-all duration-200 active:scale-[0.98] cursor-pointer"
           >
             {loading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin text-card" />
             ) : (
-              "Initialize Session"
+              "Sign In"
             )}
           </button>
         </form>
@@ -149,11 +146,12 @@ const AdminLogin: React.FC = () => {
         <div className="mt-6 text-center">
           <button
             onClick={() => navigate("/")}
-            className="inline-flex items-center gap-2 text-xs font-semibold text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer"
+            className="inline-flex items-center gap-2 text-sm font-medium text-secondary hover:text-foreground transition-colors duration-200 cursor-pointer"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             Return to Homepage
           </button>
+        </div>
         </div>
       </div>
     </div>

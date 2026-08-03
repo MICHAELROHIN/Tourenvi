@@ -57,8 +57,8 @@ const EliteDashboard = () => {
   const totalCost = calcData?.financials?.totalCost || 0;
 
   const chartData = [
-    { name: "Fuel", value: fuelExpenditure, color: "#0B2B5C" }, // gt-blue
-    { name: "Lodging", value: totalLodging, color: "#D4AF37" }, // gt-gold
+    { name: "Fuel", value: fuelExpenditure, color: "#0f766e" }, // gt-blue -> darker green
+    { name: "Lodging", value: totalLodging, color: "#10B981" }, // gt-gold -> eco green
     { name: "Tolls", value: tollPricing, color: "#9ca3af" },
     { name: "Food", value: foodCost, color: "#10b981" },
     { name: "Sightseeing", value: placesCost, color: "#ec4899" },

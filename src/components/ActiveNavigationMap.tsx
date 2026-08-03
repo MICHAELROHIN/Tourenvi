@@ -204,7 +204,7 @@ export const ActiveNavigationMap: React.FC<ActiveNavigationMapProps> = ({ origin
             <input 
               type="text" 
               placeholder="Vehicle License Plate / Car Number"
-              className="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#D4AF37] uppercase"
+              className="p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-eco-green uppercase"
               value={licensePlate}
               onChange={(e) => setLicensePlate(e.target.value)}
               required
@@ -212,7 +212,7 @@ export const ActiveNavigationMap: React.FC<ActiveNavigationMapProps> = ({ origin
           </div>
           <button 
             type="submit"
-            className="whitespace-nowrap px-6 py-3 bg-[#0F3057] text-[#D4AF37] font-bold rounded-lg shadow-md hover:bg-[#1a4a85] transition-colors"
+            className="whitespace-nowrap px-6 py-3 bg-forest-dark text-eco-green font-bold rounded-lg shadow-md hover:bg-forest-dark/90 transition-colors"
           >
             Start Active Navigation Mode
           </button>
@@ -223,7 +223,7 @@ export const ActiveNavigationMap: React.FC<ActiveNavigationMapProps> = ({ origin
         <div className="flex justify-between items-center p-4 bg-[#0F3057] text-white rounded-xl">
           <div className="flex items-center gap-3">
             <div className="animate-pulse w-3 h-3 bg-red-500 rounded-full"></div>
-            <span className="font-bold tracking-wide text-[#D4AF37]">LIVE NAVIGATION ACTIVE</span>
+            <span className="font-bold tracking-wide text-eco-green">LIVE NAVIGATION ACTIVE</span>
           </div>
           <div className="font-mono text-sm opacity-80">Vehicle: {licensePlate.toUpperCase()}</div>
         </div>

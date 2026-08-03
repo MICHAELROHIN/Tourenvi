@@ -152,20 +152,18 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab }) 
   ];
 
   return (
-    <aside className="w-80 h-[calc(100vh-2rem)] sticky top-4 left-4 flex flex-col justify-between rounded-2xl border border-white/10 bg-[#0B2B5C]/80 backdrop-blur-md shadow-[0_8px_32px_0_rgba(5,17,36,0.5)] p-6 z-30 transition-all duration-300">
+    <aside className="w-96 h-[calc(100vh-2rem)] sticky top-6 left-6 flex flex-col justify-between rounded-[1rem] border border-border bg-card text-foreground p-6 z-30 transition-all duration-300">
       {/* Header / Brand */}
       <div className="space-y-8">
         <div className="flex items-center gap-3 px-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#D4AF37] text-[#0B2B5C] shadow-[0_0_15px_rgba(212,175,55,0.4)]">
-            <Compass className="h-6 w-6 animate-spin-slow" />
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-gradient-to-br from-eco-green to-accent shadow-card">
+            <Compass className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-white">
-              Tourenvi<span className="text-[#D4AF37] ml-1">Admin</span>
+            <h1 className="text-lg font-semibold tracking-tight text-foreground">
+              Tourenvi <span className="font-bold text-primary/90 ml-1">Admin</span>
             </h1>
-            <p className="text-[10px] tracking-widest text-[#D4AF37] uppercase font-bold">
-              Operations Center
-            </p>
+            <p className="text-xs text-secondary mt-0.5 uppercase font-medium">Operations</p>
           </div>
         </div>
 
@@ -179,22 +177,20 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab }) 
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-semibold tracking-wide transition-all duration-300 relative group cursor-pointer ${
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-lg text-sm font-medium tracking-wide transition-all duration-200 relative group cursor-pointer ${
                   isActive
-                    ? "text-[#D4AF37] bg-[#F8F9FA]/5 border-l-4 border-[#D4AF37] shadow-[inset_4px_0_15px_rgba(212,175,55,0.05)]"
-                    : "text-gray-300 hover:text-white hover:bg-white/5 hover:translate-x-1"
+                    ? "text-primary bg-primary/10 border-l-4 border-primary font-semibold"
+                    : "text-secondary hover:text-foreground hover:bg-gray-50"
                 }`}
               >
                 <Icon
-                  className={`h-5 w-5 transition-transform duration-300 group-hover:scale-110 ${
-                    isActive ? "text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]" : "text-gray-400 group-hover:text-white"
-                  }`}
+                  className={`h-6 w-6 transition-transform duration-200 ${isActive ? "text-primary" : "text-gray-500 group-hover:text-foreground"}`}
                 />
                 <span>{item.label}</span>
 
                 {/* Animated active/hover glow element */}
                 {isActive && (
-                  <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-[#D4AF37] shadow-[0_0_8px_rgba(212,175,55,0.8)]" />
+                  <span className="absolute right-3 w-1.5 h-6 rounded-full bg-primary/80" />
                 )}
               </button>
             );
@@ -203,22 +199,22 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab }) 
       </div>
 
       {/* Footer Profile & Logout */}
-      <div className="space-y-4 pt-6 border-t border-white/10">
+      <div className="space-y-4 pt-6 border-t border-border">
         <div className="flex items-center gap-3 px-2 py-1">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#D4AF37]/30 bg-[#051124] text-[#D4AF37]">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100 text-foreground">
             {adminProfile?.name ? (
-              <span className="font-bold text-sm uppercase">
+              <span className="font-semibold text-sm uppercase">
                 {adminProfile.name.substring(0, 2)}
               </span>
             ) : (
-              <UserCheck className="h-5 w-5" />
+              <UserCheck className="h-5 w-5 text-secondary" />
             )}
           </div>
           <div className="flex-1 overflow-hidden">
-            <h4 className="text-sm font-bold text-white truncate">
+            <h4 className="text-sm font-semibold text-foreground truncate">
               {adminProfile?.name || "System Admin"}
             </h4>
-            <p className="text-xs text-gray-400 truncate">
+            <p className="text-xs text-secondary truncate">
               {adminProfile?.email || adminUser?.email || "admin@tourenvi.com"}
             </p>
           </div>
@@ -226,10 +222,10 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab }) 
 
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-sm font-semibold tracking-wide transition-all duration-300 active:scale-95 cursor-pointer shadow-[0_2px_10px_rgba(239,68,68,0.05)]"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-white text-foreground hover:bg-gray-50 text-sm font-medium tracking-wide transition-all duration-200 active:scale-95 cursor-pointer"
         >
           <LogOut className="h-4 w-4" />
-          <span>Exit Dashboard</span>
+          <span>Sign Out</span>
         </button>
       </div>
     </aside>
