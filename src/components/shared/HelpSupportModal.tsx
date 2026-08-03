@@ -127,7 +127,7 @@ const HelpSupportModal: React.FC<HelpSupportModalProps> = ({ isOpen, onClose }) 
             {/* User Details */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
+                <label className="text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-eco-green" /> Your Name *
                 </label>
                 <input
@@ -141,7 +141,7 @@ const HelpSupportModal: React.FC<HelpSupportModalProps> = ({ isOpen, onClose }) 
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
+                <label className="text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5 text-eco-green" /> Email Address *
                 </label>
                 <input
@@ -157,7 +157,7 @@ const HelpSupportModal: React.FC<HelpSupportModalProps> = ({ isOpen, onClose }) 
 
             {/* Issue Category */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
+              <label className="text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
                 <Tag className="w-3.5 h-3.5 text-eco-green" /> Issue Category *
               </label>
               <select
@@ -175,7 +175,7 @@ const HelpSupportModal: React.FC<HelpSupportModalProps> = ({ isOpen, onClose }) 
 
             {/* Message Body */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
+              <label className="text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
                 <MessageSquare className="w-3.5 h-3.5 text-[#D4AF37]" /> Describe Your Issue or Query *
               </label>
               <textarea

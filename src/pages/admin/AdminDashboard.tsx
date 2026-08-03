@@ -1723,7 +1723,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Affiliate Revenue</p>
-                    <h3 className="text-2xl font-black text-white mt-1 text-emerald-400 font-mono">
+                    <h3 className="text-2xl font-black mt-1 text-emerald-400 font-mono">
                       ₹1,24,500 <span className="text-xs font-semibold text-gray-400">($14,820)</span>
                     </h3>
                   </div>
@@ -1740,7 +1740,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Hotel Bookings (Agoda/Booking)</p>
-                    <h3 className="text-2xl font-black text-white mt-1 text-blue-400 font-mono">
+                    <h3 className="text-2xl font-black mt-1 text-blue-400 font-mono">
                       ₹71,000 <span className="text-xs font-semibold text-gray-400">(57%)</span>
                     </h3>
                   </div>
@@ -1757,7 +1757,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Vehicle Rental Clicks</p>
-                    <h3 className="text-2xl font-black text-white mt-1 text-amber-400 font-mono">
+                    <h3 className="text-2xl font-black mt-1 text-amber-400 font-mono">
                       ₹32,900 <span className="text-xs font-semibold text-gray-400">(26%)</span>
                     </h3>
                   </div>
@@ -1774,7 +1774,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Premium Trip Exports</p>
-                    <h3 className="text-2xl font-black text-white mt-1 text-eco-green font-mono">
+                    <h3 className="text-2xl font-black mt-1 text-eco-green font-mono">
                       ₹20,600 <span className="text-xs font-semibold text-gray-400">(17%)</span>
                     </h3>
                   </div>
