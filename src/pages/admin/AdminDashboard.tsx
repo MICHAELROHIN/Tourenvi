@@ -80,8 +80,8 @@ import {
 import AdminSidebar, { AdminTab } from "@/components/admin/AdminSidebar";
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from "@react-google-maps/api";
 
-const COLORS_MOOD = ["#D4AF37", "#0B2B5C", "#10B981", "#EF4444"];
-const COLORS_VEHICLE = ["#10B981", "#3B82F6", "#F59E0B"];
+const COLORS_MOOD = ["#10B981", "#0F766e", "#10B981", "#EF4444"];
+const COLORS_VEHICLE = ["#10B981", "#16a34a", "#F59E0B"];
 
 const TRIP_TRENDS_DATA = [
   { month: "Jan", trips: 140 },
@@ -713,30 +713,29 @@ const AdminDashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#051124] text-white flex p-4 gap-6 font-sans relative overflow-x-hidden">
-      <div className="fixed -top-40 -left-40 w-96 h-96 bg-[#0B2B5C]/40 rounded-full blur-3xl pointer-events-none" />
-      <div className="fixed top-1/2 -right-40 w-96 h-96 bg-[#D4AF37]/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-background text-foreground flex p-4 gap-6 font-sans relative overflow-x-hidden">
 
       <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <main className="flex-1 space-y-6 max-w-7xl mx-auto pb-12 z-10">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg">
+        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-[1rem] border border-border bg-card shadow-card">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-              Welcome back, <span className="text-[#D4AF37]">{adminName}</span>
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+              Welcome back, <span className="text-primary">{adminName}</span>
             </h2>
-            <p className="text-xs text-gray-400 mt-1">
-              Tourenvi Operational Intelligence Dashboard • Central Real-time Telemetry
+            <p className="text-sm text-secondary mt-1">
+              Tourenvi Operational Intelligence • Central Telemetry
             </p>
           </div>
 
           <div className="flex items-center gap-4">
-            <div className="px-3.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-center gap-2 text-xs font-semibold text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            <div className="px-3.5 py-1.5 rounded-lg border border-border bg-primary/10 flex items-center gap-3 text-sm font-medium text-primary">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary/40 opacity-60"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
               </span>
-              System Status: {systemHealth}
+              <span>System Status:</span>
+              <span className="font-semibold">{systemHealth}</span>
             </div>
 
             <button
@@ -747,10 +746,10 @@ const AdminDashboard: React.FC = () => {
                   toast.success("Telemetry and user tables synchronized.");
                 }, 800);
               }}
-              className="p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all cursor-pointer active:scale-95 shadow-sm"
+              className="p-2.5 rounded-lg border border-border bg-white hover:bg-gray-50 text-secondary transition-all cursor-pointer active:scale-95 shadow-sm"
               title="Sync Telemetry Data"
             >
-              <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin text-[#D4AF37]" : ""}`} />
+              <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin text-primary" : "text-secondary"}`} />
             </button>
           </div>
         </header>
@@ -758,15 +757,15 @@ const AdminDashboard: React.FC = () => {
         {activeTab === "overview" && (
           <div className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+              <div className="p-5 rounded-[1rem] border border-border bg-card shadow-card hover:-translate-y-1 transition-all duration-200 group">
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Users</p>
-                    <h3 className="text-2xl font-black text-white mt-1 group-hover:text-[#D4AF37] transition-colors">
+                    <h3 className="text-2xl font-black text-forest-dark mt-1 group-hover:text-eco-green transition-colors">
                       {users.length}
                     </h3>
                   </div>
-                  <div className="p-3 rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37]">
+                  <div className="p-3 rounded-xl border border-eco-green/30 bg-eco-green/10 text-eco-green">
                     <UsersIcon className="h-5 w-5" />
                   </div>
                 </div>
@@ -775,15 +774,15 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+              <div className="p-5 rounded-[1rem] border border-border bg-card shadow-card hover:-translate-y-1 transition-all duration-200 group">
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Trips Planned</p>
-                    <h3 className="text-2xl font-black text-white mt-1 group-hover:text-[#D4AF37] transition-colors">
+                    <h3 className="text-2xl font-black text-forest-dark mt-1 group-hover:text-eco-green transition-colors">
                       2,480
                     </h3>
                   </div>
-                  <div className="p-3 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400">
+                  <div className="p-3 rounded-xl border border-eco-green/30 bg-eco-green/10 text-eco-green">
                     <Compass className="h-5 w-5" />
                   </div>
                 </div>
@@ -792,11 +791,11 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+              <div className="p-5 rounded-[1rem] border border-border bg-card shadow-card hover:-translate-y-1 transition-all duration-200 group">
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Active Navigations</p>
-                    <h3 className="text-2xl font-black text-white mt-1 group-hover:text-[#D4AF37] transition-colors">
+                    <h3 className="text-2xl font-black text-forest-dark mt-1 group-hover:text-eco-green transition-colors">
                       {fleet.length}
                     </h3>
                   </div>
@@ -809,15 +808,15 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+              <div className="p-5 rounded-[1rem] border border-border bg-card shadow-card hover:-translate-y-1 transition-all duration-200 group">
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">CO₂ Saved</p>
-                    <h3 className="text-2xl font-black text-white mt-1 group-hover:text-[#D4AF37] transition-colors">
+                    <h3 className="text-2xl font-black text-forest-dark mt-1 group-hover:text-eco-green transition-colors">
                       4,820 <span className="text-sm font-semibold text-gray-400">kg</span>
                     </h3>
                   </div>
-                  <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
+                  <div className="p-3 rounded-xl border border-eco-green/30 bg-eco-green/10 text-eco-green">
                     <DollarSign className="h-5 w-5" />
                   </div>
                 </div>
@@ -828,43 +827,43 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg">
+              <div className="lg:col-span-2 p-6 rounded-[1rem] border border-border bg-card shadow-card">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h3 className="text-base font-bold text-white uppercase tracking-wider">Monthly Trip Activity Trends</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">Aggregated trip planning frequency per month</p>
-                  </div>
+                      <h3 className="text-base font-bold text-forest-dark uppercase tracking-wider">Monthly Trip Activity Trends</h3>
+                      <p className="text-xs text-gray-500 mt-0.5">Aggregated trip planning frequency per month</p>
+                    </div>
                 </div>
                 <div className="h-72 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={TRIP_TRENDS_DATA}>
                       <defs>
                         <linearGradient id="colorTrips" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.4} />
-                          <stop offset="95%" stopColor="#D4AF37" stopOpacity={0} />
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
                         </linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(4,120,87,0.06)" />
                       <XAxis dataKey="month" stroke="#9CA3AF" fontSize={12} />
                       <YAxis stroke="#9CA3AF" fontSize={12} />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: "#051124",
-                          border: "1px solid rgba(255, 255, 255, 0.15)",
+                          backgroundColor: "#ECFDF5",
+                          border: "1px solid rgba(4,120,87,0.08)",
                           borderRadius: "12px",
-                          color: "#FFF",
+                          color: "#064E3B",
                         }}
                       />
-                      <Area type="monotone" dataKey="trips" stroke="#D4AF37" strokeWidth={2} fillOpacity={1} fill="url(#colorTrips)" />
+                      <Area type="monotone" dataKey="trips" stroke="#10B981" strokeWidth={2} fillOpacity={1} fill="url(#colorTrips)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-6">
+              <div className="p-6 rounded-[1rem] border border-border bg-card shadow-card space-y-6">
                 <div>
-                  <h3 className="text-base font-bold text-white uppercase tracking-wider">Trip Vibe Distribution</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">User preferred trip atmospheres</p>
+                  <h3 className="text-base font-bold text-forest-dark uppercase tracking-wider">Trip Vibe Distribution</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">User preferred trip atmospheres</p>
                   <div className="h-44 w-full mt-2">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
@@ -891,11 +890,11 @@ const AdminDashboard: React.FC = () => {
         )}
 
         {activeTab === "users" && (
-          <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4 animate-fade-in">
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-b border-white/5 pb-3">
+          <div className="p-6 rounded-[1rem] border border-border bg-card shadow-card space-y-4 animate-fade-in">
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-b border-border pb-3">
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <UsersIcon className="h-5 w-5 text-[#D4AF37]" /> User Accounts Management
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <UsersIcon className="h-5 w-5 text-primary" /> User Accounts Management
                 </h3>
                 <p className="text-xs text-gray-400">
                   Showing non-admin user accounts. Click any account to view planned trips and profile details.
@@ -911,15 +910,15 @@ const AdminDashboard: React.FC = () => {
                     setUserSearch(e.target.value);
                     setUserPage(1);
                   }}
-                  className="w-full pl-11 pr-4 py-2 rounded-xl border border-white/10 bg-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                  className="w-full pl-11 pr-4 py-3 rounded-lg border border-border bg-card text-sm text-foreground placeholder-gray-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40 transition-all"
                 />
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+            <div className="overflow-x-auto border border-border rounded-xl bg-card">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/5 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <tr className="border-b border-border bg-card text-xs font-semibold text-secondary uppercase tracking-wider">
                     <th className="px-6 py-4">Full Name</th>
                     <th className="px-6 py-4">Contact Details</th>
                     <th className="px-6 py-4">Login Method</th>
@@ -928,24 +927,24 @@ const AdminDashboard: React.FC = () => {
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 text-sm">
+                <tbody className="divide-y divide-border text-sm">
                   {paginatedUsers.length > 0 ? (
                     paginatedUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-white/5 transition-colors duration-200">
+                      <tr key={user.id} className="hover:bg-gray-50 transition-colors duration-200">
                         <td className="px-6 py-4">
                           <button
                             onClick={() => handleOpenUserModal(user)}
-                            className="text-left font-semibold text-white hover:text-[#D4AF37] transition-colors group flex items-center gap-1.5 cursor-pointer"
+                            className="text-left font-semibold text-foreground hover:text-primary transition-colors group flex items-center gap-1.5 cursor-pointer"
                           >
                             <span>{user.name || "Anonymous User"}</span>
-                            <Eye className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 text-[#D4AF37] transition-opacity" />
+                            <Eye className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 text-eco-green transition-opacity" />
                           </button>
                           <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">
                             UID: {user.uid?.substr(0, 8) || user.id?.substr(0, 8)}...
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-white font-medium">{user.email}</div>
+                          <div className="text-foreground font-medium">{user.email}</div>
                           <div className="text-xs text-gray-400 mt-0.5">{user.phone || "No phone registered"}</div>
                         </td>
                         <td className="px-6 py-4">{renderAuthProviderBadge(user)}</td>
@@ -983,24 +982,24 @@ const AdminDashboard: React.FC = () => {
                           <div className="flex justify-end gap-2">
                             <button
                               onClick={() => handleOpenUserModal(user)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-500/20 hover:border-blue-500 bg-white/5 hover:bg-blue-500/15 text-blue-400 text-xs font-bold transition-all cursor-pointer active:scale-95"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:border-blue-500 bg-card hover:bg-blue-50 text-blue-600 text-xs font-medium transition-all cursor-pointer active:scale-95"
                               title="Inspect User Details & Trip Plans"
                             >
                               <Eye className="h-3.5 w-3.5" /> View Trips
                             </button>
                             <button
                               onClick={() => handlePromoteAdmin(user.id)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#D4AF37]/20 hover:border-[#D4AF37] bg-white/5 hover:bg-[#D4AF37]/15 text-[#D4AF37] text-xs font-bold transition-all cursor-pointer active:scale-95"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border hover:border-primary bg-card hover:bg-primary/10 text-primary text-xs font-medium transition-all cursor-pointer active:scale-95"
                               title="Promote to Administrator"
                             >
                               <Shield className="h-3.5 w-3.5" /> Promote
                             </button>
                             <button
                               onClick={() => handleToggleSuspension(user.id, user.status)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer active:scale-95 ${
                                 user.status === "suspended"
-                                  ? "border-emerald-500/20 hover:border-emerald-500 bg-white/5 hover:bg-emerald-500/15 text-emerald-400"
-                                  : "border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400"
+                                  ? "border-emerald-200 hover:border-emerald-300 bg-card hover:bg-emerald-50 text-emerald-600"
+                                  : "border-red-200 hover:border-red-300 bg-card hover:bg-red-50 text-red-600"
                               }`}
                               title={user.status === "suspended" ? "Unsuspend account" : "Suspend account"}
                             >
@@ -1054,11 +1053,11 @@ const AdminDashboard: React.FC = () => {
         )}
 
         {activeTab === "admins" && (
-          <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4 animate-fade-in">
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-b border-white/5 pb-3">
+          <div className="p-6 rounded-[1rem] border border-border bg-card shadow-card space-y-4 animate-fade-in">
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-b border-border pb-3">
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-[#D4AF37]" /> Admin Accounts Management
+                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-primary" /> Admin Accounts Management
                 </h3>
                 <p className="text-xs text-gray-400">
                   Administrators with full operational access. Demoting an account automatically moves it to User Management.
@@ -1074,7 +1073,7 @@ const AdminDashboard: React.FC = () => {
                     setAdminSearch(e.target.value);
                     setAdminPage(1);
                   }}
-                  className="w-full pl-11 pr-4 py-2 rounded-xl border border-white/10 bg-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                  className="w-full pl-11 pr-4 py-3 rounded-lg border border-border bg-card text-sm text-foreground placeholder-gray-400 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40 transition-all"
                 />
               </div>
             </div>
@@ -1107,7 +1106,7 @@ const AdminDashboard: React.FC = () => {
                         </td>
                         <td className="px-6 py-4">{renderAuthProviderBadge(user)}</td>
                         <td className="px-6 py-4">
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30">
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-eco-green/15 text-eco-green border border-eco-green/30">
                             admin
                           </span>
                         </td>
@@ -1132,17 +1131,17 @@ const AdminDashboard: React.FC = () => {
                           <div className="flex justify-end gap-2">
                             <button
                               onClick={() => handleDemoteAdmin(user.id)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400 text-xs font-bold transition-all cursor-pointer active:scale-95"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 hover:border-red-500 bg-card hover:bg-red-50 text-red-600 text-xs font-medium transition-all cursor-pointer active:scale-95"
                               title="Demote Admin back to Regular User"
                             >
                               <ShieldAlert className="h-3.5 w-3.5" /> Demote to User
                             </button>
                             <button
                               onClick={() => handleToggleSuspension(user.id, user.status)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer active:scale-95 ${
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all cursor-pointer active:scale-95 ${
                                 user.status === "suspended"
-                                  ? "border-emerald-500/20 hover:border-emerald-500 bg-white/5 hover:bg-emerald-500/15 text-emerald-400"
-                                  : "border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400"
+                                  ? "border-emerald-200 hover:border-emerald-500 bg-card hover:bg-emerald-50 text-emerald-600"
+                                  : "border-red-200 hover:border-red-500 bg-card hover:bg-red-50 text-red-600"
                               }`}
                               title={user.status === "suspended" ? "Unsuspend account" : "Suspend account"}
                             >
@@ -1151,7 +1150,7 @@ const AdminDashboard: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleDeleteUser(user.id)}
-                              className="p-1.5 rounded-lg border border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400 transition-all cursor-pointer active:scale-95"
+                              className="p-1.5 rounded-lg border border-red-200 hover:border-red-500 bg-card hover:bg-red-50 text-red-600 transition-all cursor-pointer active:scale-95"
                               title="Delete Account permanently"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -1197,9 +1196,9 @@ const AdminDashboard: React.FC = () => {
 
         {activeTab === "fleet" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-            <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg p-4 h-[550px] relative overflow-hidden flex flex-col justify-between">
-              <div className="absolute top-6 left-6 z-10 bg-[#051124]/90 border border-white/10 p-3.5 rounded-xl shadow-lg max-w-xs pointer-events-none">
-                <h4 className="text-xs font-bold text-[#D4AF37] uppercase tracking-widest">Active Operations Map</h4>
+            <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-forest-dark/15 backdrop-blur-xl shadow-lg p-4 h-[550px] relative overflow-hidden flex flex-col justify-between">
+              <div className="absolute top-6 left-6 z-10 bg-card border border-border p-3.5 rounded-xl shadow-card max-w-xs pointer-events-none">
+                <h4 className="text-xs font-bold text-primary uppercase tracking-widest">Active Operations Map</h4>
                 <p className="text-[10px] text-gray-300 mt-1 leading-relaxed">
                   Real-time telemetry showing live transits. Click a fleet vehicle to target telemetry tracker.
                 </p>
@@ -1216,8 +1215,8 @@ const AdminDashboard: React.FC = () => {
                         { elementType: "geometry", stylers: [{ color: "#051124" }] },
                         { elementType: "labels.text.stroke", stylers: [{ color: "#051124" }] },
                         { elementType: "labels.text.fill", stylers: [{ color: "#8a9ba8" }] },
-                        { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d4af37" }] },
-                        { featureType: "road", elementType: "geometry", stylers: [{ color: "#0b2b5c" }] },
+                        { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#16A34A" }] },
+                        { featureType: "road", elementType: "geometry", stylers: [{ color: "#0f766e" }] },
                         { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#1d3f72" }] },
                         { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#8a9ba8" }] },
                         { featureType: "water", elementType: "geometry", stylers: [{ color: "#030a16" }] },
@@ -1237,7 +1236,7 @@ const AdminDashboard: React.FC = () => {
                         icon={{
                           path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
                           scale: 6,
-                          fillColor: v.model.includes("EV") ? "#10B981" : "#D4AF37",
+                          fillColor: v.model.includes("EV") ? "#10B981" : "#10B981",
                           fillOpacity: 0.9,
                           strokeWeight: 2,
                           strokeColor: "#FFF",
@@ -1261,17 +1260,17 @@ const AdminDashboard: React.FC = () => {
                   </GoogleMap>
                 </div>
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center rounded-xl bg-[#051124] border border-white/5 p-4 text-center mt-4">
+                <div className="w-full h-full flex flex-col items-center justify-center rounded-xl bg-card border border-border p-4 text-center mt-4">
                   <div className="text-gray-400 space-y-3 max-w-sm">
-                    <MapPin className="h-10 w-10 mx-auto text-[#D4AF37] animate-bounce" />
+                    <MapPin className="h-10 w-10 mx-auto text-primary animate-bounce" />
                     <h5 className="font-bold text-white">Interactive Geographic Console</h5>
                     <p className="text-xs text-gray-500">
                       Standard maps api not currently loaded. Displaying telemetry route simulation matrix:
                     </p>
-                    <div className="p-3 border border-[#D4AF37]/20 rounded-xl bg-[#0B2B5C]/15 flex flex-col gap-2.5 text-left text-[11px]">
+                    <div className="p-3 border border-eco-green/20 rounded-xl bg-forest-dark/15 flex flex-col gap-2.5 text-left text-[11px]">
                       {fleet.map((v, idx) => (
                         <div key={idx} className="flex justify-between items-center border-b border-white/5 pb-1">
-                          <span className="font-bold text-[#D4AF37]">{v.regNo}</span>
+                          <span className="font-bold text-eco-green">{v.regNo}</span>
                           <span className="text-gray-400">{v.route}</span>
                           <span className="text-emerald-400 font-semibold">{v.progress}%</span>
                         </div>
@@ -1282,10 +1281,10 @@ const AdminDashboard: React.FC = () => {
               )}
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg p-5 flex flex-col h-[550px]">
+            <div className="rounded-[1rem] border border-border bg-card shadow-card p-5 flex flex-col h-[550px]">
               <div className="flex items-center gap-2 mb-4">
-                <Car className="h-5 w-5 text-[#D4AF37]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Active Fleet Telemetry</h4>
+                <Car className="h-5 w-5 text-eco-green" />
+                <h4 className="text-sm font-bold text-forest-dark uppercase tracking-wider">Active Fleet Telemetry</h4>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-3 pr-1">
@@ -1299,13 +1298,13 @@ const AdminDashboard: React.FC = () => {
                     }}
                     className={`p-4 rounded-xl border transition-all duration-300 cursor-pointer flex flex-col gap-2.5 group ${
                       selectedVehicle?.regNo === v.regNo
-                        ? "border-[#D4AF37] bg-[#D4AF37]/5 shadow-[0_0_15px_rgba(212,175,55,0.1)]"
+                        ? "border-primary bg-card shadow-sm"
                         : "border-white/10 bg-white/5 hover:border-white/20"
                     }`}
                   >
                     <div className="flex justify-between items-start">
                       <div>
-                        <span className="font-bold text-white text-sm group-hover:text-[#D4AF37] transition-colors">
+                        <span className="font-bold text-white text-sm group-hover:text-eco-green transition-colors">
                           {v.regNo}
                         </span>
                         <div className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">{v.model}</div>
@@ -1337,11 +1336,11 @@ const AdminDashboard: React.FC = () => {
                     <div className="space-y-1 mt-1">
                       <div className="flex justify-between text-[10px] font-semibold text-gray-400">
                         <span>Transit Progress</span>
-                        <span className="text-[#D4AF37]">{v.progress}%</span>
+                        <span className="text-eco-green">{v.progress}%</span>
                       </div>
                       <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-[#0B2B5C] to-[#D4AF37] rounded-full transition-all duration-1000"
+                          className="h-full bg-gradient-to-r from-forest-dark to-eco-green rounded-full transition-all duration-1000"
                           style={{ width: `${v.progress}%` }}
                         />
                       </div>
@@ -1355,37 +1354,45 @@ const AdminDashboard: React.FC = () => {
 
         {activeTab === "fuel" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-            <div className="lg:col-span-2 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
-              <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-                <Fuel className="h-5 w-5 text-[#D4AF37]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Active Fuel & Routing Overrides</h4>
+            <div className="lg:col-span-2 p-6 rounded-[1rem] border border-border bg-card shadow-card space-y-4">
+              <div className="flex items-center gap-3 border-b border-border pb-3">
+                <Fuel className="h-5 w-5 text-primary" />
+                <h4 className="text-sm font-semibold text-foreground">Active Fuel & Routing Overrides</h4>
+                <div className="ml-auto flex items-center gap-3 text-sm text-secondary">
+                  <div className="px-2 py-1 rounded-lg bg-primary/10 text-primary border border-primary/20">Overrides: <span className="font-bold text-foreground ml-1">{fuelOverrides.length}</span></div>
+                </div>
               </div>
 
-              <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+              <div className="overflow-x-auto border border-border rounded-xl bg-card">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-white/10 bg-white/5 text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                      <th className="px-6 py-4">City</th>
-                      <th className="px-6 py-4">Petrol Rate (₹/L)</th>
-                      <th className="px-6 py-4">Diesel Rate (₹/L)</th>
-                      <th className="px-6 py-4">Average Toll Surcharge (₹)</th>
-                      <th className="px-6 py-4 text-right">Action</th>
+                    <tr className="border-b border-border bg-card text-xs font-semibold text-secondary tracking-wide">
+                      <th className="px-6 py-3">City</th>
+                      <th className="px-6 py-3">Petrol (₹/L)</th>
+                      <th className="px-6 py-3">Diesel (₹/L)</th>
+                      <th className="px-6 py-3">Toll (₹)</th>
+                      <th className="px-6 py-3 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 text-sm">
+                  <tbody className="text-sm">
+                    {fuelOverrides.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="text-center py-8 text-secondary font-medium">No overrides configured.</td>
+                      </tr>
+                    )}
                     {fuelOverrides.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4 font-bold text-white">{item.city}</td>
-                        <td className="px-6 py-4 font-mono text-[#D4AF37]">₹{item.petrol.toFixed(2)}</td>
-                        <td className="px-6 py-4 font-mono text-gray-300">₹{item.diesel.toFixed(2)}</td>
-                        <td className="px-6 py-4 font-mono text-gray-300">₹{item.tollRate.toFixed(2)}</td>
+                      <tr key={idx} className={`transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-card'} hover:bg-gray-50`}>
+                        <td className="px-6 py-4 font-semibold text-foreground">{item.city}</td>
+                        <td className="px-6 py-4 font-mono text-primary">₹{item.petrol.toFixed(2)}</td>
+                        <td className="px-6 py-4 font-mono text-secondary">₹{item.diesel.toFixed(2)}</td>
+                        <td className="px-6 py-4 font-mono text-secondary">₹{item.tollRate.toFixed(2)}</td>
                         <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => handleDeleteFuelOverride(item.city)}
-                            className="p-1.5 rounded-lg border border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400 transition-all cursor-pointer active:scale-95"
+                            className="p-2 rounded-lg border border-red-200 hover:border-red-500 bg-card hover:bg-red-50 text-red-600 transition-all cursor-pointer active:scale-95"
                             title="Reset rates to Default"
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
+                            <Trash2 className="h-4 w-4" />
                           </button>
                         </td>
                       </tr>
@@ -1395,53 +1402,55 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg h-fit space-y-4">
-              <div className="flex items-center gap-2">
-                <Plus className="h-5 w-5 text-[#D4AF37]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Create/Update Override</h4>
+            <div className="p-6 rounded-[1rem] border border-border bg-card shadow-card h-fit space-y-4">
+              <div className="flex items-center gap-3">
+                <Plus className="h-5 w-5 text-primary" />
+                <h4 className="text-sm font-semibold text-foreground">Create / Update Override</h4>
               </div>
 
-              <form onSubmit={handleSaveFuelOverride} className="space-y-4 text-xs font-semibold uppercase tracking-wider text-gray-300">
-                <div className="space-y-1">
-                  <label>City Region</label>
+              <form onSubmit={handleSaveFuelOverride} className="space-y-4 text-sm">
+                <div>
+                  <label className="block text-xs text-secondary mb-1">City Region</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Mumbai, Goa"
                     value={overrideCity}
                     onChange={(e) => setOverrideCity(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                    className="w-full px-4 py-3 rounded-lg border border-border bg-card text-sm text-foreground placeholder-secondary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40 transition-all"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label>Petrol Rate (₹ / Liter)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="104.21"
-                    value={overridePetrol}
-                    onChange={(e) => setOverridePetrol(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-secondary mb-1">Petrol Rate (₹ / L)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      placeholder="104.21"
+                      value={overridePetrol}
+                      onChange={(e) => setOverridePetrol(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg border border-border bg-card text-sm text-foreground placeholder-secondary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40 transition-all"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-secondary mb-1">Diesel Rate (₹ / L)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      required
+                      placeholder="92.15"
+                      value={overrideDiesel}
+                      onChange={(e) => setOverrideDiesel(e.target.value)}
+                      className="w-full px-4 py-3 rounded-lg border border-border bg-card text-sm text-foreground placeholder-secondary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40 transition-all"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label>Diesel Rate (₹ / Liter)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    placeholder="92.15"
-                    value={overrideDiesel}
-                    onChange={(e) => setOverrideDiesel(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label>Toll Surcharge (₹)</label>
+                <div>
+                  <label className="block text-xs text-secondary mb-1">Toll Surcharge (₹)</label>
                   <input
                     type="number"
                     step="1"
@@ -1449,13 +1458,13 @@ const AdminDashboard: React.FC = () => {
                     placeholder="120"
                     value={overrideToll}
                     onChange={(e) => setOverrideToll(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                    className="w-full px-4 py-3 rounded-lg border border-border bg-card text-sm text-foreground placeholder-secondary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/40 transition-all"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl text-sm font-bold uppercase tracking-wider text-[#0B2B5C] bg-[#D4AF37] hover:bg-[#D4AF37]/90 transition-all cursor-pointer active:scale-95"
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold text-[#0B2B5C] bg-primary hover:bg-primary/90 transition-all active:scale-95"
                 >
                   <Plus className="h-4 w-4" /> Save Rates Override
                 </button>
@@ -1465,17 +1474,17 @@ const AdminDashboard: React.FC = () => {
         )}
 
         {activeTab === "logs" && (
-          <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4 animate-fade-in">
+          <div className="p-6 rounded-[1rem] border border-border bg-card shadow-card space-y-4 animate-fade-in">
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-b border-white/5 pb-3">
               <div className="flex items-center gap-2">
-                <FileWarning className="h-5 w-5 text-[#D4AF37]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Failed Budget Estimator Telemetry Logs</h4>
+                <FileWarning className="h-5 w-5 text-eco-green" />
+                <h4 className="text-sm font-bold text-forest-dark uppercase tracking-wider">Failed Budget Estimator Telemetry Logs</h4>
               </div>
 
               <div className="flex gap-2">
                 <button
                   onClick={handleSimulateException}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#D4AF37]/20 hover:border-[#D4AF37] bg-white/5 hover:bg-[#D4AF37]/15 text-[#D4AF37] text-xs font-bold transition-all cursor-pointer active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-eco-green/20 hover:border-eco-green bg-white/5 hover:bg-eco-green/15 text-eco-green text-xs font-bold transition-all cursor-pointer active:scale-95"
                 >
                   <Plus className="h-3.5 w-3.5" /> Simulate Exception
                 </button>
@@ -1489,10 +1498,10 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+            <div className="overflow-x-auto border border-border rounded-xl bg-card">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/5 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <tr className="border-b border-border bg-card text-xs font-semibold text-secondary uppercase tracking-wider">
                     <th className="px-6 py-4">Timestamp</th>
                     <th className="px-6 py-4">Route Info</th>
                     <th className="px-6 py-4">User Allocation (Budget)</th>
@@ -1545,7 +1554,7 @@ const AdminDashboard: React.FC = () => {
               <div className="p-4 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold text-gray-400 uppercase">Total Tickets</p>
-                  <h3 className="text-2xl font-black text-white mt-1">{inquiries.length}</h3>
+                  <h3 className="text-2xl font-black text-forest-dark mt-1">{inquiries.length}</h3>
                 </div>
                 <div className="p-3 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400">
                   <Headphones className="h-5 w-5" />
@@ -1590,21 +1599,21 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Filter Tabs */}
-            <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
+            <div className="p-6 rounded-[1rem] border border-border bg-card shadow-card space-y-4">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/5 pb-4">
                 <div className="flex items-center gap-2">
-                  <Headphones className="h-5 w-5 text-[#D4AF37]" />
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">User Support Inquiries & Tickets</h4>
+                  <Headphones className="h-5 w-5 text-eco-green" />
+                  <h4 className="text-sm font-bold text-forest-dark uppercase tracking-wider">User Support Inquiries & Tickets</h4>
                 </div>
 
-                <div className="flex items-center gap-1.5 bg-[#051124]/60 p-1 rounded-xl border border-white/10 text-xs">
+                <div className="flex items-center gap-1.5 bg-card p-1 rounded-xl border border-border text-xs">
                   {(["All", "Open", "In Progress", "Resolved"] as const).map((filter) => (
                     <button
                       key={filter}
                       onClick={() => setSupportFilter(filter)}
                       className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
                         supportFilter === filter
-                          ? "bg-[#D4AF37] text-[#0B2B5C] shadow-md"
+                          ? "bg-eco-green text-forest-dark shadow-md"
                           : "text-gray-400 hover:text-white"
                       }`}
                     >
@@ -1615,10 +1624,10 @@ const AdminDashboard: React.FC = () => {
               </div>
 
               {/* Tickets Table */}
-              <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+              <div className="overflow-x-auto border border-border rounded-xl bg-card">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-white/10 bg-white/5 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                    <tr className="border-b border-border bg-card text-xs font-semibold text-secondary uppercase tracking-wider">
                       <th className="px-6 py-4">Ticket ID</th>
                       <th className="px-6 py-4">User Details</th>
                       <th className="px-6 py-4">Category</th>
@@ -1634,7 +1643,7 @@ const AdminDashboard: React.FC = () => {
                         .filter((inq) => supportFilter === "All" || inq.status === supportFilter)
                         .map((inq) => (
                           <tr key={inq.id} className="hover:bg-white/5 transition-colors">
-                            <td className="px-6 py-4 font-mono text-[#D4AF37] font-bold">
+                            <td className="px-6 py-4 font-mono text-eco-green font-bold">
                               #{inq.id.substring(0, 6)}
                             </td>
                             <td className="px-6 py-4">
@@ -1643,7 +1652,7 @@ const AdminDashboard: React.FC = () => {
                             </td>
                             <td className="px-6 py-4">
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-gray-300">
-                                <Tag className="h-3 w-3 text-[#D4AF37]" />
+                                <Tag className="h-3 w-3 text-eco-green" />
                                 {inq.category}
                               </span>
                             </td>
@@ -1684,7 +1693,7 @@ const AdminDashboard: React.FC = () => {
                             <td className="px-6 py-4 text-right">
                               <button
                                 onClick={() => setSelectedTicket(inq)}
-                                className="px-3 py-1.5 rounded-lg border border-[#D4AF37]/30 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] font-bold text-xs transition-all active:scale-95 cursor-pointer"
+                                className="px-3 py-1.5 rounded-lg border border-eco-green/30 bg-eco-green/10 hover:bg-eco-green/20 text-eco-green font-bold text-xs transition-all active:scale-95 cursor-pointer"
                               >
                                 View Ticket
                               </button>
@@ -1714,7 +1723,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Affiliate Revenue</p>
-                    <h3 className="text-2xl font-black text-white mt-1 text-emerald-400 font-mono">
+                    <h3 className="text-2xl font-black mt-1 text-emerald-400 font-mono">
                       ₹1,24,500 <span className="text-xs font-semibold text-gray-400">($14,820)</span>
                     </h3>
                   </div>
@@ -1731,7 +1740,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Hotel Bookings (Agoda/Booking)</p>
-                    <h3 className="text-2xl font-black text-white mt-1 text-blue-400 font-mono">
+                    <h3 className="text-2xl font-black mt-1 text-blue-400 font-mono">
                       ₹71,000 <span className="text-xs font-semibold text-gray-400">(57%)</span>
                     </h3>
                   </div>
@@ -1748,7 +1757,7 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Vehicle Rental Clicks</p>
-                    <h3 className="text-2xl font-black text-white mt-1 text-amber-400 font-mono">
+                    <h3 className="text-2xl font-black mt-1 text-amber-400 font-mono">
                       ₹32,900 <span className="text-xs font-semibold text-gray-400">(26%)</span>
                     </h3>
                   </div>
@@ -1765,11 +1774,11 @@ const AdminDashboard: React.FC = () => {
                 <div className="flex justify-between items-start">
                   <div>
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Premium Trip Exports</p>
-                    <h3 className="text-2xl font-black text-white mt-1 text-[#D4AF37] font-mono">
+                    <h3 className="text-2xl font-black mt-1 text-eco-green font-mono">
                       ₹20,600 <span className="text-xs font-semibold text-gray-400">(17%)</span>
                     </h3>
                   </div>
-                  <div className="p-3 rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37]">
+                  <div className="p-3 rounded-xl border border-eco-green/30 bg-eco-green/10 text-eco-green">
                     <Sparkles className="h-5 w-5" />
                   </div>
                 </div>
@@ -1781,10 +1790,10 @@ const AdminDashboard: React.FC = () => {
 
             {/* Revenue Charts & Breakdown */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
+              <div className="lg:col-span-2 p-6 rounded-[1rem] border border-border bg-card shadow-card space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="text-sm font-bold text-white uppercase tracking-wider">Monthly Affiliate Revenue Trend</h4>
+                    <h4 className="text-sm font-bold text-forest-dark uppercase tracking-wider">Monthly Affiliate Revenue Trend</h4>
                     <p className="text-xs text-gray-400 mt-0.5">Estimated gross commissions (INR)</p>
                   </div>
                 </div>
@@ -1825,10 +1834,10 @@ const AdminDashboard: React.FC = () => {
               </div>
 
               {/* Affiliate Partner Streams */}
-              <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Monetization Channels</h4>
+              <div className="p-6 rounded-[1rem] border border-border bg-card shadow-card space-y-4">
+                <h4 className="text-sm font-bold text-forest-dark uppercase tracking-wider">Monetization Channels</h4>
                 <div className="space-y-3">
-                  <div className="p-3.5 rounded-xl border border-white/10 bg-[#051124]/40 flex items-center justify-between">
+                  <div className="p-3.5 rounded-xl border border-border bg-card flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
                         <Globe className="h-4 w-4" />
@@ -1844,9 +1853,9 @@ const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl border border-white/10 bg-[#051124]/40 flex items-center justify-between">
+                  <div className="p-3.5 rounded-xl border border-border bg-card flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 rounded-lg bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
+                      <div className="p-2 rounded-lg bg-primary/10 text-primary border border-primary/20">
                         <Globe className="h-4 w-4" />
                       </div>
                       <div>
@@ -1860,7 +1869,7 @@ const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl border border-white/10 bg-[#051124]/40 flex items-center justify-between">
+                  <div className="p-3.5 rounded-xl border border-border bg-card flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
                         <Car className="h-4 w-4" />
@@ -1876,7 +1885,7 @@ const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="p-3.5 rounded-xl border border-white/10 bg-[#051124]/40 flex items-center justify-between">
+                  <div className="p-3.5 rounded-xl border border-border bg-card flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
                         <Sparkles className="h-4 w-4" />
@@ -1903,7 +1912,7 @@ const AdminDashboard: React.FC = () => {
             {/* Action Bar */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg">
               <div>
-                <h4 className="text-base font-bold text-white flex items-center gap-2">
+                <h4 className="text-base font-bold text-forest-dark flex items-center gap-2">
                   <Activity className="h-5 w-5 text-emerald-400 animate-pulse" />
                   Live Third-Party API Health & Telemetry Monitor
                 </h4>
@@ -1914,7 +1923,7 @@ const AdminDashboard: React.FC = () => {
 
               <button
                 onClick={handlePingServices}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#D4AF37] text-[#0B2B5C] font-bold text-xs hover:bg-[#c49f27] active:scale-95 transition-all cursor-pointer shadow-lg shadow-[#D4AF37]/20"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-[#0B2B5C] font-bold text-xs hover:bg-primary/90 active:scale-95 transition-all cursor-pointer shadow-lg shadow-primary/20"
               >
                 <RefreshCw className="h-4 w-4 animate-spin-slow" /> Ping Services Now
               </button>
@@ -1992,14 +2001,14 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Manual Fallback Trigger Switches */}
-            <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
+            <div className="p-6 rounded-[1rem] border border-border bg-card shadow-card space-y-4">
               <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-                <Sliders className="h-5 w-5 text-[#D4AF37]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Manual Emergency Fallback Controls</h4>
+                <Sliders className="h-5 w-5 text-primary" />
+                <h4 className="text-sm font-bold text-forest-dark uppercase tracking-wider">Manual Emergency Fallback Controls</h4>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl border border-white/10 bg-[#051124]/40 flex items-center justify-between">
+                <div className="p-4 rounded-xl border border-border bg-card flex items-center justify-between">
                   <div>
                     <h5 className="font-bold text-white text-sm">Static Fuel Price Cache Fallback</h5>
                     <p className="text-xs text-gray-400 mt-0.5">Bypasses external Fuel API during rate limits or outages</p>
@@ -2018,7 +2027,7 @@ const AdminDashboard: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="p-4 rounded-xl border border-white/10 bg-[#051124]/40 flex items-center justify-between">
+                <div className="p-4 rounded-xl border border-border bg-card flex items-center justify-between">
                   <div>
                     <h5 className="font-bold text-white text-sm">Offline Map Tile Fallback</h5>
                     <p className="text-xs text-gray-400 mt-0.5">Switches to vector tile cache if Google Maps API throttles</p>
@@ -2037,7 +2046,7 @@ const AdminDashboard: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="p-4 rounded-xl border border-white/10 bg-[#051124]/40 flex items-center justify-between">
+                <div className="p-4 rounded-xl border border-border bg-card flex items-center justify-between">
                   <div>
                     <h5 className="font-bold text-white text-sm">Seasonal Weather Climatology Cache</h5>
                     <p className="text-xs text-gray-400 mt-0.5">Uses offline monthly averages if weather API fails</p>
@@ -2056,7 +2065,7 @@ const AdminDashboard: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="p-4 rounded-xl border border-white/10 bg-[#051124]/40 flex items-center justify-between">
+                <div className="p-4 rounded-xl border border-border bg-card flex items-center justify-between">
                   <div>
                     <h5 className="font-bold text-white text-sm">Firebase Local Cache Sync</h5>
                     <p className="text-xs text-gray-400 mt-0.5">Enforces persistent offline cache read mode</p>
@@ -2081,11 +2090,11 @@ const AdminDashboard: React.FC = () => {
 
         {/* --- 4. SYSTEM AUDIT & ACTIVITY LOGS TAB --- */}
         {activeTab === "audit" && (
-          <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4 animate-fade-in">
+          <div className="p-6 rounded-[1rem] border border-border bg-card shadow-card space-y-4 animate-fade-in">
             <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-b border-white/5 pb-3">
               <div className="flex items-center gap-2">
-                <History className="h-5 w-5 text-[#D4AF37]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">System Audit & Administrative Activity Logs</h4>
+                <History className="h-5 w-5 text-primary" />
+                <h4 className="text-sm font-bold text-forest-dark uppercase tracking-wider">System Audit & Administrative Activity Logs</h4>
               </div>
 
               <div className="relative w-full sm:w-64">
@@ -2095,15 +2104,15 @@ const AdminDashboard: React.FC = () => {
                   placeholder="Filter by admin or action..."
                   value={auditSearch}
                   onChange={(e) => setAuditSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 rounded-xl border border-white/10 bg-white/5 text-xs text-white placeholder-gray-400 focus:outline-none focus:border-[#D4AF37]"
+                  className="w-full pl-9 pr-4 py-2 rounded-lg border border-border bg-card text-xs text-foreground placeholder-gray-400 focus:outline-none focus:border-primary"
                 />
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+            <div className="overflow-x-auto border border-border rounded-xl bg-card">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/5 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <tr className="border-b border-border bg-card text-xs font-semibold text-secondary uppercase tracking-wider">
                     <th className="px-6 py-4">Timestamp</th>
                     <th className="px-6 py-4">Admin Officer</th>
                     <th className="px-6 py-4">Action Performed</th>
@@ -2137,7 +2146,7 @@ const AdminDashboard: React.FC = () => {
                             <div className="text-gray-400 text-[10px]">{log.adminEmail || "admin@tourenvi.com"}</div>
                           </td>
                           <td className="px-6 py-4">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
                               {log.action}
                             </span>
                           </td>
@@ -2160,24 +2169,24 @@ const AdminDashboard: React.FC = () => {
       </main>
 
       {selectedUserModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0B2B5C] text-white shadow-2xl p-6 space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 animate-fade-in">
+          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[1rem] border border-border bg-card text-foreground shadow-2xl p-6 space-y-6">
             <div className="flex items-start justify-between border-b border-white/10 pb-4">
               <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#D4AF37]/40 bg-[#051124] text-[#D4AF37] text-lg font-black uppercase">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 text-foreground font-semibold">
                   {selectedUserModal.name ? selectedUserModal.name.substring(0, 2) : "US"}
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <h3 className="text-xl font-semibold text-foreground flex items-center gap-2">
                     {selectedUserModal.name || "Anonymous User"}
                   </h3>
-                  <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
-                    <span className="flex items-center gap-1 text-gray-300">
-                      <Mail className="h-3.5 w-3.5 text-[#D4AF37]" /> {selectedUserModal.email}
+                  <div className="flex items-center gap-3 text-xs text-secondary mt-1">
+                    <span className="flex items-center gap-1 text-secondary">
+                      <Mail className="h-3.5 w-3.5 text-primary" /> {selectedUserModal.email}
                     </span>
                     <span>•</span>
-                    <span className="flex items-center gap-1 text-gray-300">
-                      <Phone className="h-3.5 w-3.5 text-[#D4AF37]" /> {selectedUserModal.phone || "No phone added"}
+                    <span className="flex items-center gap-1 text-secondary">
+                      <Phone className="h-3.5 w-3.5 text-primary" /> {selectedUserModal.phone || "No phone added"}
                     </span>
                   </div>
                 </div>
@@ -2191,33 +2200,33 @@ const AdminDashboard: React.FC = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-              <div className="p-3.5 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
-                <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Account Role</span>
-                <div className="font-bold text-white uppercase text-xs">{selectedUserModal.role || "user"}</div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+              <div className="p-3.5 rounded-lg border border-border bg-gray-50/50 space-y-1">
+                <span className="text-secondary text-[10px] font-medium uppercase tracking-wider">Account Role</span>
+                <div className="font-semibold text-foreground uppercase text-xs">{selectedUserModal.role || "user"}</div>
               </div>
 
-              <div className="p-3.5 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
-                <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Login Method</span>
+              <div className="p-3.5 rounded-lg border border-border bg-gray-50/50 space-y-1">
+                <span className="text-secondary text-[10px] font-medium uppercase tracking-wider">Login Method</span>
                 <div>{renderAuthProviderBadge(selectedUserModal)}</div>
               </div>
 
-              <div className="p-3.5 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
-                <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Account Status</span>
-                <div className={selectedUserModal.status === "suspended" ? "text-red-400 font-bold" : "text-emerald-400 font-bold"}>
+              <div className="p-3.5 rounded-lg border border-border bg-gray-50/50 space-y-1">
+                <span className="text-secondary text-[10px] font-medium uppercase tracking-wider">Account Status</span>
+                <div className={selectedUserModal.status === "suspended" ? "text-red-500 font-semibold" : "text-primary font-semibold"}>
                   {selectedUserModal.status === "suspended" ? "Suspended" : "Active & Verified"}
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
-                <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">User ID</span>
-                <div className="font-mono text-gray-300 text-[11px] truncate">{selectedUserModal.uid || selectedUserModal.id}</div>
+              <div className="p-3.5 rounded-lg border border-border bg-gray-50/50 space-y-1">
+                <span className="text-secondary text-[10px] font-medium uppercase tracking-wider">User ID</span>
+                <div className="font-mono text-secondary text-[11px] truncate">{selectedUserModal.uid || selectedUserModal.id}</div>
               </div>
             </div>
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-bold uppercase tracking-wider text-[#D4AF37] flex items-center gap-2">
+                <h4 className="text-sm font-bold uppercase tracking-wider text-eco-green flex items-center gap-2">
                   <Sparkles className="h-4 w-4" /> User Planned Itineraries & Budget History
                 </h4>
                 <span className="text-xs text-gray-400 font-semibold">
@@ -2227,22 +2236,22 @@ const AdminDashboard: React.FC = () => {
 
               {loadingTripsModal ? (
                 <div className="p-8 text-center text-sm text-gray-400 flex items-center justify-center gap-2">
-                  <RefreshCw className="h-4 w-4 animate-spin text-[#D4AF37]" /> Fetching planned trip itineraries...
+                  <RefreshCw className="h-4 w-4 animate-spin text-eco-green" /> Fetching planned trip itineraries...
                 </div>
               ) : userTripsModal.length > 0 ? (
                 <div className="space-y-4">
                   {userTripsModal.map((trip, idx) => (
                     <div
                       key={idx}
-                      className="p-5 rounded-xl border border-white/10 bg-[#051124]/50 space-y-3 relative overflow-hidden group hover:border-[#D4AF37]/50 transition-all"
+                      className="p-5 rounded-xl border border-border bg-card space-y-3 relative overflow-hidden group hover:border-primary/50 transition-all"
                     >
                       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-white/5 pb-3">
                         <div>
-                          <h5 className="font-bold text-white text-base group-hover:text-[#D4AF37] transition-colors">
+                          <h5 className="font-bold text-white text-base group-hover:text-eco-green transition-colors">
                             {trip.tripName || `${trip.startLocation || "Origin"} Trip`}
                           </h5>
                           <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
-                            <MapPin className="h-3.5 w-3.5 text-[#D4AF37]" />
+                            <MapPin className="h-3.5 w-3.5 text-eco-green" />
                             <span>Route: <strong className="text-white">{trip.startLocation || "Origin"}</strong> ➔ {Array.isArray(trip.destinations) ? trip.destinations.join(" ➔ ") : trip.destinations || "Destination"}</span>
                           </p>
                         </div>
@@ -2297,7 +2306,7 @@ const AdminDashboard: React.FC = () => {
                         <div className="flex items-center gap-1.5 text-xs pt-1">
                           <span className="text-[10px] text-gray-400 uppercase font-bold">Vibes:</span>
                           {trip.moods.map((m: string, idx: number) => (
-                            <span key={idx} className="px-2 py-0.5 rounded-md bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[10px] font-semibold">
+                            <span key={idx} className="px-2 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20 text-[10px] font-semibold">
                               {m}
                             </span>
                           ))}
@@ -2307,7 +2316,7 @@ const AdminDashboard: React.FC = () => {
                   ))}
                 </div>
               ) : (
-                <div className="p-8 text-center rounded-xl border border-white/10 bg-[#051124]/40 text-gray-400 text-xs space-y-2">
+                <div className="p-8 text-center rounded-xl border border-border bg-card text-gray-400 text-xs space-y-2">
                   <Info className="h-6 w-6 mx-auto text-gray-500" />
                   <p className="font-bold text-white text-sm">No Planned Trips Recorded Yet</p>
                   <p>This user has not saved any trip itineraries with the trip calculator builder.</p>
@@ -2331,7 +2340,7 @@ const AdminDashboard: React.FC = () => {
                 {selectedUserModal.email && (
                   <a
                     href={`mailto:${selectedUserModal.email}?subject=Exclusive Tourenvi Travel Promo`}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#D4AF37] text-[#0B2B5C] font-bold text-xs hover:bg-[#D4AF37]/90 transition-all active:scale-95 cursor-pointer shadow-lg shadow-[#D4AF37]/20"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-[#0B2B5C] font-bold text-xs hover:bg-primary/90 transition-all active:scale-95 cursor-pointer shadow-lg shadow-primary/20"
                   >
                     <Mail className="h-3.5 w-3.5" /> Send Campaign Email
                   </a>
@@ -2350,34 +2359,30 @@ const AdminDashboard: React.FC = () => {
 
       {/* --- SUPPORT TICKET DETAIL MODAL / DRAWER --- */}
       {selectedTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[#0B2B5C] text-white shadow-2xl p-6 space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 animate-fade-in">
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-[1rem] border border-border bg-card text-foreground shadow-2xl p-6 space-y-6">
             {/* Modal Header */}
             <div className="flex items-start justify-between border-b border-white/10 pb-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-primary">
                   <Headphones className="h-6 w-6" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-white">
-                      Support Ticket #{selectedTicket.id?.substring(0, 6)}
-                    </h3>
+                    <h3 className="text-lg font-semibold text-foreground">Support Ticket #{selectedTicket.id?.substring(0, 6)}</h3>
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
                         selectedTicket.status === "Open"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                          ? "bg-red-50 text-red-600 border border-red-100"
                           : selectedTicket.status === "In Progress"
-                          ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                          : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                          ? "bg-amber-50 text-amber-600 border border-amber-100"
+                          : "bg-emerald-50 text-emerald-600 border border-emerald-100"
                       }`}
                     >
                       {selectedTicket.status}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Category: <strong className="text-white">{selectedTicket.category}</strong>
-                  </p>
+                  <p className="text-sm text-secondary mt-0.5">Category: <strong className="text-foreground">{selectedTicket.category}</strong></p>
                 </div>
               </div>
 
@@ -2391,13 +2396,13 @@ const AdminDashboard: React.FC = () => {
 
             {/* Submitter User Details Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="p-3 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
+              <div className="p-3 rounded-xl border border-border bg-card space-y-1">
                 <span className="text-gray-400 text-[10px] font-bold uppercase">Submitted By</span>
                 <div className="font-bold text-white">{selectedTicket.name || "Anonymous"}</div>
                 <div className="text-gray-400 text-[10px] truncate">{selectedTicket.email}</div>
               </div>
 
-              <div className="p-3 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
+              <div className="p-3 rounded-xl border border-border bg-card space-y-1">
                 <span className="text-gray-400 text-[10px] font-bold uppercase">Account Status</span>
                 <div className="font-bold text-blue-400">{selectedTicket.userRole || "Registered User"}</div>
                 <div className="text-gray-400 text-[10px] truncate">
@@ -2405,9 +2410,9 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
+              <div className="p-3 rounded-xl border border-border bg-card space-y-1">
                 <span className="text-gray-400 text-[10px] font-bold uppercase">Assigned Staff</span>
-                <div className="font-bold text-[#D4AF37]">
+                <div className="font-bold text-primary">
                   {selectedTicket.assignedTo || "Unassigned"}
                 </div>
                 <div className="text-gray-400 text-[10px]">
@@ -2421,9 +2426,9 @@ const AdminDashboard: React.FC = () => {
             {/* Message Body */}
             <div className="space-y-2">
               <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                <MessageSquare className="h-4 w-4 text-[#D4AF37]" /> User Message Content
+                <MessageSquare className="h-4 w-4 text-primary" /> User Message Content
               </label>
-              <div className="p-4 rounded-xl border border-white/10 bg-[#051124]/60 text-sm text-gray-200 leading-relaxed font-sans whitespace-pre-wrap">
+              <div className="p-4 rounded-xl border border-border bg-card text-sm text-gray-700 leading-relaxed font-sans whitespace-pre-wrap">
                 {selectedTicket.message}
               </div>
             </div>
@@ -2463,7 +2468,7 @@ const AdminDashboard: React.FC = () => {
                     0,
                     6
                   )}] - Response&body=Hi ${selectedTicket.name || "Traveler"},\n\nThank you for reaching out to Tourenvi Support regarding your inquiry (${selectedTicket.category}).\n\n`}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#D4AF37] text-[#0B2B5C] text-xs font-bold hover:bg-[#c49f27] transition-all cursor-pointer shadow-lg shadow-[#D4AF37]/20 active:scale-95"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-[#0B2B5C] text-xs font-bold hover:bg-primary/90 transition-all cursor-pointer shadow-lg shadow-primary/20 active:scale-95"
                 >
                   <Mail className="h-3.5 w-3.5" /> Reply via Email
                 </a>

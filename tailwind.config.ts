@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 export default {
   darkMode: ["class"],
@@ -71,8 +72,8 @@ export default {
         "ocean-blue": "hsl(var(--ocean-blue))",
         "forest-dark": "hsl(var(--forest-dark))",
         "nature-light": "hsl(var(--nature-light))",
-        "gt-blue": "#0B2B5C",
-        "gt-gold": "#D4AF37",
+        "gt-blue": "hsl(var(--forest-dark))",
+        "gt-gold": "hsl(var(--eco-green))",
         "gt-offwhite": "#F8F9FA",
       },
       fontFamily: {
@@ -121,5 +122,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 } satisfies Config;

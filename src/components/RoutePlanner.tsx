@@ -273,7 +273,7 @@ const dangerZones = [
 
 const hiddenGemIcon = new L.DivIcon({
   className: "hidden-gem-marker",
-  html: `<div style="font-size:18px;color:#d4af37;text-shadow:0 2px 4px rgba(0,0,0,.4)">★</div>`,
+  html: `<div style="font-size:18px;color:#10B981;text-shadow:0 2px 4px rgba(0,0,0,.4)">★</div>`,
   iconSize: [18, 18],
   iconAnchor: [9, 9],
 });

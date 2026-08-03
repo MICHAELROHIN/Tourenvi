@@ -7,12 +7,12 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => ({
   server: {
     host: "localhost",
-    port: 8080,
-    strictPort: true,
+    port: 5173,
+    strictPort: false,
     hmr: {
       host: "localhost",
       protocol: "ws",
-      clientPort: 8080,
+      clientPort: 5173,
     },
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin-allow-popups",

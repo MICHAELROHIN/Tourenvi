@@ -157,9 +157,9 @@ const Navigation = () => {
               {/* Help & Support Nav Button */}
               <button
                 onClick={() => setIsHelpModalOpen(true)}
-                className="flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 hover:bg-[#D4AF37]/20 transition-colors duration-200 cursor-pointer"
+                className="flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium text-eco-green bg-eco-green/10 border border-eco-green/30 hover:bg-eco-green/20 transition-colors duration-200 cursor-pointer"
               >
-                <LifeBuoy className="w-4 h-4 shrink-0 animate-pulse text-[#D4AF37]" />
+                <LifeBuoy className="w-4 h-4 shrink-0 animate-pulse text-eco-green" />
                 <span className="whitespace-nowrap font-semibold">Help & Support</span>
               </button>
             </div>
