@@ -20,6 +20,9 @@ import {
   Route as RouteIcon,
 } from "lucide-react";
 
+import RouteHazardBanner from "@/components/shared/RouteHazardBanner";
+import GroupTripLedger from "@/components/shared/GroupTripLedger";
+
 interface SavedRoute {
   id: string;
   origin: string;
@@ -104,6 +107,11 @@ const Dashboard = () => {
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
             Quick access to your routes, recent costs, and handy actions.
           </p>
+        </div>
+
+        {/* Real-Time Route Weather & Hazard Intelligence */}
+        <div className="max-w-6xl mx-auto mb-8">
+          <RouteHazardBanner />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
@@ -271,6 +279,15 @@ const Dashboard = () => {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Group Budget Splitter & Expense Ledger */}
+        <div className="max-w-6xl mx-auto mt-12">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-[#D4AF37]" />
+            <h3 className="text-xl font-bold text-foreground">Group Trip Ledger & Shared Expense Splitter</h3>
+          </div>
+          <GroupTripLedger />
         </div>
       </div>
     </section>

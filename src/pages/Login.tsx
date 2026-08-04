@@ -60,9 +60,16 @@ const Login: React.FC = () => {
   // --- Redirect Logic ---
   useEffect(() => {
     if (currentUser && userRole) {
-      navigate(roleRoutes[userRole], { replace: true });
+      const from = (location.state as { from?: string } | null)?.from;
+      if (from && from !== "/login") {
+        navigate(from, { replace: true });
+        return;
+      }
+      // Logging in via User Login page (/login) opens User Home (/hero) even for admins
+      const target = userRole === "admin" ? "/hero" : (roleRoutes[userRole] || "/hero");
+      navigate(target, { replace: true });
     }
-  }, [currentUser, navigate, userRole]);
+  }, [currentUser, navigate, userRole, location.state]);
 
   const routeAfterAuth = (role: UserRole | null) => {
     const from = (location.state as { from?: string } | null)?.from;
@@ -70,7 +77,9 @@ const Login: React.FC = () => {
       navigate(from, { replace: true });
       return;
     }
-    navigate(role ? roleRoutes[role] : "/hero", { replace: true });
+    // Logging in via User Login page (/login) opens User Home (/hero) even for admins
+    const target = role === "admin" ? "/hero" : (role ? roleRoutes[role] : "/hero");
+    navigate(target, { replace: true });
   };
 
   const getAuthErrorMessage = (error: unknown): string => {

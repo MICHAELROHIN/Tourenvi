@@ -14,23 +14,28 @@ import {
   AlertTriangle,
   MessageSquare,
   LifeBuoy,
+  Megaphone,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HelpSupportModal from "@/components/shared/HelpSupportModal";
+import EmergencyRadarModal from "@/components/shared/EmergencyRadarModal";
 
 // --- FIREBASE IMPORTS ---
-import { auth, logout } from "@/firebase";
+import { auth, db, logout } from "@/firebase";
 import {
   deleteUser,
   onAuthStateChanged,
   User as FirebaseUser,
 } from "firebase/auth";
+import { collection, onSnapshot } from "firebase/firestore";
 
 const Navigation = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [isEmergencyRadarOpen, setIsEmergencyRadarOpen] = useState(false);
+  const [activeAnnouncements, setActiveAnnouncements] = useState<any[]>([]);
   const [user, setUser] = useState<FirebaseUser | null>(null);
 
   const navigate = useNavigate();
@@ -43,6 +48,19 @@ const Navigation = () => {
       setUser(currentUser);
     });
     return () => unsubscribe();
+  }, []);
+
+  // Monitor Active Broadcast Announcements from Firestore
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "announcements"), (snap) => {
+      if (!snap.empty) {
+        const list = snap.docs
+          .map((doc) => doc.data())
+          .filter((a) => a.isActive);
+        setActiveAnnouncements(list);
+      }
+    });
+    return () => unsub();
   }, []);
 
   // Close mobile menu on route change
@@ -161,6 +179,15 @@ const Navigation = () => {
               >
                 <LifeBuoy className="w-4 h-4 shrink-0 animate-pulse text-[#D4AF37]" />
                 <span className="whitespace-nowrap font-semibold">Help & Support</span>
+              </button>
+
+              {/* Emergency Assist Nav Button */}
+              <button
+                onClick={() => setIsEmergencyRadarOpen(true)}
+                className="flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-bold text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 transition-all duration-200 cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+              >
+                <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse text-red-400" />
+                <span className="whitespace-nowrap font-bold">Emergency Assist</span>
               </button>
             </div>
 
@@ -383,6 +410,12 @@ const Navigation = () => {
           </div>
         </div>
       )}
+
+      {/* Emergency Radar Modal */}
+      <EmergencyRadarModal
+        isOpen={isEmergencyRadarOpen}
+        onClose={() => setIsEmergencyRadarOpen(false)}
+      />
     </>
   );
 };

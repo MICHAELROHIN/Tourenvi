@@ -52,7 +52,7 @@ const RootRedirect = () => {
   if (currentUser) {
     const roleRoutes: Record<string, string> = {
       user: "/hero",
-      admin: "/admin",
+      admin: "/hero", // Admins land on /hero user homepage by default from root
       guide: "/guide/dashboard",
       support: "/support/dashboard",
     };
@@ -114,7 +114,7 @@ const AppRoutes = () => {
       <Route
         path="/trip/new"
         element={
-          <ProtectedRoute allowedRoles={["user"]}>
+          <ProtectedRoute allowedRoles={["user", "admin"]}>
             <AppLayout>
               <ElitePlanner />
             </AppLayout>
@@ -124,7 +124,7 @@ const AppRoutes = () => {
       <Route
         path="/elite-dashboard"
         element={
-          <ProtectedRoute allowedRoles={["user"]}>
+          <ProtectedRoute allowedRoles={["user", "admin"]}>
             <AppLayout>
               <EliteDashboard />
             </AppLayout>
@@ -134,7 +134,7 @@ const AppRoutes = () => {
       <Route
         path="/map"
         element={
-          <ProtectedRoute allowedRoles={["user"]}>
+          <ProtectedRoute allowedRoles={["user", "admin"]}>
             <AppLayout>
               <RoutePlanner />
             </AppLayout>
@@ -204,7 +204,7 @@ const AppRoutes = () => {
       <Route
         path="/live"
         element={
-          <ProtectedRoute allowedRoles={["user", "guide"]}>
+          <ProtectedRoute allowedRoles={["user", "guide", "admin"]}>
             <AppLayout>
               <LiveTracking />
             </AppLayout>

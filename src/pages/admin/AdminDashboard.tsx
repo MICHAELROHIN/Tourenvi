@@ -63,7 +63,12 @@ import {
   Filter,
   ArrowUpRight,
   MessageSquare,
+  History,
+  Megaphone,
+  Download,
+  Send,
 } from "lucide-react";
+import { exportToCSV } from "@/utils/csvExporter";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -143,6 +148,14 @@ const AdminDashboard: React.FC = () => {
   // --- Audit Logs State ---
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [auditSearch, setAuditSearch] = useState("");
+
+  // --- Broadcast Announcements State ---
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [newBroadcastTitle, setNewBroadcastTitle] = useState("");
+  const [newBroadcastMsg, setNewBroadcastMsg] = useState("");
+  const [newBroadcastCategory, setNewBroadcastCategory] = useState<"Route Alert" | "Weather Warning" | "System Advisory" | "Promotion">("Route Alert");
+  const [newBroadcastTarget, setNewBroadcastTarget] = useState<"All Travelers" | "EV Drivers" | "Highway Drivers">("All Travelers");
+  const [newBroadcastSeverity, setNewBroadcastSeverity] = useState<"Normal" | "High" | "Urgent">("Normal");
 
   // --- API Health & Fallback State ---
   const [latencies, setLatencies] = useState({
@@ -405,6 +418,39 @@ const AdminDashboard: React.FC = () => {
       }
     });
 
+    const unsubAnnouncements = onSnapshot(collection(db, "announcements"), async (snap) => {
+      if (snap.empty) {
+        const defaultAnnouncements = [
+          {
+            title: "Heavy Monsoon Rainfall Advisory: Mumbai-Pune Expressway",
+            message: "Waterlogging reported near Khalapur toll. Drive with fog lights and keep speed below 60 km/h.",
+            category: "Route Alert",
+            targetAudience: "All Travelers",
+            severity: "High",
+            isActive: true,
+            publisher: "Operations Team",
+            createdAt: new Date(),
+          },
+          {
+            title: "Toll Tariff Adjustment Notice",
+            message: "State Highway 14 FASTag surcharges updated across Maharashtra toll plazas.",
+            category: "System Advisory",
+            targetAudience: "Highway Drivers",
+            severity: "Normal",
+            isActive: true,
+            publisher: "Operations Team",
+            createdAt: new Date(Date.now() - 3600000 * 24),
+          },
+        ];
+        for (const ann of defaultAnnouncements) {
+          await addDoc(collection(db, "announcements"), ann);
+        }
+      } else {
+        const list = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setAnnouncements(list);
+      }
+    });
+
     return () => {
       unsubUsers();
       unsubAdmins();
@@ -413,6 +459,7 @@ const AdminDashboard: React.FC = () => {
       unsubLogs();
       unsubInquiries();
       unsubAudit();
+      unsubAnnouncements();
     };
   }, []);
 
@@ -446,6 +493,53 @@ const AdminDashboard: React.FC = () => {
 
     return () => clearInterval(timer);
   }, []);
+
+  const handlePublishBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBroadcastTitle.trim() || !newBroadcastMsg.trim()) {
+      toast.error("Please provide both an announcement title and message.");
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, "announcements"), {
+        title: newBroadcastTitle.trim(),
+        message: newBroadcastMsg.trim(),
+        category: newBroadcastCategory,
+        targetAudience: newBroadcastTarget,
+        severity: newBroadcastSeverity,
+        isActive: true,
+        publisher: adminName || "Admin",
+        createdAt: serverTimestamp(),
+      });
+
+      toast.success("Broadcast Announcement published to user dashboards!");
+      await logAdminAction("Published Announcement", newBroadcastTitle.trim(), `Broadcasted to ${newBroadcastTarget}`);
+      setNewBroadcastTitle("");
+      setNewBroadcastMsg("");
+    } catch {
+      toast.error("Failed to publish announcement.");
+    }
+  };
+
+  const handleToggleBroadcastStatus = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, "announcements", id), { isActive: !currentStatus });
+      toast.success(`Announcement ${!currentStatus ? "activated" : "deactivated"}.`);
+    } catch {
+      toast.error("Failed to update announcement status.");
+    }
+  };
+
+  const handleDeleteBroadcast = async (id: string) => {
+    if (!window.confirm("Delete this broadcast announcement?")) return;
+    try {
+      await deleteDoc(doc(db, "announcements", id));
+      toast.success("Announcement deleted.");
+    } catch {
+      toast.error("Failed to delete announcement.");
+    }
+  };
 
   const handlePromoteAdmin = async (targetUid: string) => {
     try {
@@ -901,18 +995,27 @@ const AdminDashboard: React.FC = () => {
                   Showing non-admin user accounts. Click any account to view planned trips and profile details.
                 </p>
               </div>
-              <div className="relative w-full sm:max-w-md">
-                <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by name, email or phone..."
-                  value={userSearch}
-                  onChange={(e) => {
-                    setUserSearch(e.target.value);
-                    setUserPage(1);
-                  }}
-                  className="w-full pl-11 pr-4 py-2 rounded-xl border border-white/10 bg-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
-                />
+              <div className="flex items-center gap-3 w-full sm:max-w-md">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by name, email or phone..."
+                    value={userSearch}
+                    onChange={(e) => {
+                      setUserSearch(e.target.value);
+                      setUserPage(1);
+                    }}
+                    className="w-full pl-11 pr-4 py-2 rounded-xl border border-white/10 bg-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                  />
+                </div>
+                <button
+                  onClick={() => exportToCSV("Tourenvi_Users_Report", regularUsers)}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#D4AF37] text-[#0B2B5C] font-bold text-xs hover:bg-[#c49f27] transition-all shrink-0 cursor-pointer shadow-md"
+                  title="Export User Accounts CSV Report"
+                >
+                  <Download className="h-4 w-4" /> Export CSV
+                </button>
               </div>
             </div>
 
@@ -1705,10 +1808,10 @@ const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* --- 2. REVENUE & AFFILIATE EARNINGS TRACKER TAB --- */}
-        {activeTab === "revenue" && (
+        {/* --- 2. REVENUE & AFFILIATE EARNINGS TRACKER TAB (COMMENTED OUT - UNCOMMENT WHEN NEEDED) --- */}
+        {/*
+        activeTab === "revenue" && (
           <div className="space-y-6 animate-fade-in">
-            {/* Revenue Summary Metric Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg">
                 <div className="flex justify-between items-start">
@@ -1779,7 +1882,6 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Revenue Charts & Breakdown */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
                 <div className="flex items-center justify-between">
@@ -1824,7 +1926,6 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Affiliate Partner Streams */}
               <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
                 <h4 className="text-sm font-bold text-white uppercase tracking-wider">Monetization Channels</h4>
                 <div className="space-y-3">
@@ -1895,7 +1996,8 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
           </div>
-        )}
+        )
+        */}
 
         {/* --- 3. THIRD-PARTY API HEALTH & OUTAGE MONITOR TAB --- */}
         {activeTab === "health" && (
@@ -1991,7 +2093,8 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Manual Fallback Trigger Switches */}
+            {/* Manual Fallback Trigger Switches (COMMENTED OUT - UNCOMMENT WHEN NEEDED) */}
+            {/*
             <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
               <div className="flex items-center gap-2 border-b border-white/5 pb-3">
                 <Sliders className="h-5 w-5 text-[#D4AF37]" />
@@ -2076,6 +2179,222 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
             </div>
+            */}
+          </div>
+        )}
+
+        {/* --- BROADCAST ANNOUNCEMENT & PUSH NOTIFICATION MANAGER TAB --- */}
+        {activeTab === "broadcast" && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Active Broadcasts</p>
+                    <h3 className="text-2xl font-black text-white mt-1 text-emerald-400 font-mono">
+                      {announcements.filter((a) => a.isActive).length} Live
+                    </h3>
+                  </div>
+                  <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                    <Megaphone className="h-5 w-5" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2">Active on user route banners</p>
+              </div>
+
+              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Sent Broadcasts</p>
+                    <h3 className="text-2xl font-black text-white mt-1 text-[#D4AF37] font-mono">
+                      {announcements.length} Published
+                    </h3>
+                  </div>
+                  <div className="p-3 rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37]">
+                    <Send className="h-5 w-5" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2">Pushed across all traveler channels</p>
+              </div>
+
+              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Estimated Audience Reach</p>
+                    <h3 className="text-2xl font-black text-white mt-1 text-blue-400 font-mono">
+                      14,890 Travelers
+                    </h3>
+                  </div>
+                  <div className="p-3 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400">
+                    <UsersIcon className="h-5 w-5" />
+                  </div>
+                </div>
+                <p className="text-[11px] text-gray-400 mt-2">Active GPS highway subscribers</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
+                <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <Megaphone className="h-4 w-4 text-[#D4AF37]" /> Publish New Broadcast
+                </h4>
+
+                <form onSubmit={handlePublishBroadcast} className="space-y-3.5">
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-300 uppercase">Announcement Title</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Heavy Rainfall Advisory on Highway 48"
+                      value={newBroadcastTitle}
+                      onChange={(e) => setNewBroadcastTitle(e.target.value)}
+                      className="w-full mt-1 px-3.5 py-2.5 rounded-xl bg-[#051124] border border-white/15 text-white placeholder-gray-400 text-xs focus:outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-300 uppercase">Category</label>
+                      <select
+                        value={newBroadcastCategory}
+                        onChange={(e) => setNewBroadcastCategory(e.target.value as any)}
+                        className="w-full mt-1 px-3 py-2 rounded-xl bg-[#051124] border border-white/15 text-white text-xs focus:outline-none focus:border-[#D4AF37]"
+                      >
+                        <option value="Route Alert">Route Alert</option>
+                        <option value="Weather Warning">Weather Warning</option>
+                        <option value="System Advisory">System Advisory</option>
+                        <option value="Promotion">Promotion</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-bold text-gray-300 uppercase">Audience</label>
+                      <select
+                        value={newBroadcastTarget}
+                        onChange={(e) => setNewBroadcastTarget(e.target.value as any)}
+                        className="w-full mt-1 px-3 py-2 rounded-xl bg-[#051124] border border-white/15 text-white text-xs focus:outline-none focus:border-[#D4AF37]"
+                      >
+                        <option value="All Travelers">All Travelers</option>
+                        <option value="EV Drivers">EV Drivers</option>
+                        <option value="Highway Drivers">Highway Drivers</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-300 uppercase">Severity Level</label>
+                    <select
+                      value={newBroadcastSeverity}
+                      onChange={(e) => setNewBroadcastSeverity(e.target.value as any)}
+                      className="w-full mt-1 px-3 py-2 rounded-xl bg-[#051124] border border-white/15 text-white text-xs focus:outline-none focus:border-[#D4AF37]"
+                    >
+                      <option value="Normal">Normal Advisory</option>
+                      <option value="High">High Priority Warning</option>
+                      <option value="Urgent">Urgent Emergency Alert</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-gray-300 uppercase">Message Body</label>
+                    <textarea
+                      rows={3}
+                      placeholder="Enter detailed broadcast instructions or safety advisories..."
+                      value={newBroadcastMsg}
+                      onChange={(e) => setNewBroadcastMsg(e.target.value)}
+                      className="w-full mt-1 px-3.5 py-2.5 rounded-xl bg-[#051124] border border-white/15 text-white placeholder-gray-400 text-xs focus:outline-none focus:border-[#D4AF37]"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3 rounded-xl bg-[#D4AF37] hover:bg-[#c49f27] text-[#0B2B5C] font-bold text-xs transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <Send className="h-4 w-4" /> Publish Broadcast Now
+                  </button>
+                </form>
+              </div>
+
+              <div className="lg:col-span-2 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Published Broadcast Announcements ({announcements.length})
+                  </h4>
+                  <button
+                    onClick={() => exportToCSV("Tourenvi_Announcements_Report", announcements)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#D4AF37] text-[#0B2B5C] font-bold text-xs hover:bg-[#c49f27] transition-all cursor-pointer shadow-md"
+                  >
+                    <Download className="h-3.5 w-3.5" /> Export CSV
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-white/10 bg-white/5 text-gray-400 uppercase tracking-wider text-[10px]">
+                        <th className="p-3">Title & Message</th>
+                        <th className="p-3">Category</th>
+                        <th className="p-3">Audience</th>
+                        <th className="p-3">Severity</th>
+                        <th className="p-3">Status</th>
+                        <th className="p-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5 text-gray-300">
+                      {announcements.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="p-6 text-center text-gray-400">
+                            No broadcasts published yet.
+                          </td>
+                        </tr>
+                      ) : (
+                        announcements.map((ann) => (
+                          <tr key={ann.id} className="hover:bg-white/5 transition-all">
+                            <td className="p-3">
+                              <div className="font-bold text-white text-xs">{ann.title}</div>
+                              <div className="text-[10px] text-gray-400 line-clamp-1">{ann.message}</div>
+                            </td>
+                            <td className="p-3 font-semibold text-gray-300">{ann.category}</td>
+                            <td className="p-3 text-blue-400 font-medium">{ann.targetAudience}</td>
+                            <td className="p-3">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  ann.severity === "Urgent"
+                                    ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                                    : ann.severity === "High"
+                                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                    : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                                }`}
+                              >
+                                {ann.severity}
+                              </span>
+                            </td>
+                            <td className="p-3">
+                              <button
+                                onClick={() => handleToggleBroadcastStatus(ann.id, ann.isActive)}
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-all ${
+                                  ann.isActive
+                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                                    : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
+                                }`}
+                              >
+                                {ann.isActive ? "Live / Active" : "Inactive"}
+                              </button>
+                            </td>
+                            <td className="p-3 text-right">
+                              <button
+                                onClick={() => handleDeleteBroadcast(ann.id)}
+                                className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/20 transition-all cursor-pointer"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -2088,15 +2407,24 @@ const AdminDashboard: React.FC = () => {
                 <h4 className="text-sm font-bold text-white uppercase tracking-wider">System Audit & Administrative Activity Logs</h4>
               </div>
 
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Filter by admin or action..."
-                  value={auditSearch}
-                  onChange={(e) => setAuditSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 rounded-xl border border-white/10 bg-white/5 text-xs text-white placeholder-gray-400 focus:outline-none focus:border-[#D4AF37]"
-                />
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Filter by admin or action..."
+                    value={auditSearch}
+                    onChange={(e) => setAuditSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 rounded-xl border border-white/10 bg-white/5 text-xs text-white placeholder-gray-400 focus:outline-none focus:border-[#D4AF37]"
+                  />
+                </div>
+                <button
+                  onClick={() => exportToCSV("Tourenvi_Audit_Logs_Report", auditLogs)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#D4AF37] text-[#0B2B5C] font-bold text-xs hover:bg-[#c49f27] transition-all shrink-0 cursor-pointer shadow-md"
+                  title="Export Audit Logs CSV Report"
+                >
+                  <Download className="h-4 w-4" /> Export CSV
+                </button>
               </div>
             </div>
 

@@ -18,6 +18,8 @@ import {
   DollarSign,
   Activity,
   History,
+  AlertTriangle,
+  Megaphone,
 } from "lucide-react";
 
 export type AdminTab =
@@ -28,6 +30,7 @@ export type AdminTab =
   | "fuel"
   | "logs"
   | "support"
+  | "broadcast"
   | "revenue"
   | "health"
   | "audit";
@@ -135,10 +138,17 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab }) 
       icon: Headphones,
     },
     {
+      id: "broadcast" as AdminTab,
+      label: "Broadcast & Alerts",
+      icon: Megaphone,
+    },
+    /*
+    {
       id: "revenue" as AdminTab,
       label: "Revenue & Monetization",
       icon: DollarSign,
     },
+    */
     {
       id: "health" as AdminTab,
       label: "System Health",
