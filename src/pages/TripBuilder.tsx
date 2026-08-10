@@ -127,11 +127,27 @@ const TripBuilder = () => {
               type="date"
               value={trip.startDate}
               onChange={(event) => updateTrip("startDate", event.target.value)}
+              onClick={(e) => {
+                try {
+                  e.currentTarget.showPicker();
+                } catch (err) {
+                  console.error("Error opening date picker: ", err);
+                }
+              }}
+              className="cursor-pointer"
             />
             <Input
               type="date"
               value={trip.endDate}
               onChange={(event) => updateTrip("endDate", event.target.value)}
+              onClick={(e) => {
+                try {
+                  e.currentTarget.showPicker();
+                } catch (err) {
+                  console.error("Error opening date picker: ", err);
+                }
+              }}
+              className="cursor-pointer"
             />
             <Input
               type="number"

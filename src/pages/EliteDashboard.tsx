@@ -53,6 +53,7 @@ const EliteDashboard = () => {
   }, []);
 
   const [routePath, setRoutePath] = useState<RoutePoint[]>([]);
+  const [activePieIndex, setActivePieIndex] = useState<number | null>(null);
 
   const mockDistanceKm = calcData?.routeDetails?.distanceKm || 450;
   const fuelExpenditure = calcData?.financials?.fuelCost || 0;
@@ -64,7 +65,7 @@ const EliteDashboard = () => {
   const totalCost = calcData?.financials?.totalCost || 0;
 
   const chartData = [
-    { name: "Fuel", value: fuelExpenditure, color: "#0B2B5C" }, // gt-blue
+    { name: "Fuel", value: fuelExpenditure, color: "#059669" }, // emerald-600
     { name: "Lodging", value: totalLodging, color: "#D4AF37" }, // gt-gold
     { name: "Tolls", value: tollPricing, color: "#9ca3af" },
     { name: "Food", value: foodCost, color: "#10b981" },
@@ -581,7 +582,7 @@ const EliteDashboard = () => {
 
         {/* Column C: Financial & Eco Analysis (Right) */}
         <div className="w-full lg:w-1/3 p-6 lg:p-8 bg-white border-l border-gray-100 overflow-y-auto h-full custom-scrollbar pb-24">
-          <h2 className="text-3xl font-serif font-bold text-gt-blue mb-2">Analysis</h2>
+          <h2 className="text-3xl font-serif font-bold text-emerald-800 mb-2">Analysis</h2>
           <p className="text-gray-500 mb-8 font-sans">Financial metrics and ecological impact.</p>
 
           <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 mb-8 relative overflow-hidden">
@@ -593,7 +594,7 @@ const EliteDashboard = () => {
               <h3 className="font-semibold text-gray-700">Eco Leaf Score</h3>
             </div>
             <div className="mt-4 flex items-baseline gap-2">
-              <span className="text-4xl font-bold text-gt-blue">{co2}</span>
+              <span className="text-4xl font-bold text-emerald-800">{co2}</span>
               <span className="text-gray-500">kg CO₂</span>
             </div>
             <p className="text-sm text-gray-500 mt-2">
@@ -603,33 +604,121 @@ const EliteDashboard = () => {
 
           <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
             <h3 className="font-semibold text-gray-700 mb-6">Financial Breakdown</h3>
-
-            <div className="h-64 mb-6">
+            <div className="relative h-64 mb-6 flex items-center justify-center">
+              <div 
+                className="absolute w-36 h-36 rounded-full bg-gradient-to-br from-white to-gray-100 shadow-[inset_0_2px_4px_rgba(255,255,255,0.9),0_10px_20px_rgba(0,0,0,0.12),0_2px_4px_rgba(0,0,0,0.06)] border border-gray-200/60 flex flex-col items-center justify-center text-center pointer-events-none z-10 p-4 transition-all duration-300"
+              >
+                <Leaf className="text-emerald-600 mb-1 drop-shadow-xs" size={22} />
+                {activePieIndex !== null ? (
+                  <>
+                    <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest leading-none">
+                      {chartData[activePieIndex].name}
+                    </span>
+                    <span 
+                      className="text-lg font-black transition-all duration-300 mt-1.5 leading-none"
+                      style={{ color: chartData[activePieIndex].color }}
+                    >
+                      ₹{chartData[activePieIndex].value.toLocaleString()}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest leading-none">
+                      Total Cost
+                    </span>
+                    <span className="text-lg font-black text-emerald-800 mt-1.5 leading-none">
+                      ₹{totalCost.toLocaleString()}
+                    </span>
+                  </>
+                )}
+              </div>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
+                  <defs>
+                    <filter id="bevel-filter" x="-20%" y="-20%" width="140%" height="140%">
+                      <feDropShadow dx="0" dy="6" stdDeviation="5" floodColor="#000000" floodOpacity="0.16" />
+                      <feGaussianBlur in="SourceAlpha" stdDeviation="1.5" result="blur" />
+                      <feOffset dx="1" dy="1.5" result="offset" />
+                      <feSpecularLighting in="blur" surfaceScale="3.5" specularConstant="0.9" specularExponent="16" lighting-color="#ffffff" result="spec">
+                        <fePointLight x="-50" y="-80" z="180" />
+                      </feSpecularLighting>
+                      <feComposite in="spec" in2="SourceAlpha" operator="in" result="specOut" />
+                      <feComposite in="SourceGraphic" in2="specOut" operator="arithmetic" k1="0" k2="1" k3="0.75" k4="0" />
+                    </filter>
+                  </defs>
                   <Pie
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
+                    innerRadius={65}
+                    outerRadius={85}
+                    paddingAngle={4}
+                    cornerRadius={6}
                     dataKey="value"
+                    onMouseEnter={(_, index) => setActivePieIndex(index)}
+                    onMouseLeave={() => setActivePieIndex(null)}
                   >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
+                    {chartData.map((entry, index) => {
+                      const isActive = activePieIndex === index;
+                      return (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={entry.color}
+                          stroke="#ffffff"
+                          strokeWidth={isActive ? 3.5 : 2}
+                          filter="url(#bevel-filter)"
+                          style={{
+                            outline: "none",
+                            cursor: "pointer",
+                            transition: "all 0.2s ease"
+                          }}
+                        />
+                      );
+                    })}
                   </Pie>
-                  <RechartsTooltip formatter={(value) => `₹${value}`} />
-                  <Legend />
+                  <RechartsTooltip content={() => null} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
 
-            <div className="space-y-4">
+            {/* Premium Interactive Callout Cards Grid (Inspired by the 3D callout labels) */}
+            <div className="grid grid-cols-2 gap-3 mb-6">
+              {chartData.map((item, index) => {
+                const pct = totalCost > 0 ? Math.round((item.value / totalCost) * 100) : 0;
+                const isActive = activePieIndex === index;
+                return (
+                  <div 
+                    key={item.name}
+                    onMouseEnter={() => setActivePieIndex(index)}
+                    onMouseLeave={() => setActivePieIndex(null)}
+                    className={`p-3.5 rounded-2xl border transition-all duration-300 text-left ${
+                      isActive 
+                        ? "bg-emerald-50/40 border-emerald-200/80 shadow-md translate-y-[-2px]" 
+                        : "bg-gray-50/50 border-gray-100 shadow-2xs hover:border-gray-200"
+                    }`}
+                    style={{ cursor: "pointer" }}
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span 
+                        className="px-2.5 py-0.5 rounded-full text-[9px] font-bold text-white tracking-wider uppercase"
+                        style={{ backgroundColor: item.color }}
+                      >
+                        {item.name}
+                      </span>
+                      <span className="text-[10px] font-extrabold text-gray-400">{pct}%</span>
+                    </div>
+                    <div className="text-sm font-black text-gray-800">
+                      ₹{item.value.toLocaleString()}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-gray-100">
               <div className="flex justify-between items-center pb-4 border-b border-gray-100">
                 <span className="text-gray-500">Total Estimate</span>
-                <span className="text-xl font-bold text-gt-blue">
+                <span className="text-xl font-bold text-emerald-800">
                   ₹{totalCost.toLocaleString()}
                 </span>
               </div>
@@ -640,13 +729,13 @@ const EliteDashboard = () => {
                 </span>
               </div>
             </div>
-          </div>
+            </div>
 
           <RoadTripBudgetCard financials={calcData?.financials} tripData={trip} className="mt-8" />
 
           <button
             onClick={handleSaveItinerary}
-            className="w-full mt-8 py-4 bg-gt-blue hover:bg-gt-blue/90 text-white font-medium rounded-xl shadow-lg transition-all active:scale-[0.98]"
+            className="w-full mt-8 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl shadow-lg transition-all active:scale-[0.98]"
           >
             Finalize & Save Itinerary (Offline Mode)
           </button>
