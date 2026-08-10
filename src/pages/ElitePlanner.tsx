@@ -29,9 +29,25 @@ import {
   Fuel,
   IndianRupee,
   Loader2,
+  Bed,
+  Sparkles,
+  Calendar,
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
+
+interface RealHotel {
+  id: string;
+  name: string;
+  address: string;
+  rating: number;
+  user_ratings_total: number;
+  phone?: string;
+  photoUrl: string;
+  price_level?: number;
+  estimatedPricePerNight: number;
+  category: "Boutique" | "Luxury" | "Eco";
+}
 
 const stages = [
   "Profile",
@@ -74,15 +90,21 @@ const ElitePlanner = () => {
   const [carBrand, setCarBrand] = useState("");
   const [carModel, setCarModel] = useState("");
 
+  // Real Hotels state
+  const [realHotels, setRealHotels] = useState<RealHotel[]>([]);
+  const [hotelsLoading, setHotelsLoading] = useState(false);
+  const [hotelsError, setHotelsError] = useState<string | null>(null);
+
   const sourceCity = trip.startLocation.trim();
   const defaultFuelPrice = trip.fuelType === "diesel" ? 94 : 102.5;
 
   const fetchLiveFuelPrice = async (city: string, fuelType: string, signal?: AbortSignal) => {
     const normalizedFuel = fuelType.toLowerCase();
-    const fallbackPrice = normalizedFuel === "diesel" ? 94 : 102.5;
+    const fallbackPrice = normalizedFuel === "diesel" ? 92.34 : 100.75;
 
     if (!city.trim()) {
       setLiveFuelPrice(fallbackPrice);
+      updateTrip("fuelPrice", fallbackPrice);
       return;
     }
 
@@ -90,33 +112,33 @@ const ElitePlanner = () => {
 
     try {
       const response = await fetch(
-        `https://daily-petrol-diesel-lpg-cng-fuel-prices-in-india.p.rapidapi.com/v1/fuel-prices?city=${encodeURIComponent(city)}&fuelType=${encodeURIComponent(normalizedFuel)}`,
+        `http://localhost:8000/api/fuel-price?city=${encodeURIComponent(city)}&fuelType=${encodeURIComponent(normalizedFuel)}`,
         {
           method: "GET",
           signal,
-          headers: {
-            "x-rapidapi-key": import.meta.env.VITE_RAPIDAPI_KEY || "YOUR_RAPIDAPI_KEY",
-            "x-rapidapi-host": "daily-petrol-diesel-lpg-cng-fuel-prices-in-india.p.rapidapi.com",
-          },
         },
       );
 
       if (!response.ok) {
         setLiveFuelPrice(fallbackPrice);
+        updateTrip("fuelPrice", fallbackPrice);
         return;
       }
 
       const data = await response.json();
-      const price = Number(data?.retailPrice ?? data?.price);
+      const price = Number(data?.price);
 
       if (Number.isFinite(price) && price > 0) {
         setLiveFuelPrice(price);
+        updateTrip("fuelPrice", price);
       } else {
         setLiveFuelPrice(fallbackPrice);
+        updateTrip("fuelPrice", fallbackPrice);
       }
     } catch (error) {
       console.error("Fuel price fetch failed:", error);
       setLiveFuelPrice(fallbackPrice);
+      updateTrip("fuelPrice", fallbackPrice);
     } finally {
       if (!signal?.aborted) {
         setFuelPriceLoading(false);
@@ -210,6 +232,149 @@ const ElitePlanner = () => {
     updateTrip("fuelType", normalized as any);
     fetchMileage(val);
   };
+
+  // Target destination for hotel lookup
+  const targetDestination = trip.destinations[0] || trip.startLocation || "Ooty";
+
+  // Calculate nights from trip start/end date
+  const tripNights = useMemo(() => {
+    if (trip.startDate && trip.endDate) {
+      const start = new Date(trip.startDate);
+      const end = new Date(trip.endDate);
+      const diffTime = Math.abs(end.getTime() - start.getTime());
+      const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return Math.max(1, days);
+    }
+    return 2; // Default 2 nights
+  }, [trip.startDate, trip.endDate]);
+
+  // Fetch real hotels when entering Lodging stage (Stage 6) or when destination changes
+  useEffect(() => {
+    if (currentStage === 6 && targetDestination) {
+      const fetchDestinationHotels = async () => {
+        setHotelsLoading(true);
+        setHotelsError(null);
+        try {
+          const res = await fetch(`http://localhost:8000/get-hotels?destination=${encodeURIComponent(targetDestination)}`);
+          if (!res.ok) throw new Error("Failed to fetch real hotels for " + targetDestination);
+          const data = await res.json();
+          if (data.hotels && data.hotels.length > 0) {
+            const mapped: RealHotel[] = data.hotels.map((h: any) => {
+              let basePrice = 3500;
+              if (h.price_level === 1) basePrice = 2200;
+              else if (h.price_level === 2) basePrice = 4500;
+              else if (h.price_level === 3) basePrice = 8500;
+              else if (h.price_level === 4) basePrice = 14500;
+              else if (h.rating) {
+                basePrice = h.rating > 4.4 ? 7500 : h.rating > 3.9 ? 4200 : 2500;
+              }
+              const nameHash = (h.name || "").split("").reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
+              const priceOffset = (nameHash % 7) * 150 - 300;
+              const estimatedPricePerNight = Math.max(1800, basePrice + priceOffset);
+
+              // Assign lodging category
+              let category: "Boutique" | "Luxury" | "Eco" = "Boutique";
+              const lowerName = (h.name || "").toLowerCase();
+              if (
+                h.price_level >= 3 ||
+                h.rating >= 4.4 ||
+                lowerName.includes("resort") ||
+                lowerName.includes("palace") ||
+                lowerName.includes("luxury") ||
+                lowerName.includes("spa") ||
+                lowerName.includes("grand") ||
+                lowerName.includes("villas")
+              ) {
+                category = "Luxury";
+              } else if (
+                h.price_level <= 1 ||
+                lowerName.includes("eco") ||
+                lowerName.includes("lodge") ||
+                lowerName.includes("nature") ||
+                lowerName.includes("farm") ||
+                lowerName.includes("guest") ||
+                lowerName.includes("cottage") ||
+                lowerName.includes("homestay")
+              ) {
+                category = "Eco";
+              } else {
+                category = "Boutique";
+              }
+
+              return {
+                id: h.id,
+                name: h.name,
+                address: h.address,
+                rating: h.rating || 4.2,
+                user_ratings_total: h.user_ratings_total || 85,
+                phone: h.phone,
+                photoUrl: h.photoUrl,
+                price_level: h.price_level,
+                estimatedPricePerNight,
+                category,
+              };
+            });
+            setRealHotels(mapped);
+          } else {
+            setHotelsError("No hotels found for " + targetDestination);
+          }
+        } catch (err: any) {
+          console.error("Hotel fetch error:", err);
+          setHotelsError(err.message || "Failed to load real hotels");
+        } finally {
+          setHotelsLoading(false);
+        }
+      };
+      fetchDestinationHotels();
+    }
+  }, [currentStage, targetDestination]);
+
+  // Handle hotel selection & calculate hotel budget addition
+  const handleSelectHotel = (hotel: RealHotel) => {
+    const nightPrice = hotel.estimatedPricePerNight;
+    const rooms = Math.max(1, Math.ceil(trip.numberOfMembers / 2));
+    const totalHotelCost = nightPrice * tripNights * rooms;
+
+    updateTrip("selectedHotelName", hotel.name);
+    updateTrip("selectedHotelPrice", nightPrice);
+
+    const currentBreakdown = trip.costBreakdown || {
+      fuel: 0,
+      toll: 0,
+      hotel: 0,
+      food: 0,
+      places: 0,
+      misc: 0,
+      total: 0,
+      perPerson: 0,
+    };
+
+    const newHotelCost = totalHotelCost;
+    const newTotalCost =
+      (currentBreakdown.fuel || 0) +
+      (currentBreakdown.toll || 0) +
+      newHotelCost +
+      (currentBreakdown.food || 0) +
+      (currentBreakdown.places || 0) +
+      (currentBreakdown.misc || 0);
+
+    const newPerPerson = Math.round(newTotalCost / Math.max(1, trip.numberOfMembers));
+
+    updateTrip("costBreakdown", {
+      ...currentBreakdown,
+      hotel: newHotelCost,
+      total: newTotalCost,
+      perPerson: newPerPerson,
+    });
+
+    toast.success(`Selected "${hotel.name}" (₹${totalHotelCost.toLocaleString()} added for ${tripNights} night${tripNights > 1 ? "s" : ""})`);
+  };
+
+  // Filtered real hotels based on selected lodging style cards
+  const filteredHotels = useMemo(() => {
+    if (!trip.lodgingType || trip.lodgingType.length === 0) return realHotels;
+    return realHotels.filter((h) => trip.lodgingType.includes(h.category));
+  }, [realHotels, trip.lodgingType]);
 
   const FuelPriceCard = () => {
     const displayedPrice = liveFuelPrice ?? defaultFuelPrice;
@@ -824,39 +989,168 @@ const ElitePlanner = () => {
 
             {/* Stage 7: Lodging */}
             {currentStage === 6 && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className="text-4xl font-serif font-semibold text-emerald-800 mb-4">Accommodation Stylist</h2>
-                <p className="text-gray-500 mb-8 font-sans">Where would you like to rest?</p>
-                
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
+                <div>
+                  <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
+                    <h2 className="text-4xl font-serif font-semibold text-emerald-800">Accommodation & Real Stays</h2>
+                    <span className="px-3.5 py-1.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-xs flex items-center gap-1.5">
+                      <MapPin size={14} /> Destination: {targetDestination}
+                    </span>
+                  </div>
+                  <p className="text-gray-500 font-sans">
+                    Filter and choose real hotels & lodges in {targetDestination}. Selected stay will be automatically added to your trip budget calculation.
+                  </p>
+                </div>
+
+                {/* 3 Lodging Style Options */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   {[
-                    { id: "Boutique", title: "Boutique Stays", icon: Home, desc: "Intimate, unique, and personalized." },
-                    { id: "Luxury", title: "Luxury Resorts", icon: Star, desc: "5-star amenities and ultimate comfort." },
-                    { id: "Eco", title: "Eco-Lodges", icon: Leaf, desc: "Sustainable stays close to nature." },
+                    { id: "Boutique", title: "Boutique Stays", icon: Home, desc: "Intimate, unique & heritage stays." },
+                    { id: "Luxury", title: "Luxury Resorts", icon: Star, desc: "5-star amenities & premium villas." },
+                    { id: "Eco", title: "Eco-Lodges", icon: Leaf, desc: "Sustainable nature stays & budget lodges." },
                   ].map((l) => {
                     const isSelected = trip.lodgingType?.includes(l.id);
                     return (
-                      <div 
+                      <div
                         key={l.id}
                         onClick={() => {
                           const current = trip.lodgingType || [];
-                          const newTypes = isSelected 
+                          const newTypes = isSelected
                             ? current.filter(x => x !== l.id)
                             : [...current, l.id];
                           updateTrip("lodgingType", newTypes);
                         }}
                         className={`cursor-pointer rounded-2xl border-2 p-6 flex flex-col items-center text-center transition-all ${
-                          isSelected ? "border-emerald-500 bg-emerald-50 shadow-md" : "border-gray-100 hover:border-gray-200"
+                          isSelected ? "border-emerald-600 bg-emerald-50 shadow-md scale-102" : "border-gray-100 hover:border-gray-200"
                         }`}
                       >
-                        <div className={`p-4 rounded-full mb-4 ${isSelected ? "bg-emerald-600 text-white" : "bg-gray-50 text-gray-400"}`}>
-                          <l.icon size={32} />
+                        <div className={`p-4 rounded-full mb-3 ${isSelected ? "bg-emerald-600 text-white" : "bg-gray-50 text-gray-400"}`}>
+                          <l.icon size={28} />
                         </div>
-                        <h3 className="font-serif font-medium text-xl mb-2 text-emerald-800">{l.title}</h3>
-                        <p className="text-sm text-gray-500">{l.desc}</p>
+                        <h3 className="font-serif font-medium text-lg text-emerald-800">{l.title}</h3>
+                        <p className="text-xs text-gray-500 mt-1">{l.desc}</p>
                       </div>
                     );
                   })}
+                </div>
+
+                {/* Real Hotels for Destination */}
+                <div className="pt-4 border-t border-gray-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-serif font-semibold text-emerald-900 flex items-center gap-2">
+                      <Bed className="text-emerald-600" size={22} />
+                      Real Hotels & Lodges in {targetDestination}
+                    </h3>
+                    <span className="text-xs text-gray-500 font-medium">
+                      Showing {filteredHotels.length} stay{filteredHotels.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+
+                  {/* Loading State */}
+                  {hotelsLoading && (
+                    <div className="py-12 text-center text-gray-500 space-y-3">
+                      <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
+                      <p className="text-sm font-medium">Searching OpenStreetMap for real hotels in {targetDestination}...</p>
+                    </div>
+                  )}
+
+                  {/* Error State */}
+                  {!hotelsLoading && hotelsError && (
+                    <div className="py-8 text-center text-amber-700 bg-amber-50 rounded-xl p-4 border border-amber-200">
+                      <p className="font-semibold text-sm">{hotelsError}</p>
+                      <p className="text-xs mt-1 text-amber-600">Select a stay category above to estimate lodging budget.</p>
+                    </div>
+                  )}
+
+                  {/* Real Hotel List */}
+                  {!hotelsLoading && filteredHotels.length > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[480px] overflow-y-auto pr-2">
+                      {filteredHotels.map((hotel) => {
+                        const isChosen = trip.selectedHotelName === hotel.name;
+                        const rooms = Math.max(1, Math.ceil(trip.numberOfMembers / 2));
+                        const totalCostForStay = hotel.estimatedPricePerNight * tripNights * rooms;
+
+                        return (
+                          <div
+                            key={hotel.id}
+                            onClick={() => handleSelectHotel(hotel)}
+                            className={`cursor-pointer rounded-2xl border-2 overflow-hidden flex flex-col justify-between transition-all group ${
+                              isChosen
+                                ? "border-emerald-600 bg-emerald-50/90 ring-4 ring-emerald-500/20 shadow-lg scale-102"
+                                : "border-gray-200 bg-white hover:border-emerald-400 hover:shadow-md"
+                            }`}
+                          >
+                            <div>
+                              <div className="relative h-40 w-full bg-gray-100 overflow-hidden">
+                                <img
+                                  src={hotel.photoUrl}
+                                  alt={hotel.name}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                  onError={(e) => {
+                                    (e.target as HTMLElement).style.display = 'none';
+                                  }}
+                                />
+                                <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider backdrop-blur-md shadow-sm ${
+                                  hotel.category === "Luxury"
+                                    ? "bg-amber-500/90 text-white"
+                                    : hotel.category === "Eco"
+                                    ? "bg-emerald-600/90 text-white"
+                                    : "bg-blue-600/90 text-white"
+                                }`}>
+                                  {hotel.category}
+                                </span>
+                                {isChosen && (
+                                  <span className="absolute top-3 right-3 p-1.5 rounded-full bg-emerald-600 text-white shadow-md">
+                                    <CheckCircle2 size={16} />
+                                  </span>
+                                )}
+                              </div>
+
+                              <div className="p-4 space-y-2">
+                                <h4 className="font-serif font-bold text-base text-emerald-950 group-hover:text-emerald-700 transition-colors line-clamp-1">
+                                  {hotel.name}
+                                </h4>
+                                <p className="text-xs text-gray-500 flex items-center gap-1 line-clamp-1">
+                                  <MapPin size={12} className="shrink-0 text-gray-400" />
+                                  {hotel.address}
+                                </p>
+                                <div className="flex items-center gap-1 text-xs text-amber-600 font-semibold pt-1">
+                                  <Star size={14} className="fill-amber-400 text-amber-400" />
+                                  {hotel.rating}
+                                  <span className="text-gray-400 font-normal">({hotel.user_ratings_total} reviews)</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="p-4 pt-0 border-t border-gray-100 flex items-center justify-between mt-3">
+                              <div>
+                                <span className="text-lg font-bold text-emerald-700">₹{hotel.estimatedPricePerNight.toLocaleString()}</span>
+                                <span className="text-[11px] text-gray-500"> / night</span>
+                                <div className="text-[10px] text-emerald-600 font-medium">
+                                  Total: ₹{totalCostForStay.toLocaleString()} ({tripNights}N, {rooms} room{rooms > 1 ? "s" : ""})
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectHotel(hotel);
+                                }}
+                                className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                                  isChosen
+                                    ? "bg-emerald-600 text-white shadow-sm"
+                                    : "bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white"
+                                }`}
+                              >
+                                {isChosen ? "Selected ✓" : "Select Stay"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -888,8 +1182,30 @@ const ElitePlanner = () => {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Budget</p>
+                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Budget Cap</p>
                       <p className="font-semibold text-emerald-600">₹{trip.budgetCap.toLocaleString()}</p>
+                    </div>
+
+                    {/* Travel Dates */}
+                    <div className="col-span-2 md:col-span-4 bg-emerald-100/60 border border-emerald-200/80 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-lg bg-emerald-600 text-white shadow-sm">
+                          <Calendar size={22} />
+                        </div>
+                        <div>
+                          <p className="text-xs text-emerald-800 uppercase tracking-wider font-bold">Selected Travel Dates</p>
+                          <p className="font-bold text-emerald-950 text-base">
+                            {trip.startDate ? new Date(trip.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Start Date Not Set'}
+                            {' → '}
+                            {trip.endDate ? new Date(trip.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'End Date Not Set'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <span className="px-3.5 py-1.5 bg-emerald-700 text-white font-bold rounded-full text-xs shadow-sm">
+                          {tripNights > 0 ? `${tripNights} Night${tripNights > 1 ? 's' : ''} / ${tripNights + 1} Days` : 'Duration Not Set'}
+                        </span>
+                      </div>
                     </div>
                     
                     <div className="col-span-2">
@@ -901,12 +1217,35 @@ const ElitePlanner = () => {
                       </div>
                     </div>
                     <div className="col-span-2">
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Lodging</p>
+                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Lodging Styles</p>
                       <div className="flex flex-wrap gap-2 mt-1">
                         {trip.lodgingType?.map(l => (
                           <span key={l} className="px-3 py-1 bg-white border rounded-full text-xs font-medium text-emerald-800">{l}</span>
                         ))}
                       </div>
+                    </div>
+
+                    <div className="col-span-2 md:col-span-4 border-t border-gray-200 pt-4 mt-2">
+                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-2 font-bold">Selected Accommodation & Lodging Budget</p>
+                      {trip.selectedHotelName ? (
+                        <div className="flex items-center justify-between p-4 rounded-xl bg-white border border-emerald-200 shadow-sm">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2.5 rounded-lg bg-emerald-100 text-emerald-700">
+                              <Bed size={22} />
+                            </div>
+                            <div>
+                              <p className="font-bold text-emerald-900 text-sm">{trip.selectedHotelName}</p>
+                              <p className="text-xs text-gray-500">₹{(trip.selectedHotelPrice || 0).toLocaleString()} / night ({tripNights} Nights stay)</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-bold text-emerald-700 text-base">₹{(trip.costBreakdown?.hotel || 0).toLocaleString()}</p>
+                            <p className="text-[10px] text-gray-400">Added to Trip Budget</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-500 italic">No specific hotel selected. Standard category lodging estimate included.</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -920,7 +1259,7 @@ const ElitePlanner = () => {
               variant="outline" 
               onClick={handlePrev}
               disabled={currentStage === 0 || isSubmitting}
-              className="px-6 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+              className="px-6 border border-emerald-300 text-emerald-700 bg-white hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all duration-200 font-medium shadow-sm"
             >
               <ArrowLeft size={16} className="mr-2" /> Back
             </Button>

@@ -61,6 +61,8 @@ export type TripDraft = {
   budgetCap: number;
   routePriority: "fastest" | "toll-free" | "eco-friendly";
   lodgingType: string[];
+  selectedHotelName?: string;
+  selectedHotelPrice?: number;
 };
 
 type TripContextValue = {
@@ -99,6 +101,8 @@ const DEFAULT_TRIP: TripDraft = {
   budgetCap: 50000,
   routePriority: "fastest",
   lodgingType: [],
+  selectedHotelName: "",
+  selectedHotelPrice: 0,
 };
 
 const TripContext = createContext<TripContextValue | null>(null);

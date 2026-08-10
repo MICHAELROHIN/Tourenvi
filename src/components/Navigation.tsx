@@ -15,6 +15,7 @@ import {
   MessageSquare,
   LifeBuoy,
   Megaphone,
+  CalendarCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HelpSupportModal from "@/components/shared/HelpSupportModal";
@@ -100,6 +101,7 @@ const Navigation = () => {
     { icon: BarChart3, label: "Dashboard", href: "/dashboard" },
     { icon: Sparkles, label: "Attractions", href: "/attractions" },
     { icon: Calculator, label: "Trip Builder", href: "/trip/new" },
+    { icon: CalendarCheck, label: "Trip Planned", href: "/trips-planned" },
     { icon: MessageSquare, label: "AI Assistant", href: "/chatAI" },
   ];
 
@@ -171,24 +173,6 @@ const Navigation = () => {
                   <span className="whitespace-nowrap">{item.label}</span>
                 </Link>
               ))}
-
-              {/* Help & Support Nav Button */}
-              <button
-                onClick={() => setIsHelpModalOpen(true)}
-                className="flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-medium text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 hover:bg-[#D4AF37]/20 transition-colors duration-200 cursor-pointer"
-              >
-                <LifeBuoy className="w-4 h-4 shrink-0 animate-pulse text-[#D4AF37]" />
-                <span className="whitespace-nowrap font-semibold">Help & Support</span>
-              </button>
-
-              {/* Emergency Assist Nav Button */}
-              <button
-                onClick={() => setIsEmergencyRadarOpen(true)}
-                className="flex items-center space-x-1.5 px-3 py-2 rounded-lg text-sm font-bold text-red-400 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 transition-all duration-200 cursor-pointer shadow-[0_0_15px_rgba(239,68,68,0.2)]"
-              >
-                <AlertTriangle className="w-4 h-4 shrink-0 animate-pulse text-red-400" />
-                <span className="whitespace-nowrap font-bold">Emergency Assist</span>
-              </button>
             </div>
 
             {/* Right side actions — Desktop */}
@@ -214,30 +198,57 @@ const Navigation = () => {
 
                 {/* Dropdown Menu */}
                 {isProfileOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-background border border-border rounded-lg shadow-lg py-1 z-50 animate-in fade-in zoom-in-95 duration-200">
-                    <div className="px-2 py-2 border-b border-border">
+                  <div className="absolute right-0 mt-2 w-64 bg-background border border-border rounded-xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="px-3 py-2 border-b border-border">
                       <button
                         onClick={() => {
                           setIsProfileOpen(false);
                           setIsDeleteModalOpen(true);
                         }}
-                        className="w-full text-left p-2 rounded-md hover:bg-gray-100 transition-colors"
+                        className="w-full text-left p-2 rounded-lg hover:bg-muted transition-colors"
                       >
                         <p className="text-sm font-semibold truncate text-foreground">
-                          {user?.displayName || "Guest User"}
+                          {user?.displayName || "Michael Rohin"}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">
-                          {user?.email || "No email detected"}
+                          {user?.email || "michaelrohin@gmail.com"}
                         </p>
                       </button>
                     </div>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors text-left"
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Log Out
-                    </button>
+
+                    <div className="py-1 border-b border-border">
+                      <button
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          setIsHelpModalOpen(true);
+                        }}
+                        className="w-full flex items-center px-4 py-2.5 text-sm font-medium text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-colors text-left"
+                      >
+                        <LifeBuoy className="w-4 h-4 mr-2.5 shrink-0 text-[#D4AF37]" />
+                        Help & Support
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setIsProfileOpen(false);
+                          setIsEmergencyRadarOpen(true);
+                        }}
+                        className="w-full flex items-center px-4 py-2.5 text-sm font-bold text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors text-left"
+                      >
+                        <AlertTriangle className="w-4 h-4 mr-2.5 shrink-0 text-red-500 animate-pulse" />
+                        Emergency Assist
+                      </button>
+                    </div>
+
+                    <div className="pt-1">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors text-left"
+                      >
+                        <LogOut className="w-4 h-4 mr-2.5 shrink-0" />
+                        Log Out
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -350,8 +361,19 @@ const Navigation = () => {
               }}
               className="w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 hover:bg-[#D4AF37]/20 transition-colors duration-200 text-left font-semibold"
             >
-              <LifeBuoy className="w-5 h-5 shrink-0 animate-pulse text-[#D4AF37]" />
+              <LifeBuoy className="w-5 h-5 shrink-0 text-[#D4AF37]" />
               <span className="text-sm">Help & Support</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setIsOpen(false);
+                setIsEmergencyRadarOpen(true);
+              }}
+              className="w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-red-500 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 transition-colors duration-200 text-left font-bold"
+            >
+              <AlertTriangle className="w-5 h-5 shrink-0 text-red-500 animate-pulse" />
+              <span className="text-sm">Emergency Assist</span>
             </button>
           </div>
 

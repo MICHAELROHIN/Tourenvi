@@ -183,7 +183,7 @@ const TripBuilder = () => {
           onClick={() =>
             setActiveStep(String(Math.max(0, Number(activeStep) - 1)))
           }
-          className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+          className="border border-emerald-300 text-emerald-700 bg-white hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all duration-200 font-medium shadow-sm"
         >
           Back
         </Button>

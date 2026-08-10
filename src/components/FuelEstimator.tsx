@@ -67,9 +67,9 @@ const FuelEstimator = () => {
 
   const fetchLiveFuelPrice = async (selectedFuel: string) => {
     if (selectedFuel === "Electric") {
-      setFuelPrice("20");
-      updateTrip("fuelPrice", 20);
-      toast.success("Auto-set EV rate: ₹20/kWh");
+      setFuelPrice("15");
+      updateTrip("fuelPrice", 15);
+      toast.success("Auto-set EV rate: ₹15/kWh");
       return;
     }
 
@@ -78,13 +78,9 @@ const FuelEstimator = () => {
     try {
       const fuelQuery = selectedFuel.toLowerCase();
       const response = await fetch(
-        `https://${RAPIDAPI_HOST}/v1/fuel-prices?city=${city}&fuelType=${fuelQuery}`,
+        `${API_BASE}/api/fuel-price?city=${encodeURIComponent(city)}&fuelType=${encodeURIComponent(fuelQuery)}`,
         {
           method: "GET",
-          headers: {
-            "x-rapidapi-key": RAPIDAPI_KEY,
-            "x-rapidapi-host": RAPIDAPI_HOST,
-          },
         }
       );
 
@@ -94,12 +90,12 @@ const FuelEstimator = () => {
       }
 
       const data = await response.json();
-      const price = data?.retailPrice || data?.price;
+      const price = data?.price;
 
       if (price) {
         setFuelPrice(String(price));
         updateTrip("fuelPrice", Number(price));
-        toast.success(`Fetched live ${selectedFuel} price: ₹${price}`);
+        toast.success(`Live ${selectedFuel} rate for ${city}: ₹${price}/L`);
       } else {
         fallbackPrices(selectedFuel);
       }

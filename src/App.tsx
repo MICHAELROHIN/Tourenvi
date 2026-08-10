@@ -12,6 +12,7 @@ import { TripProvider } from "@/context/TripContext";
 import Navigation from "@/components/Navigation";
 import ElitePlanner from "@/pages/ElitePlanner";
 import EliteDashboard from "@/pages/EliteDashboard";
+import TripsPlanned from "@/pages/TripsPlanned";
 import Hotels from "@/pages/Hotels";
 import Cart from "@/pages/Cart";
 import AIChat from "@/pages/AIChat";
@@ -127,6 +128,16 @@ const AppRoutes = () => {
           <ProtectedRoute allowedRoles={["user", "admin"]}>
             <AppLayout>
               <EliteDashboard />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/trips-planned"
+        element={
+          <ProtectedRoute allowedRoles={["user", "admin", "guide", "support"]}>
+            <AppLayout>
+              <TripsPlanned />
             </AppLayout>
           </ProtectedRoute>
         }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   AlertTriangle,
   Fuel,
@@ -16,196 +16,48 @@ import {
   ExternalLink,
   Zap,
   CheckCircle2,
+  Loader2,
+  Star,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type EmergencyCategory = "fuel" | "mechanics" | "brand_service" | "emergency_medical";
+
+interface PlaceResult {
+  id: string;
+  name: string;
+  address: string;
+  rating: number | null;
+  totalRatings: number;
+  isOpenNow: boolean | null;
+  location: { lat: number; lng: number };
+  mapsUrl: string;
+  types: string[];
+  businessStatus: string | null;
+  icon: string | null;
+  phone: string | null;
+  brand: string | null;
+}
 
 interface EmergencyService {
   id: string;
   name: string;
-  category: "fuel" | "mechanics" | "brand_service" | "emergency_medical";
-  brand?: string;
+  category: EmergencyCategory;
   address: string;
   distanceKm: number;
-  phone: string;
-  is24x7: boolean;
+  rating: number | null;
+  totalRatings: number;
+  isOpenNow: boolean | null;
   lat: number;
   lng: number;
-  rating?: number;
-  availableTypes?: string[];
+  mapsUrl: string;
+  types: string[];
+  phone: string | null;
+  brand: string | null;
 }
-
-const DEFAULT_EMERGENCY_SERVICES: EmergencyService[] = [
-  // Fuel & EV
-  {
-    id: "fuel-1",
-    name: "Indian Oil Swagat Highway Plaza & EV Supercharger",
-    category: "fuel",
-    brand: "IndianOil",
-    address: "KM 42, Mumbai-Pune Expressway, Khalapur",
-    distanceKm: 3.2,
-    phone: "+91 98230 11223",
-    is24x7: true,
-    lat: 18.8234,
-    lng: 73.2389,
-    rating: 4.6,
-    availableTypes: ["Petrol", "Diesel", "EV Fast Charging 120kW"],
-  },
-  {
-    id: "fuel-2",
-    name: "HPCL Highway COCO Fuel Hub",
-    category: "fuel",
-    brand: "HPCL",
-    address: "NH 48, Near Toll Plaza, Talegaon",
-    distanceKm: 8.5,
-    phone: "+91 98450 99881",
-    is24x7: true,
-    lat: 18.7301,
-    lng: 73.6754,
-    rating: 4.4,
-    availableTypes: ["Petrol", "Diesel", "CNG"],
-  },
-  {
-    id: "fuel-3",
-    name: "Tata Power EZ Charge EV Station",
-    category: "fuel",
-    brand: "Tata Power",
-    address: "Food Mall Plaza, Lonavala Bypass",
-    distanceKm: 12.1,
-    phone: "1800 209 5161",
-    is24x7: true,
-    lat: 18.7557,
-    lng: 73.4091,
-    rating: 4.8,
-    availableTypes: ["CCS2 60kW EV Charger", "Type 2 AC"],
-  },
-
-  // Mechanics & Puncture
-  {
-    id: "mech-1",
-    name: "Expressway 24/7 Mobile Mechanic & Breakdown Patrol",
-    category: "mechanics",
-    address: "Expressway Bay 14, Food Mall Lonavala",
-    distanceKm: 4.1,
-    phone: "+91 94220 88712",
-    is24x7: true,
-    lat: 18.7523,
-    lng: 73.4012,
-    rating: 4.9,
-    availableTypes: ["Tire Puncture", "Engine Jumpstart", "Towing Crane"],
-  },
-  {
-    id: "mech-2",
-    name: "Highway All-Vehicle Garage & Hydraulic Lift Service",
-    category: "mechanics",
-    address: "NH-48 Service Road, Khandala Ghat Entry",
-    distanceKm: 9.8,
-    phone: "+91 91580 44321",
-    is24x7: true,
-    lat: 18.7612,
-    lng: 73.3755,
-    rating: 4.5,
-    availableTypes: ["Brake Repair", "Clutch Cable Replacement", "Coolant Leak"],
-  },
-
-  // Brand Service Centers
-  {
-    id: "brand-1",
-    name: "Tata Motors Authorized Service Center",
-    category: "brand_service",
-    brand: "Tata Motors",
-    address: "Industrial Zone, Old Mumbai-Pune Highway, Panvel",
-    distanceKm: 14.5,
-    phone: "1800 209 8282",
-    is24x7: false,
-    lat: 18.9892,
-    lng: 73.1198,
-    rating: 4.7,
-    availableTypes: ["EV Battery Diagnostics", "Genuine Parts", "RSA Assist"],
-  },
-  {
-    id: "brand-2",
-    name: "Hyundai Roadside Assistance & Service Hub",
-    category: "brand_service",
-    brand: "Hyundai",
-    address: "NH 48 Bypass, Chakan Road",
-    distanceKm: 18.2,
-    phone: "1800 11 4645",
-    is24x7: true,
-    lat: 18.7511,
-    lng: 73.8421,
-    rating: 4.8,
-    availableTypes: ["Hyundai Care RSA", "24/7 Breakdown Towing"],
-  },
-  {
-    id: "brand-3",
-    name: "Mahindra & Mahindra Authorized RSA Workshop",
-    category: "brand_service",
-    brand: "Mahindra",
-    address: "Ghatkopar Highway Connector",
-    distanceKm: 21.0,
-    phone: "1800 209 6006",
-    is24x7: true,
-    lat: 19.0812,
-    lng: 72.9099,
-    rating: 4.6,
-    availableTypes: ["4x4 SUV Recovery", "Scorpio/XUV700 Parts"],
-  },
-  {
-    id: "brand-4",
-    name: "Maruti Suzuki Arena 24/7 Quick Service & RSA",
-    category: "brand_service",
-    brand: "Maruti Suzuki",
-    address: "Near Somatane Phata Toll Plaza",
-    distanceKm: 11.4,
-    phone: "1800 102 1800",
-    is24x7: true,
-    lat: 18.7109,
-    lng: 73.6543,
-    rating: 4.7,
-    availableTypes: ["Maruti On-Road Service", "Mobile Van"],
-  },
-
-  // Emergency Medical & Towing
-  {
-    id: "med-1",
-    name: "NHAI Highway Trauma Center & Ambulance Unit",
-    category: "emergency_medical",
-    address: "Expressway Control Room, Khalapur Toll Plaza",
-    distanceKm: 2.8,
-    phone: "1033",
-    is24x7: true,
-    lat: 18.8199,
-    lng: 73.2355,
-    rating: 5.0,
-    availableTypes: ["Advanced Life Support Ambulance", "NHAI Patrol"],
-  },
-  {
-    id: "med-2",
-    name: "Sanjeevani Highway Emergency Hospital & ICU",
-    category: "emergency_medical",
-    address: "Main Highway Junction, Lonavala East",
-    distanceKm: 6.7,
-    phone: "+91 2114 273000",
-    is24x7: true,
-    lat: 18.7544,
-    lng: 73.4077,
-    rating: 4.8,
-    availableTypes: ["24/7 Emergency ER", "Trauma Care", "Blood Bank"],
-  },
-  {
-    id: "med-3",
-    name: "Expressway Heavy Crane & Flatbed Towing Patrol",
-    category: "emergency_medical",
-    address: "Patrol Base 4, Expressway Kilometer 55",
-    distanceKm: 5.4,
-    phone: "+91 98220 55443",
-    is24x7: true,
-    lat: 18.7891,
-    lng: 73.3512,
-    rating: 4.9,
-    availableTypes: ["Flatbed Car Carrier", "Heavy Bus/Truck Towing"],
-  },
-];
 
 interface EmergencyRadarModalProps {
   isOpen: boolean;
@@ -214,93 +66,219 @@ interface EmergencyRadarModalProps {
   userLng?: number;
 }
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const BACKEND_URL = "http://localhost:8000";
+const CACHE_KEY = "tourenvi_emergency_radar_cache";
+const SEARCH_RADIUS_KM = 5;
+
+/** Maps our UI category tabs to Google Places API type param */
+const CATEGORY_TO_GOOGLE_TYPE: Record<EmergencyCategory, string> = {
+  fuel: "gas_station",
+  mechanics: "car_repair",
+  brand_service: "car_repair",
+  emergency_medical: "hospital",
+};
+
+// ─── Haversine Distance ───────────────────────────────────────────────────────
+
+function haversineDistanceKm(
+  lat1: number,
+  lng1: number,
+  lat2: number,
+  lng2: number
+): number {
+  const R = 6371; // Earth radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10; // 1 decimal place
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
   isOpen,
   onClose,
   userLat = 18.7544,
   userLng = 73.4077,
 }) => {
-  const [activeCategory, setActiveCategory] = useState<
-    "fuel" | "mechanics" | "brand_service" | "emergency_medical"
-  >("fuel");
+  const [activeCategory, setActiveCategory] = useState<EmergencyCategory>("fuel");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLocating, setIsLocating] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
   const [currentCoords, setCurrentCoords] = useState<{ lat: number; lng: number }>({
     lat: userLat,
     lng: userLng,
   });
   const [isOffline, setIsOffline] = useState(!navigator.onLine);
   const [services, setServices] = useState<EmergencyService[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [hasGpsLock, setHasGpsLock] = useState(false);
 
-  // Listen to network status for offline safety caching indicator
+  // Prevent double-fetching on mount
+  const lastFetchRef = useRef<string>("");
+
+  // ─── Network status listener ──────────────────────────────────────────────
+
   useEffect(() => {
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
-
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
-
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
 
-  // Initialize and load offline cache from localStorage
-  useEffect(() => {
-    const cachedData = localStorage.getItem("tourenvi_emergency_radar_cache");
-    if (cachedData) {
-      try {
-        const parsed = JSON.parse(cachedData);
-        setServices(parsed);
-      } catch {
-        setServices(DEFAULT_EMERGENCY_SERVICES);
-      }
-    } else {
-      setServices(DEFAULT_EMERGENCY_SERVICES);
-      localStorage.setItem(
-        "tourenvi_emergency_radar_cache",
-        JSON.stringify(DEFAULT_EMERGENCY_SERVICES)
-      );
-    }
-  }, []);
+  // ─── Fetch nearby services from backend ───────────────────────────────────
 
-  // GPS Geolocation Scan Handler
-  const handleScanLocation = () => {
+  const fetchNearbyServices = useCallback(
+    async (lat: number, lng: number, category: EmergencyCategory) => {
+      const fetchKey = `${lat.toFixed(4)}_${lng.toFixed(4)}_${category}`;
+      if (fetchKey === lastFetchRef.current) return;
+      lastFetchRef.current = fetchKey;
+
+      const googleType = CATEGORY_TO_GOOGLE_TYPE[category];
+      setIsFetching(true);
+      setServices([]); // Clear previous category services immediately
+      setFetchError(null);
+
+      try {
+        const url = `${BACKEND_URL}/api/nearby-emergency?lat=${lat}&lng=${lng}&type=${googleType}`;
+        const response = await fetch(url);
+        const json = await response.json();
+
+        if (!response.ok || !json.success) {
+          throw new Error(json.error || `Server returned ${response.status}`);
+        }
+
+        const mapped: EmergencyService[] = (json.data as PlaceResult[]).map((place) => ({
+          id: place.id,
+          name: place.name,
+          category,
+          address: place.address,
+          distanceKm: haversineDistanceKm(lat, lng, place.location.lat, place.location.lng),
+          rating: place.rating,
+          totalRatings: place.totalRatings,
+          isOpenNow: place.isOpenNow,
+          lat: place.location.lat,
+          lng: place.location.lng,
+          mapsUrl: place.mapsUrl,
+          types: place.types,
+          phone: place.phone || null,
+          brand: place.brand || null,
+        }));
+
+        // Sort by distance ascending
+        mapped.sort((a, b) => a.distanceKm - b.distanceKm);
+
+        setServices(mapped);
+
+        // Cache the successful result
+        try {
+          const cacheData = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
+          cacheData[category] = { data: mapped, timestamp: Date.now(), coords: { lat, lng } };
+          localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+        } catch {
+          // localStorage full or unavailable, ignore
+        }
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : "Network error";
+        console.error("Emergency radar fetch failed:", message);
+        setFetchError(message);
+
+        // Fall back to cached data
+        try {
+          const cacheData = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
+          if (cacheData[category]?.data && cacheData[category].data.length > 0) {
+            setServices(cacheData[category].data);
+            toast.info("Showing cached results. Live data unavailable.");
+          } else {
+            setServices([]);
+          }
+        } catch {
+          setServices([]);
+        }
+      } finally {
+        setIsFetching(false);
+      }
+    },
+    []
+  );
+
+  // ─── GPS Geolocation ──────────────────────────────────────────────────────
+
+  const handleScanLocation = useCallback(() => {
     if (!navigator.geolocation) {
       toast.error("Geolocation is not supported by your browser.");
       return;
     }
 
     setIsLocating(true);
-    toast.info("Scanning GPS location for nearby highway emergency services...");
+    toast.info("Scanning GPS for nearby emergency services...");
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
         setCurrentCoords({ lat: latitude, lng: longitude });
+        setHasGpsLock(true);
         setIsLocating(false);
-        toast.success("GPS Location verified! Services updated within 25km radius.");
+        // Reset fetch key so the new coords trigger a fresh fetch
+        lastFetchRef.current = "";
+        toast.success(
+          `GPS locked! Scanning ${SEARCH_RADIUS_KM}km radius around (${latitude.toFixed(3)}, ${longitude.toFixed(3)})`
+        );
       },
       (error) => {
-        console.warn("GPS lookup failed, using highway route coordinates:", error);
+        console.warn("GPS lookup failed:", error);
         setIsLocating(false);
-        toast.info("Using active highway route location for safety radar.");
+        toast.info("GPS unavailable. Using default route coordinates.");
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
-  };
+  }, []);
+
+  // ─── Auto-fetch when coords or category change ────────────────────────────
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetchNearbyServices(currentCoords.lat, currentCoords.lng, activeCategory);
+  }, [isOpen, currentCoords.lat, currentCoords.lng, activeCategory, fetchNearbyServices]);
+
+  // ─── Auto-scan GPS on first open ──────────────────────────────────────────
+
+  const hasAutoScanned = useRef(false);
+  useEffect(() => {
+    if (isOpen && !hasAutoScanned.current) {
+      hasAutoScanned.current = true;
+      handleScanLocation();
+    }
+    if (!isOpen) {
+      hasAutoScanned.current = false;
+    }
+  }, [isOpen, handleScanLocation]);
+
+  // ─── Filter by search query ───────────────────────────────────────────────
 
   const filteredServices = useMemo(() => {
-    return services.filter((s) => {
-      const matchesCategory = s.category === activeCategory;
-      const matchesSearch =
-        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.brand?.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
-    });
-  }, [services, activeCategory, searchQuery]);
+    if (!searchQuery.trim()) return services;
+    const q = searchQuery.toLowerCase();
+    return services.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.address.toLowerCase().includes(q)
+    );
+  }, [services, searchQuery]);
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   if (!isOpen) return null;
 
@@ -318,24 +296,34 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
                 <h3 className="text-xl font-black text-white tracking-wide">
                   Emergency Break-Down & Fuel Assist Radar
                 </h3>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/40 uppercase tracking-wider">
-                  Live Safety Hub
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 uppercase tracking-wider flex items-center gap-1">
+                  <Zap className="h-3 w-3" /> Live GPS
                 </span>
               </div>
               <p className="text-xs text-gray-300 mt-0.5 flex items-center gap-2">
                 <MapPin className="h-3.5 w-3.5 text-[#D4AF37]" />
-                Scanning 25 km Highway Radius around ({currentCoords.lat.toFixed(3)}, {currentCoords.lng.toFixed(3)})
+                {hasGpsLock ? (
+                  <>
+                    <span className="text-emerald-400 font-semibold">GPS Locked</span> — Scanning {SEARCH_RADIUS_KM}km radius around ({currentCoords.lat.toFixed(3)},{" "}
+                    {currentCoords.lng.toFixed(3)})
+                  </>
+                ) : (
+                  <>Scanning {SEARCH_RADIUS_KM}km radius around ({currentCoords.lat.toFixed(3)}, {currentCoords.lng.toFixed(3)})</>
+                )}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={handleScanLocation}
+              onClick={() => {
+                lastFetchRef.current = "";
+                handleScanLocation();
+              }}
               disabled={isLocating}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 text-white text-xs font-semibold hover:bg-white/20 transition-all border border-white/15 cursor-pointer"
             >
-              <Navigation className={`h-4 w-4 text-[#D4AF37] ${isLocating ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-4 w-4 text-[#D4AF37] ${isLocating ? "animate-spin" : ""}`} />
               {isLocating ? "Locating..." : "Refresh GPS"}
             </button>
             <button
@@ -353,11 +341,11 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
             <div className="flex items-center gap-2 font-medium">
               <WifiOff className="h-4 w-4 text-amber-400" />
               <span>
-                <strong>Offline Safety Mode Active:</strong> All emergency contacts & nearest station coordinates are cached locally from IndexedDB.
+                <strong>Offline Safety Mode Active:</strong> Showing cached emergency services from your last GPS scan.
               </span>
             </div>
             <span className="text-[10px] font-bold bg-amber-500/30 px-2 py-0.5 rounded-full">
-              Cached 25km Radius
+              Cached {SEARCH_RADIUS_KM}km Radius
             </span>
           </div>
         )}
@@ -465,7 +453,7 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
             <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by brand (e.g. Tata, Hyundai, IndianOil), area, or service type..."
+              placeholder="Search by name or address..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#051124] border border-white/15 text-white placeholder-gray-400 text-xs focus:outline-none focus:border-[#D4AF37]"
@@ -475,19 +463,58 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
 
         {/* Results List */}
         <div className="p-6 flex-1 overflow-y-auto space-y-4 max-h-[480px]">
-          {filteredServices.length === 0 ? (
+          {/* Loading State */}
+          {(isFetching || isLocating) && (
+            <div className="py-12 text-center space-y-3">
+              <div className="relative mx-auto w-16 h-16">
+                <div className="absolute inset-0 rounded-full border-2 border-[#D4AF37]/30 animate-ping" />
+                <div className="absolute inset-2 rounded-full border-2 border-[#D4AF37]/50 animate-ping animation-delay-150" />
+                <div className="absolute inset-4 rounded-full bg-[#D4AF37]/20 flex items-center justify-center">
+                  <Loader2 className="h-5 w-5 text-[#D4AF37] animate-spin" />
+                </div>
+              </div>
+              <p className="text-sm font-semibold text-white">
+                {isLocating ? "Acquiring GPS coordinates..." : `Scanning ${SEARCH_RADIUS_KM}km radius for nearby services...`}
+              </p>
+              <p className="text-xs text-gray-400">Using Google Places real-time data</p>
+            </div>
+          )}
+
+          {/* Error State */}
+          {!isFetching && !isLocating && fetchError && services.length === 0 && (
+            <div className="py-12 text-center text-gray-400 space-y-3">
+              <AlertTriangle className="h-10 w-10 text-red-400 mx-auto opacity-80" />
+              <p className="font-semibold text-sm text-red-300">Failed to load nearby services</p>
+              <p className="text-xs max-w-md mx-auto">{fetchError}</p>
+              <button
+                onClick={() => {
+                  lastFetchRef.current = "";
+                  fetchNearbyServices(currentCoords.lat, currentCoords.lng, activeCategory);
+                }}
+                className="mt-2 px-4 py-2 rounded-xl bg-[#D4AF37] text-[#0B2B5C] font-bold text-xs hover:bg-[#c49f27] transition-all cursor-pointer"
+              >
+                <RefreshCw className="h-3.5 w-3.5 inline mr-1.5" /> Retry
+              </button>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isFetching && !isLocating && !fetchError && filteredServices.length === 0 && (
             <div className="py-12 text-center text-gray-400 space-y-2">
               <AlertTriangle className="h-10 w-10 text-amber-400 mx-auto opacity-60" />
-              <p className="font-semibold text-sm">No verified emergency services found for this query.</p>
+              <p className="font-semibold text-sm">No emergency services found within {SEARCH_RADIUS_KM}km radius.</p>
               <p className="text-xs">Call National Highway Emergency Line <strong>1033</strong> for immediate dispatch.</p>
             </div>
-          ) : (
+          )}
+
+          {/* Results */}
+          {!isFetching && !isLocating &&
             filteredServices.map((service) => (
               <div
                 key={service.id}
                 className="p-5 rounded-2xl border border-white/10 bg-[#051124]/60 backdrop-blur-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-[#D4AF37]/40 transition-all shadow-md group"
               >
-                <div className="space-y-2">
+                <div className="space-y-2 flex-1 min-w-0">
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <h4 className="font-bold text-white text-sm group-hover:text-[#D4AF37] transition-colors">
                       {service.name}
@@ -497,13 +524,19 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
                         {service.brand}
                       </span>
                     )}
-                    {service.is24x7 ? (
+                    {service.isOpenNow === true && (
                       <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                        <Clock className="h-3 w-3" /> 24/7 Open
+                        <CheckCircle2 className="h-3 w-3" /> Open Now
                       </span>
-                    ) : (
+                    )}
+                    {service.isOpenNow === false && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1">
+                        <Clock className="h-3 w-3" /> Closed
+                      </span>
+                    )}
+                    {service.isOpenNow === null && (
                       <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-500/20 text-gray-300 border border-gray-500/30">
-                        8 AM - 9 PM
+                        Hours unknown
                       </span>
                     )}
                   </div>
@@ -513,50 +546,61 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
                     {service.address}
                   </p>
 
-                  {service.availableTypes && (
-                    <div className="flex items-center gap-2 flex-wrap pt-1">
-                      {service.availableTypes.map((type, idx) => (
-                        <span
-                          key={idx}
-                          className="px-2 py-0.5 rounded-full text-[10px] bg-white/5 text-gray-300 border border-white/10 flex items-center gap-1"
-                        >
-                          <Zap className="h-2.5 w-2.5 text-[#D4AF37]" /> {type}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {/* Rating & Types */}
+                  <div className="flex items-center gap-3 flex-wrap pt-0.5">
+                    {service.rating != null && (
+                      <span className="flex items-center gap-1 text-xs text-amber-300 font-semibold">
+                        <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                        {service.rating.toFixed(1)}
+                        {service.totalRatings > 0 && (
+                          <span className="text-gray-400 font-normal">
+                            ({service.totalRatings.toLocaleString()})
+                          </span>
+                        )}
+                      </span>
+                    )}
+                    {service.types.slice(0, 3).map((type, idx) => (
+                      <span
+                        key={`${service.id}_type_${type}_${idx}`}
+                        className="px-2 py-0.5 rounded-full text-[10px] bg-white/5 text-gray-300 border border-white/10 capitalize"
+                      >
+                        {type.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="flex flex-row md:flex-col items-end justify-between w-full md:w-auto gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
                   <div className="text-right">
                     <div className="text-sm font-black text-emerald-400 font-mono">
-                      {service.distanceKm} km away
+                      {service.distanceKm} km <span className="text-[10px] font-normal text-emerald-300/80">(Direct)</span>
                     </div>
                     <div className="text-[10px] text-gray-400">
-                      Est. {Math.round(service.distanceKm * 2.5)} mins response
+                      Est. Road: ~{(service.distanceKm * 1.5).toFixed(1)} km ({Math.max(1, Math.round(service.distanceKm * 2.5))} mins)
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
+                    {service.phone && (
+                      <a
+                        href={`tel:${service.phone}`}
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md cursor-pointer"
+                      >
+                        <Phone className="h-3.5 w-3.5" /> Call
+                      </a>
+                    )}
                     <a
-                      href={`tel:${service.phone}`}
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md cursor-pointer"
-                    >
-                      <Phone className="h-3.5 w-3.5" /> Direct Call
-                    </a>
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${service.lat},${service.lng}`}
+                      href={service.mapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#D4AF37] hover:bg-[#c49f27] text-[#0B2B5C] font-bold text-xs transition-all shadow-md cursor-pointer"
                     >
-                      <ExternalLink className="h-3.5 w-3.5" /> Navigate
+                      <Navigation className="h-3.5 w-3.5" /> Navigate
                     </a>
                   </div>
                 </div>
               </div>
-            ))
-          )}
+            ))}
         </div>
       </div>
     </div>
