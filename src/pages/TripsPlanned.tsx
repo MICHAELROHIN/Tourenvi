@@ -26,13 +26,9 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { RoadTripBudgetCard } from "@/components/cost/RoadTripBudgetCard";
-import { useAuth } from "@/context/AuthContext";
-import { db } from "@/firebase";
-import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 
 export interface PlannedTrip {
   id: string;
-  userId?: string;
   createdAt: string;
   tripData: {
     tripType: string;
@@ -88,145 +84,89 @@ const TripsPlanned = () => {
   const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<Record<string, "itinerary" | "breakdown" | "places">>({});
   const navigate = useNavigate();
-  const { currentUser, loading: authLoading } = useAuth();
-  const uid = currentUser?.uid;
 
-  // Load saved trips scoped strictly to the logged in user
+  // Load saved trips from localStorage and IndexedDB
   useEffect(() => {
-    if (authLoading) return;
+    loadTrips();
+  }, []);
 
-    if (!uid) {
-      setPlannedTrips([]);
-      setExpandedTripId(null);
-      return;
-    }
-
-    const userStorageKey = `tourenvi.planned.trips.${uid}`;
-
-    // 1. Initial fast load from local storage (user-scoped)
+  const loadTrips = () => {
     try {
-      const raw = localStorage.getItem(userStorageKey);
+      const raw = localStorage.getItem("tourenvi.planned.trips");
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setPlannedTrips(parsed);
-          setExpandedTripId((prev) => prev || parsed[0].id);
+          // Expand first trip by default
+          setExpandedTripId(parsed[0].id);
+          return;
         }
-      } else {
-        // Migration fallback: check legacy key only for items matching current uid
-        const legacyRaw = localStorage.getItem("tourenvi.planned.trips");
-        if (legacyRaw) {
-          const legacyParsed = JSON.parse(legacyRaw);
-          if (Array.isArray(legacyParsed)) {
-            const userLegacy = legacyParsed.filter((t: any) => t.userId === uid);
-            if (userLegacy.length > 0) {
-              setPlannedTrips(userLegacy);
-              setExpandedTripId((prev) => prev || userLegacy[0].id);
-              localStorage.setItem(userStorageKey, JSON.stringify(userLegacy));
+      }
+
+      // Fallback: Read from IndexedDB if localStorage is empty
+      const dbRequest = indexedDB.open("TourenviOfflineDB", 1);
+      dbRequest.onsuccess = (event: any) => {
+        const db = event.target.result;
+        if (db.objectStoreNames.contains("itineraries")) {
+          const transaction = db.transaction("itineraries", "readonly");
+          const store = transaction.objectStore("itineraries");
+          const getAll = store.getAll();
+          getAll.onsuccess = () => {
+            if (Array.isArray(getAll.result) && getAll.result.length > 0) {
+              const formattedTrips: PlannedTrip[] = getAll.result.map((item: any) => ({
+                id: item.id || "trip_" + Date.now(),
+                createdAt: item.timestamp || new Date().toISOString(),
+                tripData: item.tripData || {},
+                financials: {
+                  fuelExpenditure: item.financials?.fuelExpenditure || 0,
+                  totalLodging: item.financials?.totalLodging || 0,
+                  tollPricing: item.financials?.tollPricing || 0,
+                  foodCost: item.financials?.foodAndMisc ? Math.round(item.financials.foodAndMisc * 0.6) : 0,
+                  miscCost: item.financials?.foodAndMisc ? Math.round(item.financials.foodAndMisc * 0.4) : 0,
+                  totalCost:
+                    (item.financials?.fuelExpenditure || 0) +
+                    (item.financials?.totalLodging || 0) +
+                    (item.financials?.tollPricing || 0) +
+                    (item.financials?.foodAndMisc || 0),
+                },
+                ecoData: item.ecoData || { co2: 0 },
+                routeDetails: {
+                  distanceKm: 450,
+                  vehicleType: item.tripData?.vehicleType || "car",
+                  fuelType: item.tripData?.fuelType || "petrol",
+                  startLocation: item.tripData?.startLocation || "Origin",
+                  destination: item.tripData?.destinations?.[0] || "Destination",
+                },
+                itinerary: item.itinerary || [],
+              }));
+
+              setPlannedTrips(formattedTrips);
+              setExpandedTripId(formattedTrips[0].id);
+              localStorage.setItem("tourenvi.planned.trips", JSON.stringify(formattedTrips));
             }
-          }
+          };
         }
-      }
+      };
     } catch (err) {
-      console.error("Local storage load error:", err);
+      console.error("Failed to load saved trips:", err);
     }
+  };
 
-    // 2. Real-time subscription to Firestore 'trips' collection for this user
-    const tripsQuery = query(
-      collection(db, "trips"),
-      where("userId", "==", uid)
-    );
-
-    const unsubscribe = onSnapshot(
-      tripsQuery,
-      (snapshot) => {
-        const fetchedTrips: PlannedTrip[] = snapshot.docs.map((docSnap) => {
-          const data = docSnap.data();
-          return {
-            id: docSnap.id,
-            userId: data.userId || uid,
-            createdAt: data.createdAt || new Date().toISOString(),
-            tripData: data.tripData || {
-              tripType: data.tripType || "solo",
-              startDate: data.startDate || "",
-              endDate: data.endDate || "",
-              numberOfMembers: data.numberOfMembers || 1,
-              startLocation: data.startLocation || "",
-              vehicleType: data.vehicleType || "car",
-              fuelType: data.fuelType || "petrol",
-              budgetCap: data.budgetCap || 50000,
-              moods: data.moods || [],
-              destinations: data.destinations || [],
-            },
-            financials: data.financials || {
-              fuelExpenditure: data.costBreakdown?.fuel || 0,
-              totalLodging: data.costBreakdown?.hotel || 0,
-              tollPricing: data.costBreakdown?.toll || 0,
-              foodCost: data.costBreakdown?.food || 0,
-              placesCost: data.costBreakdown?.places || 0,
-              miscCost: data.costBreakdown?.misc || 0,
-              totalCost: data.costBreakdown?.total || 0,
-            },
-            ecoData: data.ecoData || { co2: data.ecoScore?.co2kg || 0 },
-            routeDetails: data.routeDetails || {
-              distanceKm: data.routeDistanceKm || 0,
-              vehicleType: data.vehicleType || "car",
-              fuelType: data.fuelType || "petrol",
-              startLocation: data.startLocation || "Origin",
-              destination: data.destinations?.[0] || "Destination",
-            },
-            itinerary: data.itinerary || [],
-            destinationShowcase: data.destinationShowcase || [],
-          } as PlannedTrip;
-        });
-
-        // Sort latest first
-        fetchedTrips.sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-
-        setPlannedTrips(fetchedTrips);
-        if (fetchedTrips.length > 0) {
-          setExpandedTripId((prev) =>
-            prev && fetchedTrips.some((t) => t.id === prev) ? prev : fetchedTrips[0].id
-          );
-        }
-
-        // Cache in user-scoped local storage
-        localStorage.setItem(userStorageKey, JSON.stringify(fetchedTrips));
-      },
-      (err) => {
-        console.error("Firestore onSnapshot error in TripsPlanned:", err);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [uid, authLoading]);
-
-  const handleDeleteTrip = async (tripId: string, event: React.MouseEvent) => {
+  const handleDeleteTrip = (tripId: string, event: React.MouseEvent) => {
     event.stopPropagation();
     if (!window.confirm("Are you sure you want to delete this planned trip?")) return;
 
     const updated = plannedTrips.filter((t) => t.id !== tripId);
     setPlannedTrips(updated);
+    localStorage.setItem("tourenvi.planned.trips", JSON.stringify(updated));
 
-    if (uid) {
-      const userStorageKey = `tourenvi.planned.trips.${uid}`;
-      localStorage.setItem(userStorageKey, JSON.stringify(updated));
-
-      try {
-        await deleteDoc(doc(db, "trips", tripId));
-      } catch (err) {
-        console.error("Error deleting trip from Firestore:", err);
-      }
-    }
-
+    // Also delete from IndexedDB
     try {
       const dbRequest = indexedDB.open("TourenviOfflineDB", 1);
       dbRequest.onsuccess = (e: any) => {
-        const idb = e.target.result;
-        if (idb.objectStoreNames.contains("itineraries")) {
-          const tx = idb.transaction("itineraries", "readwrite");
+        const db = e.target.result;
+        if (db.objectStoreNames.contains("itineraries")) {
+          const tx = db.transaction("itineraries", "readwrite");
           tx.objectStore("itineraries").delete(tripId);
         }
       };
@@ -289,7 +229,7 @@ const TripsPlanned = () => {
                 <Sparkles size={14} /> Confirmed Travel Plans
               </span>
             </div>
-            <h1 className="text-3xl md:text-4xl font-serif font-bold text-gt-blue">
+            <h1 className="text-3xl md:text-4xl font-serif font-bold text-emerald-800">
               Trip Planned
             </h1>
             <p className="text-gray-500 font-sans mt-1 text-sm md:text-base">
@@ -300,7 +240,7 @@ const TripsPlanned = () => {
           <div className="flex items-center gap-3">
             <Button
               onClick={() => navigate("/trip/new")}
-              className="bg-gt-blue hover:bg-gt-blue/90 text-white font-medium px-6 py-6 rounded-2xl shadow-md flex items-center gap-2"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-6 py-6 rounded-2xl shadow-md flex items-center gap-2"
             >
               <PlusCircle size={18} />
               <span>Plan New Trip</span>
@@ -314,7 +254,7 @@ const TripsPlanned = () => {
             <div className="w-24 h-24 bg-gt-gold/10 text-gt-gold rounded-full flex items-center justify-center mx-auto mb-6">
               <Calendar size={48} />
             </div>
-            <h2 className="text-2xl font-serif font-bold text-gt-blue mb-3">
+            <h2 className="text-2xl font-serif font-bold text-emerald-800 mb-3">
               No Planned Trips Yet
             </h2>
             <p className="text-gray-500 font-sans text-sm md:text-base mb-8 max-w-md mx-auto leading-relaxed">
@@ -322,7 +262,7 @@ const TripsPlanned = () => {
             </p>
             <Button
               onClick={() => navigate("/trip/new")}
-              className="bg-gt-blue hover:bg-gt-blue/90 text-white font-semibold px-8 py-6 rounded-2xl shadow-lg inline-flex items-center gap-2"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-6 rounded-2xl shadow-lg inline-flex items-center gap-2"
             >
               <Sparkles size={18} />
               <span>Start Planning Your Trip</span>
@@ -348,7 +288,7 @@ const TripsPlanned = () => {
                   {/* Trip Card Header Banner */}
                   <div
                     onClick={() => toggleExpand(plannedTrip.id)}
-                    className="p-6 md:p-8 bg-gradient-to-r from-slate-900 via-gt-blue to-blue-950 text-white cursor-pointer relative overflow-hidden"
+                    className="p-6 md:p-8 bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 text-white cursor-pointer relative overflow-hidden"
                   >
                     {/* Decorative leaf/overlay background icon */}
                     <div className="absolute right-[-20px] top-[-20px] opacity-10 pointer-events-none">
@@ -358,7 +298,7 @@ const TripsPlanned = () => {
                     <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
                       <div className="space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="px-3 py-1 bg-gt-gold text-gt-blue font-bold rounded-full text-xs uppercase tracking-wider">
+                          <span className="px-3 py-1 bg-gt-gold text-emerald-900 font-bold rounded-full text-xs uppercase tracking-wider">
                             Trip #{plannedTrips.length - index}
                           </span>
                           <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-xs font-semibold flex items-center gap-1">
@@ -439,7 +379,7 @@ const TripsPlanned = () => {
                       </span>
 
                       <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-2xs">
-                        <Users size={14} className="text-blue-600" />
+                        <Users size={14} className="text-emerald-600" />
                         <span className="capitalize">{tripData.tripType}</span> ({tripData.numberOfMembers} person{tripData.numberOfMembers > 1 ? "s" : ""})
                       </span>
 
@@ -458,7 +398,7 @@ const TripsPlanned = () => {
 
                     <button
                       onClick={() => toggleExpand(plannedTrip.id)}
-                      className="text-gt-blue font-semibold hover:underline flex items-center gap-1"
+                      className="text-emerald-600 font-semibold hover:underline flex items-center gap-1"
                     >
                       {isExpanded ? "Hide Details" : "View Full Itinerary & Breakdown"}
                       {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -472,29 +412,32 @@ const TripsPlanned = () => {
                       <div className="flex border-b border-gray-200 space-x-6">
                         <button
                           onClick={() => setTabForTrip(plannedTrip.id, "itinerary")}
-                          className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${activeTab === "itinerary"
-                              ? "border-gt-blue text-gt-blue"
+                          className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${
+                            activeTab === "itinerary"
+                              ? "border-emerald-600 text-emerald-700"
                               : "border-transparent text-gray-400 hover:text-gray-700"
-                            }`}
+                          }`}
                         >
                           Day-by-Day Itinerary
                         </button>
                         <button
                           onClick={() => setTabForTrip(plannedTrip.id, "breakdown")}
-                          className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${activeTab === "breakdown"
-                              ? "border-gt-blue text-gt-blue"
+                          className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${
+                            activeTab === "breakdown"
+                              ? "border-emerald-600 text-emerald-700"
                               : "border-transparent text-gray-400 hover:text-gray-700"
-                            }`}
+                          }`}
                         >
                           Cost Breakdown & Eco Analysis
                         </button>
                         {destinationShowcase && destinationShowcase.length > 0 && (
                           <button
                             onClick={() => setTabForTrip(plannedTrip.id, "places")}
-                            className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${activeTab === "places"
-                                ? "border-gt-blue text-gt-blue"
+                            className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${
+                              activeTab === "places"
+                                ? "border-emerald-600 text-emerald-700"
                                 : "border-transparent text-gray-400 hover:text-gray-700"
-                              }`}
+                            }`}
                           >
                             Sightseeing Highlights
                           </button>
@@ -534,11 +477,11 @@ const TripsPlanned = () => {
                                   className="bg-gray-50/80 rounded-2xl p-6 border border-gray-100 relative"
                                 >
                                   <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 rounded-full bg-gt-gold text-gt-blue font-bold flex items-center justify-center text-sm shadow-sm">
+                                    <div className="w-10 h-10 rounded-full bg-gt-gold text-emerald-900 font-bold flex items-center justify-center text-sm shadow-sm">
                                       D{day.day}
                                     </div>
                                     <div>
-                                      <h3 className="font-serif font-bold text-lg text-gt-blue">
+                                      <h3 className="font-serif font-bold text-lg text-emerald-800">
                                         Day {day.day}: {day.title}
                                       </h3>
                                       <p className="text-xs text-gray-500">Planned activities schedule</p>
@@ -551,7 +494,7 @@ const TripsPlanned = () => {
                                         key={iIdx}
                                         className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs hover:border-gt-gold/40 transition-colors flex gap-3"
                                       >
-                                        <div className="p-2.5 rounded-lg bg-gray-100 text-gt-blue h-fit">
+                                        <div className="p-2.5 rounded-lg bg-gray-100 text-emerald-700 h-fit">
                                           {item.type === "food" ? (
                                             <Coffee size={18} />
                                           ) : item.type === "sightseeing" ? (
@@ -559,7 +502,7 @@ const TripsPlanned = () => {
                                           ) : item.type === "lodging" ? (
                                             <Bed size={18} className="text-emerald-600" />
                                           ) : (
-                                            <MapPin size={18} className="text-blue-600" />
+                                            <MapPin size={18} className="text-emerald-600" />
                                           )}
                                         </div>
 
@@ -572,7 +515,7 @@ const TripsPlanned = () => {
                                               {item.type}
                                             </span>
                                           </div>
-                                          <h4 className="font-semibold text-gt-blue text-sm">
+                                          <h4 className="font-semibold text-emerald-800 text-sm">
                                             {item.title}
                                           </h4>
                                           {item.description && (
@@ -637,7 +580,7 @@ const TripsPlanned = () => {
                       {/* TAB 3: PLACES / HIGHLIGHTS */}
                       {activeTab === "places" && destinationShowcase && (
                         <div className="space-y-4">
-                          <h3 className="font-serif font-bold text-gt-blue text-lg mb-2">
+                          <h3 className="font-serif font-bold text-emerald-800 text-lg mb-2">
                             Top Sightseeing Landmarks in {destinationName}
                           </h3>
 
@@ -663,7 +606,7 @@ const TripsPlanned = () => {
                                       </span>
                                     </div>
                                     <div className="p-4">
-                                      <h4 className="font-bold text-gt-blue text-sm line-clamp-1">
+                                      <h4 className="font-bold text-emerald-800 text-sm line-clamp-1">
                                         {place.name}
                                       </h4>
                                       <p className="text-xs text-gray-500 line-clamp-2 mt-1">
@@ -683,7 +626,7 @@ const TripsPlanned = () => {
                         <Button
                           variant="outline"
                           onClick={() => navigate("/map")}
-                          className="border-gt-blue/30 text-gt-blue hover:bg-gt-blue/5 text-xs font-semibold rounded-xl"
+                          className="border border-emerald-300 text-emerald-700 hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all duration-200 text-xs font-semibold rounded-xl"
                         >
                           <MapPin size={14} className="mr-1.5" /> Launch Live Navigation Map
                         </Button>
@@ -696,7 +639,7 @@ const TripsPlanned = () => {
                               navigator.clipboard.writeText(window.location.href);
                               toast.success("Link copied to clipboard!");
                             }}
-                            className="text-gray-500 hover:text-gt-blue text-xs"
+                            className="text-gray-500 hover:text-emerald-600 text-xs"
                           >
                             <Share2 size={14} className="mr-1" /> Share Plan
                           </Button>
