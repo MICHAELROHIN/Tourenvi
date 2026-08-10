@@ -720,7 +720,14 @@ const ElitePlanner = () => {
                             value={trip.startDate}
                             min={new Date().toISOString().split('T')[0]}
                             onChange={(e) => updateTrip("startDate", e.target.value)}
-                            className="h-14 text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20 focus:ring-2"
+                            onClick={(e) => {
+                              try {
+                                e.currentTarget.showPicker();
+                              } catch (err) {
+                                console.error("Error opening date picker: ", err);
+                              }
+                            }}
+                            className="h-14 text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20 focus:ring-2 cursor-pointer"
                           />
                         </div>
                       </div>
@@ -733,7 +740,14 @@ const ElitePlanner = () => {
                             value={trip.endDate}
                             min={trip.startDate || new Date().toISOString().split('T')[0]}
                             onChange={(e) => updateTrip("endDate", e.target.value)}
-                            className="h-14 text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20 focus:ring-2"
+                            onClick={(e) => {
+                              try {
+                                e.currentTarget.showPicker();
+                              } catch (err) {
+                                console.error("Error opening date picker: ", err);
+                              }
+                            }}
+                            className="h-14 text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20 focus:ring-2 cursor-pointer"
                           />
                         </div>
                       </div>
