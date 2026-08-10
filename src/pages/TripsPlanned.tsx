@@ -26,9 +26,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { RoadTripBudgetCard } from "@/components/cost/RoadTripBudgetCard";
+import { useAuth } from "@/context/AuthContext";
+import { db } from "@/firebase";
+import { collection, query, where, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 
 export interface PlannedTrip {
   id: string;
+  userId?: string;
   createdAt: string;
   tripData: {
     tripType: string;
@@ -84,89 +88,145 @@ const TripsPlanned = () => {
   const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<Record<string, "itinerary" | "breakdown" | "places">>({});
   const navigate = useNavigate();
+  const { currentUser, loading: authLoading } = useAuth();
+  const uid = currentUser?.uid;
 
-  // Load saved trips from localStorage and IndexedDB
+  // Load saved trips scoped strictly to the logged in user
   useEffect(() => {
-    loadTrips();
-  }, []);
+    if (authLoading) return;
 
-  const loadTrips = () => {
+    if (!uid) {
+      setPlannedTrips([]);
+      setExpandedTripId(null);
+      return;
+    }
+
+    const userStorageKey = `tourenvi.planned.trips.${uid}`;
+
+    // 1. Initial fast load from local storage (user-scoped)
     try {
-      const raw = localStorage.getItem("tourenvi.planned.trips");
+      const raw = localStorage.getItem(userStorageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setPlannedTrips(parsed);
-          // Expand first trip by default
-          setExpandedTripId(parsed[0].id);
-          return;
+          setExpandedTripId((prev) => prev || parsed[0].id);
+        }
+      } else {
+        // Migration fallback: check legacy key only for items matching current uid
+        const legacyRaw = localStorage.getItem("tourenvi.planned.trips");
+        if (legacyRaw) {
+          const legacyParsed = JSON.parse(legacyRaw);
+          if (Array.isArray(legacyParsed)) {
+            const userLegacy = legacyParsed.filter((t: any) => t.userId === uid);
+            if (userLegacy.length > 0) {
+              setPlannedTrips(userLegacy);
+              setExpandedTripId((prev) => prev || userLegacy[0].id);
+              localStorage.setItem(userStorageKey, JSON.stringify(userLegacy));
+            }
+          }
         }
       }
-
-      // Fallback: Read from IndexedDB if localStorage is empty
-      const dbRequest = indexedDB.open("TourenviOfflineDB", 1);
-      dbRequest.onsuccess = (event: any) => {
-        const db = event.target.result;
-        if (db.objectStoreNames.contains("itineraries")) {
-          const transaction = db.transaction("itineraries", "readonly");
-          const store = transaction.objectStore("itineraries");
-          const getAll = store.getAll();
-          getAll.onsuccess = () => {
-            if (Array.isArray(getAll.result) && getAll.result.length > 0) {
-              const formattedTrips: PlannedTrip[] = getAll.result.map((item: any) => ({
-                id: item.id || "trip_" + Date.now(),
-                createdAt: item.timestamp || new Date().toISOString(),
-                tripData: item.tripData || {},
-                financials: {
-                  fuelExpenditure: item.financials?.fuelExpenditure || 0,
-                  totalLodging: item.financials?.totalLodging || 0,
-                  tollPricing: item.financials?.tollPricing || 0,
-                  foodCost: item.financials?.foodAndMisc ? Math.round(item.financials.foodAndMisc * 0.6) : 0,
-                  miscCost: item.financials?.foodAndMisc ? Math.round(item.financials.foodAndMisc * 0.4) : 0,
-                  totalCost:
-                    (item.financials?.fuelExpenditure || 0) +
-                    (item.financials?.totalLodging || 0) +
-                    (item.financials?.tollPricing || 0) +
-                    (item.financials?.foodAndMisc || 0),
-                },
-                ecoData: item.ecoData || { co2: 0 },
-                routeDetails: {
-                  distanceKm: 450,
-                  vehicleType: item.tripData?.vehicleType || "car",
-                  fuelType: item.tripData?.fuelType || "petrol",
-                  startLocation: item.tripData?.startLocation || "Origin",
-                  destination: item.tripData?.destinations?.[0] || "Destination",
-                },
-                itinerary: item.itinerary || [],
-              }));
-
-              setPlannedTrips(formattedTrips);
-              setExpandedTripId(formattedTrips[0].id);
-              localStorage.setItem("tourenvi.planned.trips", JSON.stringify(formattedTrips));
-            }
-          };
-        }
-      };
     } catch (err) {
-      console.error("Failed to load saved trips:", err);
+      console.error("Local storage load error:", err);
     }
-  };
 
-  const handleDeleteTrip = (tripId: string, event: React.MouseEvent) => {
+    // 2. Real-time subscription to Firestore 'trips' collection for this user
+    const tripsQuery = query(
+      collection(db, "trips"),
+      where("userId", "==", uid)
+    );
+
+    const unsubscribe = onSnapshot(
+      tripsQuery,
+      (snapshot) => {
+        const fetchedTrips: PlannedTrip[] = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            userId: data.userId || uid,
+            createdAt: data.createdAt || new Date().toISOString(),
+            tripData: data.tripData || {
+              tripType: data.tripType || "solo",
+              startDate: data.startDate || "",
+              endDate: data.endDate || "",
+              numberOfMembers: data.numberOfMembers || 1,
+              startLocation: data.startLocation || "",
+              vehicleType: data.vehicleType || "car",
+              fuelType: data.fuelType || "petrol",
+              budgetCap: data.budgetCap || 50000,
+              moods: data.moods || [],
+              destinations: data.destinations || [],
+            },
+            financials: data.financials || {
+              fuelExpenditure: data.costBreakdown?.fuel || 0,
+              totalLodging: data.costBreakdown?.hotel || 0,
+              tollPricing: data.costBreakdown?.toll || 0,
+              foodCost: data.costBreakdown?.food || 0,
+              placesCost: data.costBreakdown?.places || 0,
+              miscCost: data.costBreakdown?.misc || 0,
+              totalCost: data.costBreakdown?.total || 0,
+            },
+            ecoData: data.ecoData || { co2: data.ecoScore?.co2kg || 0 },
+            routeDetails: data.routeDetails || {
+              distanceKm: data.routeDistanceKm || 0,
+              vehicleType: data.vehicleType || "car",
+              fuelType: data.fuelType || "petrol",
+              startLocation: data.startLocation || "Origin",
+              destination: data.destinations?.[0] || "Destination",
+            },
+            itinerary: data.itinerary || [],
+            destinationShowcase: data.destinationShowcase || [],
+          } as PlannedTrip;
+        });
+
+        // Sort latest first
+        fetchedTrips.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+        setPlannedTrips(fetchedTrips);
+        if (fetchedTrips.length > 0) {
+          setExpandedTripId((prev) =>
+            prev && fetchedTrips.some((t) => t.id === prev) ? prev : fetchedTrips[0].id
+          );
+        }
+
+        // Cache in user-scoped local storage
+        localStorage.setItem(userStorageKey, JSON.stringify(fetchedTrips));
+      },
+      (err) => {
+        console.error("Firestore onSnapshot error in TripsPlanned:", err);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [uid, authLoading]);
+
+  const handleDeleteTrip = async (tripId: string, event: React.MouseEvent) => {
     event.stopPropagation();
     if (!window.confirm("Are you sure you want to delete this planned trip?")) return;
 
     const updated = plannedTrips.filter((t) => t.id !== tripId);
     setPlannedTrips(updated);
-    localStorage.setItem("tourenvi.planned.trips", JSON.stringify(updated));
 
-    // Also delete from IndexedDB
+    if (uid) {
+      const userStorageKey = `tourenvi.planned.trips.${uid}`;
+      localStorage.setItem(userStorageKey, JSON.stringify(updated));
+
+      try {
+        await deleteDoc(doc(db, "trips", tripId));
+      } catch (err) {
+        console.error("Error deleting trip from Firestore:", err);
+      }
+    }
+
     try {
       const dbRequest = indexedDB.open("TourenviOfflineDB", 1);
       dbRequest.onsuccess = (e: any) => {
-        const db = e.target.result;
-        if (db.objectStoreNames.contains("itineraries")) {
-          const tx = db.transaction("itineraries", "readwrite");
+        const idb = e.target.result;
+        if (idb.objectStoreNames.contains("itineraries")) {
+          const tx = idb.transaction("itineraries", "readwrite");
           tx.objectStore("itineraries").delete(tripId);
         }
       };
@@ -412,32 +472,29 @@ const TripsPlanned = () => {
                       <div className="flex border-b border-gray-200 space-x-6">
                         <button
                           onClick={() => setTabForTrip(plannedTrip.id, "itinerary")}
-                          className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${
-                            activeTab === "itinerary"
+                          className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${activeTab === "itinerary"
                               ? "border-gt-blue text-gt-blue"
                               : "border-transparent text-gray-400 hover:text-gray-700"
-                          }`}
+                            }`}
                         >
                           Day-by-Day Itinerary
                         </button>
                         <button
                           onClick={() => setTabForTrip(plannedTrip.id, "breakdown")}
-                          className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${
-                            activeTab === "breakdown"
+                          className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${activeTab === "breakdown"
                               ? "border-gt-blue text-gt-blue"
                               : "border-transparent text-gray-400 hover:text-gray-700"
-                          }`}
+                            }`}
                         >
                           Cost Breakdown & Eco Analysis
                         </button>
                         {destinationShowcase && destinationShowcase.length > 0 && (
                           <button
                             onClick={() => setTabForTrip(plannedTrip.id, "places")}
-                            className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${
-                              activeTab === "places"
+                            className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${activeTab === "places"
                                 ? "border-gt-blue text-gt-blue"
                                 : "border-transparent text-gray-400 hover:text-gray-700"
-                            }`}
+                              }`}
                           >
                             Sightseeing Highlights
                           </button>

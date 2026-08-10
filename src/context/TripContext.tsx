@@ -6,6 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 export type TripType = "solo" | "family" | "group";
 export type TripMood =
@@ -107,12 +108,17 @@ const DEFAULT_TRIP: TripDraft = {
 
 const TripContext = createContext<TripContextValue | null>(null);
 
-const TRIP_STORAGE_KEY = "tourenvi.trip.draft.v1";
-
 export const TripProvider = ({ children }: { children: ReactNode }) => {
+  const { currentUser } = useAuth();
+  const uid = currentUser?.uid;
+
+  const storageKey = useMemo(() => {
+    return uid ? `tourenvi.trip.draft.${uid}` : "tourenvi.trip.draft.guest";
+  }, [uid]);
+
   const [trip, setTrip] = useState<TripDraft>(() => {
     try {
-      const raw = localStorage.getItem(TRIP_STORAGE_KEY);
+      const raw = localStorage.getItem(storageKey);
       if (!raw) {
         return DEFAULT_TRIP;
       }
@@ -122,9 +128,23 @@ export const TripProvider = ({ children }: { children: ReactNode }) => {
     }
   });
 
+  // Switch trip draft when user changes
   useEffect(() => {
-    localStorage.setItem(TRIP_STORAGE_KEY, JSON.stringify(trip));
-  }, [trip]);
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        setTrip({ ...DEFAULT_TRIP, ...JSON.parse(raw) });
+      } else {
+        setTrip(DEFAULT_TRIP);
+      }
+    } catch {
+      setTrip(DEFAULT_TRIP);
+    }
+  }, [storageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(storageKey, JSON.stringify(trip));
+  }, [trip, storageKey]);
 
   const value = useMemo<TripContextValue>(
     () => ({

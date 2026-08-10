@@ -119,7 +119,7 @@ const Hero = () => {
 
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(255,255,255,0.24),_transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.02),rgba(6,20,18,0.2))]" />
 
-            <div className="relative z-10 flex min-h-[620px] flex-col justify-between px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
+            <div className="relative z-10 flex min-h-[600px] flex-col justify-between px-5 py-6 sm:px-8 sm:py-8 lg:px-10 lg:py-10">
               <div
                 className={`max-w-4xl text-center lg:max-w-3xl lg:text-left transition-all duration-700 ${isReady ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
                   }`}
@@ -251,7 +251,7 @@ const Hero = () => {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
 
-                <div className="mt-5 space-y-3">
+                <div className="mt-4 space-y-3">
                   {startTripFeatures.map((feature) => {
                     const Icon = feature.icon;
                     return (
@@ -259,7 +259,7 @@ const Hero = () => {
                         key={feature.title}
                         className="flex items-center gap-4 rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 py-4"
                       >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-emerald-100 bg-white text-emerald-600 shadow-sm">
+                        <div className="flex items-center justify-center rounded-full border border-emerald-100 bg-white text-emerald-600 shadow-sm">
                           <Icon className="h-5 w-5" />
                         </div>
                         <div>

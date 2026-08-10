@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTrip } from "@/context/TripContext";
+import { useAuth } from "@/context/AuthContext";
+import { db } from "@/firebase";
+import { doc, setDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
@@ -39,6 +42,8 @@ const center = { lat: 20.5937, lng: 78.9629 };
 
 const EliteDashboard = () => {
   const { trip } = useTrip();
+  const { currentUser } = useAuth();
+  const uid = currentUser?.uid;
   const navigate = useNavigate();
 
   // Load real calculation data from localStorage (populated by backend)
@@ -49,7 +54,7 @@ const EliteDashboard = () => {
 
   const [routePath, setRoutePath] = useState<RoutePoint[]>([]);
 
-  const mockDistanceKm = calcData?.routeDetails?.distanceKm || 450; 
+  const mockDistanceKm = calcData?.routeDetails?.distanceKm || 450;
   const fuelExpenditure = calcData?.financials?.fuelCost || 0;
   const totalLodging = calcData?.financials?.lodgingCost || 0;
   const tollPricing = calcData?.financials?.tollCost || 0;
@@ -162,7 +167,7 @@ const EliteDashboard = () => {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          
+
           <h2 className="text-4xl font-serif font-bold text-gt-blue mb-4">Cannot estimate within the given budget.</h2>
           <p className="text-gray-600 font-sans text-lg mb-8 leading-relaxed">
             Please try increasing your budget limit or modifying your travel preferences. Our algorithmic engine strictly enforces budget constraints to ensure premium quality.
@@ -225,7 +230,7 @@ const EliteDashboard = () => {
         title: d.title || `Day ${d.day}: Exploration & Sightseeing`,
         items: (d.items || []).map((item: any) => ({
           ...item,
-          icon: item.type === "food" ? Coffee : item.type === "sightseeing" ? Camera : item.type === "lodging" ? Bed : MapPin
+          iconName: item.type === "food" ? "Coffee" : item.type === "sightseeing" ? "Camera" : item.type === "lodging" ? "Bed" : "MapPin"
         }))
       }));
     }
@@ -253,7 +258,7 @@ const EliteDashboard = () => {
           title: `Explore ${p1.name}`,
           description: p1.description || `Visit top-rated viewpoint and attraction in ${trip.destinations[0] || "destination"}.`,
           image: p1.image || p1.imageUrl,
-          icon: Camera
+          iconName: "Camera"
         });
       }
 
@@ -265,7 +270,7 @@ const EliteDashboard = () => {
           title: `Nature Walk & Sightseeing at ${p2.name}`,
           description: p2.description || `Scenic landmark and nature trail exploration.`,
           image: p2.image || p2.imageUrl,
-          icon: Camera
+          iconName: "Camera"
         });
       }
 
@@ -278,7 +283,7 @@ const EliteDashboard = () => {
           title: `Visit ${p3.name}`,
           description: p3.description || `Explore heritage site and surrounding parklands.`,
           image: p3.image || p3.imageUrl,
-          icon: Camera
+          iconName: "Camera"
         });
       }
 
@@ -289,7 +294,7 @@ const EliteDashboard = () => {
           title: `Panoramic Photo Spot at ${p1.name} Viewpoint`,
           description: `Enjoy high-altitude valley views and photography.`,
           image: p1.image || p1.imageUrl,
-          icon: Camera
+          iconName: "Camera"
         });
       }
 
@@ -301,7 +306,7 @@ const EliteDashboard = () => {
           title: `Sunset Walk around ${p3.name}`,
           description: `Tranquil sunset stroll and local market walk.`,
           image: p3.image || p3.imageUrl,
-          icon: Camera
+          iconName: "Camera"
         });
       }
 
@@ -311,7 +316,7 @@ const EliteDashboard = () => {
         title: `Evening Market Stroll & Dining in ${trip.destinations[0] || "Destination"} Market`,
         description: `Sample authentic local specialties, homemade chocolates, and shop for souvenirs.`,
         image: p2?.image || p2?.imageUrl,
-        icon: Coffee
+        iconName: "Coffee"
       });
 
       days.push({ day: d, title: dayTitle, items });
@@ -321,8 +326,10 @@ const EliteDashboard = () => {
 
   const handleSaveItinerary = async () => {
     try {
+      const tripId = "trip_" + Date.now();
       const newPlannedTrip = {
-        id: "trip_" + Date.now(),
+        id: tripId,
+        userId: uid || "anonymous",
         createdAt: new Date().toISOString(),
         tripData: trip,
         financials: {
@@ -346,29 +353,39 @@ const EliteDashboard = () => {
         destinationShowcase,
       };
 
-      // 1. Save to localStorage
+      // 1. Save to Firestore if authenticated
+      if (uid) {
+        try {
+          await setDoc(doc(db, "trips", tripId), newPlannedTrip);
+        } catch (fErr) {
+          console.error("Firestore trip save error:", fErr);
+        }
+      }
+
+      // 2. Save to user-scoped localStorage
       try {
-        const existingRaw = localStorage.getItem("tourenvi.planned.trips");
+        const userKey = uid ? `tourenvi.planned.trips.${uid}` : "tourenvi.planned.trips.guest";
+        const existingRaw = localStorage.getItem(userKey);
         const existing = existingRaw ? JSON.parse(existingRaw) : [];
         const updated = [newPlannedTrip, ...existing.filter((t: any) => t.id !== newPlannedTrip.id)];
-        localStorage.setItem("tourenvi.planned.trips", JSON.stringify(updated));
+        localStorage.setItem(userKey, JSON.stringify(updated));
       } catch (err) {
         console.error("LocalStorage save error:", err);
       }
 
-      // 2. Save to IndexedDB
+      // 3. Save to IndexedDB
       const dbRequest = indexedDB.open("TourenviOfflineDB", 1);
       
       dbRequest.onupgradeneeded = (event: any) => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains("itineraries")) {
-          db.createObjectStore("itineraries", { keyPath: "id" });
+        const idb = event.target.result;
+        if (!idb.objectStoreNames.contains("itineraries")) {
+          idb.createObjectStore("itineraries", { keyPath: "id" });
         }
       };
 
       dbRequest.onsuccess = (event: any) => {
-        const db = event.target.result;
-        const transaction = db.transaction("itineraries", "readwrite");
+        const idb = event.target.result;
+        const transaction = idb.transaction("itineraries", "readwrite");
         const store = transaction.objectStore("itineraries");
         store.put(newPlannedTrip);
       };
@@ -384,12 +401,12 @@ const EliteDashboard = () => {
     <div className="h-screen pt-16 bg-gt-offwhite flex flex-col overflow-hidden">
       {/* Container for the 3 columns */}
       <div className="w-full flex flex-col lg:flex-row flex-1 overflow-hidden">
-        
+
         {/* Column A: The Itinerary (Left) */}
         <div className="w-full lg:w-1/3 p-6 lg:p-8 bg-white border-r border-gray-100 overflow-y-auto h-full custom-scrollbar pb-24">
           <h2 className="text-3xl font-serif font-bold text-gt-blue mb-2">Bespoke Itinerary</h2>
           <p className="text-gray-500 mb-8 font-sans">Crafted exclusively for your {trip.tripType} journey.</p>
-          
+
           <div className="space-y-8">
             {destinationShowcase.length > 0 ? (
               <div className="space-y-5">
@@ -442,14 +459,14 @@ const EliteDashboard = () => {
                 {idx !== itineraryDays.length - 1 && (
                   <div className="absolute left-[19px] top-12 bottom-[-2rem] w-0.5 bg-gray-100"></div>
                 )}
-                
+
                 <h3 className="text-xl font-serif font-semibold text-gt-blue mb-4 flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gt-gold/10 text-gt-gold flex items-center justify-center font-bold z-10">
                     D{day.day}
                   </div>
                   {day.title}
                 </h3>
-                
+
                 <div className="ml-5 pl-8 space-y-6">
                   {day.items.map((item, itemIdx) => (
                     <div key={itemIdx} className="relative group">
@@ -457,10 +474,10 @@ const EliteDashboard = () => {
                       <div className="bg-gray-50 border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all group-hover:border-gt-gold/30">
                         {item.image && (
                           <div className="relative h-44 w-full overflow-hidden">
-                            <img 
-                              src={item.image} 
-                              alt={item.title} 
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                            <img
+                              src={item.image}
+                              alt={item.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
                             <div className="absolute bottom-3 left-4 right-4">
@@ -472,7 +489,15 @@ const EliteDashboard = () => {
                         )}
                         <div className="p-4">
                           <div className="flex items-center gap-3 mb-2">
-                            <item.icon size={16} className="text-gt-gold animate-bounce-subtle" />
+                            {item.type === "food" || item.iconName === "Coffee" ? (
+                              <Coffee size={16} className="text-gt-gold animate-bounce-subtle" />
+                            ) : item.type === "lodging" || item.iconName === "Bed" ? (
+                              <Bed size={16} className="text-gt-gold animate-bounce-subtle" />
+                            ) : item.type === "sightseeing" || item.iconName === "Camera" ? (
+                              <Camera size={16} className="text-gt-gold animate-bounce-subtle" />
+                            ) : (
+                              <MapPin size={16} className="text-gt-gold animate-bounce-subtle" />
+                            )}
                             <span className="text-xs font-semibold text-gray-500">{item.time}</span>
                           </div>
                           <h4 className="font-semibold text-gt-blue mb-1">{item.title}</h4>
@@ -486,7 +511,7 @@ const EliteDashboard = () => {
                 </div>
               </div>
             ))}
-            
+
             {/* End state placeholder */}
             <div className="relative mt-8">
               <div className="ml-5 pl-8">
@@ -558,7 +583,7 @@ const EliteDashboard = () => {
         <div className="w-full lg:w-1/3 p-6 lg:p-8 bg-white border-l border-gray-100 overflow-y-auto h-full custom-scrollbar pb-24">
           <h2 className="text-3xl font-serif font-bold text-gt-blue mb-2">Analysis</h2>
           <p className="text-gray-500 mb-8 font-sans">Financial metrics and ecological impact.</p>
-          
+
           <div className="bg-gray-50 rounded-2xl p-6 border border-gray-100 mb-8 relative overflow-hidden">
             <div className="absolute top-0 right-0 p-4 opacity-10">
               <Leaf size={100} />
@@ -578,7 +603,7 @@ const EliteDashboard = () => {
 
           <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
             <h3 className="font-semibold text-gray-700 mb-6">Financial Breakdown</h3>
-            
+
             <div className="h-64 mb-6">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -600,7 +625,7 @@ const EliteDashboard = () => {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            
+
             <div className="space-y-4">
               <div className="flex justify-between items-center pb-4 border-b border-gray-100">
                 <span className="text-gray-500">Total Estimate</span>
@@ -616,17 +641,17 @@ const EliteDashboard = () => {
               </div>
             </div>
           </div>
-          
+
           <RoadTripBudgetCard financials={calcData?.financials} tripData={trip} className="mt-8" />
-          
-          <button 
+
+          <button
             onClick={handleSaveItinerary}
             className="w-full mt-8 py-4 bg-gt-blue hover:bg-gt-blue/90 text-white font-medium rounded-xl shadow-lg transition-all active:scale-[0.98]"
           >
             Finalize & Save Itinerary (Offline Mode)
           </button>
         </div>
-        
+
       </div>
     </div>
   );

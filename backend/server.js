@@ -1826,7 +1826,7 @@ app.get("/api/cars", (req, res) => {
 const INDIAN_FUEL_PRICE_MATRIX = {
   // Tamil Nadu & UTs
   "chennai": { state: "Tamil Nadu", petrol: 109.75, diesel: 92.34, cng: 86.50, ev: 15.00 },
-  "ooty": { state: "Tamil Nadu", petrol: 102.80, diesel: 94.30, cng: 88.00, ev: 15.00 },
+  "ooty": { state: "Tamil Nadu", petrol: 109.90, diesel: 101.62, cng: 88.00, ev: 15.00 },
   "udhagamandalam": { state: "Tamil Nadu", petrol: 102.80, diesel: 94.30, cng: 88.00, ev: 15.00 },
   "nilgiris": { state: "Tamil Nadu", petrol: 102.80, diesel: 94.30, cng: 88.00, ev: 15.00 },
   "kodaikanal": { state: "Tamil Nadu", petrol: 102.90, diesel: 94.40, cng: 88.20, ev: 15.00 },

@@ -339,7 +339,7 @@ const Hotels = () => {
               </div>
               <div className="flex items-end">
                 <Button
-                  onClick={() => {}}
+                  onClick={() => { }}
                   disabled={true}
                   className="w-full"
                   variant="outline"

@@ -75,9 +75,9 @@ const Cart = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
       <Toaster position="top-center" />
-      
+
       <div className="container mx-auto px-4 py-8">
-        
+
         {/* Header */}
         <div className="mb-8">
           <Button asChild variant="ghost" className="pl-0 hover-pl-2 transition-all mb-4">
@@ -97,7 +97,7 @@ const Cart = () => {
 
         {/* Content Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
+
           {/* Left Column: Cart Items */}
           <div className="lg:col-span-2 space-y-4">
             {cartItems.length === 0 ? (
@@ -106,7 +106,7 @@ const Cart = () => {
                 <h3 className="text-lg font-medium">Your cart is empty</h3>
                 <p className="text-muted-foreground mb-4">Looks like you haven't added any hotels yet.</p>
                 <Button asChild>
-                    <Link to="/">Browse Destinations</Link>
+                  <Link to="/">Browse Destinations</Link>
                 </Button>
               </div>
             ) : (
@@ -114,11 +114,11 @@ const Cart = () => {
                 <Card key={`${item.id}-${index}`} className="flex flex-col md:flex-row overflow-hidden hover:shadow-md transition-shadow">
                   {/* Image Section */}
                   <div className="w-full md:w-48 h-48 md:h-auto bg-muted relative shrink-0">
-                     {item.photoUrl ? (
-                        <img src={item.photoUrl} alt={item.name} className="w-full h-full object-cover" />
-                     ) : (
-                        <div className="flex items-center justify-center h-full text-muted-foreground">No Image</div>
-                     )}
+                    {item.photoUrl ? (
+                      <img src={item.photoUrl} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-muted-foreground">No Image</div>
+                    )}
                   </div>
 
                   {/* Details Section */}
@@ -131,9 +131,9 @@ const Cart = () => {
                             <MapPin className="w-3 h-3" /> {item.address}
                           </p>
                         </div>
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
+                        <Button
+                          variant="ghost"
+                          size="icon"
                           className="text-destructive hover:bg-destructive/10 hover:text-destructive -mt-2 -mr-2"
                           onClick={() => removeItem(index)}
                         >
@@ -163,11 +163,11 @@ const Cart = () => {
                     </div>
 
                     <div className="mt-4 pt-4 border-t flex justify-between items-end">
-                       <span className="text-sm text-muted-foreground">Price per night</span>
-                       <div className="text-xl font-bold flex items-center text-primary">
-                          <IndianRupee className="w-5 h-5" />
-                          {item.bookedPrice}
-                       </div>
+                      <span className="text-sm text-muted-foreground">Price per night</span>
+                      <div className="text-xl font-bold flex items-center text-primary">
+                        <IndianRupee className="w-5 h-5" />
+                        {item.bookedPrice}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -187,7 +187,7 @@ const Cart = () => {
                   <span className="text-muted-foreground">Items in cart</span>
                   <span className="font-medium">{cartItems.length}</span>
                 </div>
-                
+
                 <div className="border-t pt-4 flex justify-between items-center">
                   <span className="text-lg font-bold">Total</span>
                   <span className="text-2xl font-bold text-primary flex items-center">
@@ -196,15 +196,15 @@ const Cart = () => {
                   </span>
                 </div>
 
-                <Button 
-                  className="w-full text-lg py-6 mt-4" 
+                <Button
+                  className="w-full text-lg py-6 mt-4"
                   disabled={cartItems.length === 0}
                   onClick={handleCheckout}
                 >
                   <CreditCard className="w-5 h-5 mr-2" />
                   Proceed to Checkout
                 </Button>
-                
+
                 <p className="text-xs text-center text-muted-foreground mt-2">
                   Taxes and fees calculated at checkout.
                 </p>

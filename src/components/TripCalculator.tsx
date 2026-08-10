@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -55,7 +55,7 @@ const TripCalculator = () => {
       1,
       Math.ceil(
         (new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) /
-          86400000,
+        86400000,
       ),
     );
   }, [trip.endDate, trip.startDate]);
@@ -212,7 +212,7 @@ const TripCalculator = () => {
             : budgetType === "luxury"
               ? payload.destinationMeta?.luxuryActivitiesRange
               : payload.destinationMeta?.midActivitiesRange ||
-                payload.destinationMeta?.budgetActivitiesRange;
+              payload.destinationMeta?.budgetActivitiesRange;
 
         const averagePerPersonPerDay =
           range && Number.isFinite(range[0]) && Number.isFinite(range[1])
@@ -255,23 +255,32 @@ const TripCalculator = () => {
       return;
     }
 
-    await addDoc(collection(db, "trips"), {
+    const tripId = "trip_" + Date.now();
+    const newPlannedTrip = {
+      id: tripId,
       userId: uid,
-      tripName: `${trip.startLocation || "My"} Trip`,
-      tripType: trip.tripType,
-      startDate: trip.startDate,
-      endDate: trip.endDate,
-      numberOfDays: days,
-      numberOfMembers: trip.numberOfMembers,
-      startLocation: trip.startLocation,
-      vehicleType,
-      fuelType: trip.fuelType,
-      fuelPrice,
-      mileage,
-      moods: trip.moods,
-      genres: trip.genres,
-      destinations: trip.destinations,
-      itinerary: trip.itinerary,
+      createdAt: new Date().toISOString(),
+      tripData: {
+        tripType: trip.tripType,
+        startDate: trip.startDate,
+        endDate: trip.endDate,
+        numberOfMembers: trip.numberOfMembers,
+        startLocation: trip.startLocation,
+        vehicleType,
+        fuelType: trip.fuelType,
+        budgetCap: trip.budgetCap,
+        moods: trip.moods,
+        destinations: trip.destinations,
+      },
+      financials: {
+        fuelExpenditure: fuelCost,
+        totalLodging: hotelCost,
+        tollPricing: tollCost,
+        foodCost,
+        placesCost,
+        miscCost: misc,
+        totalCost: total,
+      },
       costBreakdown: {
         fuel: fuelCost,
         toll: tollCost,
@@ -282,23 +291,30 @@ const TripCalculator = () => {
         total,
         perPerson,
       },
+      ecoData: { co2: co2kg },
       ecoScore: {
         co2kg,
         tip: co2kg > 60 ? "Try a rail segment or EV for lower emissions" : "Great eco-friendly profile",
       },
+      routeDetails: {
+        distanceKm: distance,
+        vehicleType,
+        fuelType: trip.fuelType,
+        startLocation: trip.startLocation || "Origin",
+        destination: trip.destinations[0] || "Destination",
+      },
+      itinerary: trip.itinerary,
       status: "draft",
       memberIds: [uid],
-      createdAt: serverTimestamp(),
-    });
+    };
 
-    localStorage.setItem(
-      "tourenvi.offline.trip",
-      JSON.stringify({
-        tripName: `${trip.startLocation || "My"} Trip`,
-        destinations: trip.destinations,
-        updatedAt: new Date().toISOString(),
-      }),
-    );
+    await setDoc(doc(db, "trips", tripId), newPlannedTrip);
+
+    const userKey = `tourenvi.planned.trips.${uid}`;
+    const existingRaw = localStorage.getItem(userKey);
+    const existing = existingRaw ? JSON.parse(existingRaw) : [];
+    const updated = [newPlannedTrip, ...existing.filter((t: any) => t.id !== newPlannedTrip.id)];
+    localStorage.setItem(userKey, JSON.stringify(updated));
 
     updateTrip("costBreakdown", {
       fuel: fuelCost,

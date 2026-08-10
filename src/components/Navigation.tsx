@@ -97,9 +97,9 @@ const Navigation = () => {
   }, [isOpen]);
 
   const navItems = [
-    { icon: MapPin, label: "Route Planner", href: "/map" },
-    { icon: BarChart3, label: "Dashboard", href: "/dashboard" },
-    { icon: Sparkles, label: "Attractions", href: "/attractions" },
+    // { icon: MapPin, label: "Route Planner", href: "/map" },
+    // { icon: BarChart3, label: "Dashboard", href: "/dashboard" },
+    // { icon: Sparkles, label: "Attractions", href: "/attractions" },
     { icon: Calculator, label: "Trip Builder", href: "/trip/new" },
     { icon: CalendarCheck, label: "Trip Planned", href: "/trips-planned" },
     { icon: MessageSquare, label: "AI Assistant", href: "/chatAI" },
