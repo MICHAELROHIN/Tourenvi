@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { useTrip } from "@/context/TripContext";
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type EmergencyCategory = "fuel" | "mechanics" | "brand_service" | "emergency_medical";
@@ -76,7 +78,7 @@ const SEARCH_RADIUS_KM = 5;
 const CATEGORY_TO_GOOGLE_TYPE: Record<EmergencyCategory, string> = {
   fuel: "gas_station",
   mechanics: "car_repair",
-  brand_service: "car_repair",
+  brand_service: "brand_service",
   emergency_medical: "hospital",
 };
 
@@ -214,6 +216,8 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
     []
   );
 
+  const { trip } = useTrip();
+
   // ─── GPS Geolocation ──────────────────────────────────────────────────────
 
   const handleScanLocation = useCallback(() => {
@@ -237,14 +241,35 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
           `GPS locked! Scanning ${SEARCH_RADIUS_KM}km radius around (${latitude.toFixed(3)}, ${longitude.toFixed(3)})`
         );
       },
-      (error) => {
+      async (error) => {
         console.warn("GPS lookup failed:", error);
         setIsLocating(false);
-        toast.info("GPS unavailable. Using default route coordinates.");
+
+        // Fallback: geocode user's active trip location if GPS is unavailable
+        const targetCity = trip?.startLocation || trip?.destinations?.[0] || "";
+        if (targetCity.trim()) {
+          try {
+            toast.info(`GPS unavailable. Scanning emergency radar around ${targetCity}...`);
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(targetCity)}&limit=1`
+            );
+            const data = await res.json();
+            if (data && data[0]) {
+              const lat = parseFloat(data[0].lat);
+              const lng = parseFloat(data[0].lon);
+              setCurrentCoords({ lat, lng });
+              lastFetchRef.current = "";
+              return;
+            }
+          } catch (gErr) {
+            console.warn("Fallback geocode failed:", gErr);
+          }
+        }
+        toast.info("GPS unavailable. Using default route location.");
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
-  }, []);
+  }, [trip]);
 
   // ─── Auto-fetch when coords or category change ────────────────────────────
 

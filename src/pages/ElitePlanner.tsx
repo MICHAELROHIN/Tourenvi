@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useTrip } from "@/context/TripContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
@@ -71,9 +71,20 @@ const trackerWidthClasses = [
   "w-full",
 ];
 
+const FRONTEND_HOTEL_CACHE = new Map<string, RealHotel[]>();
+
 const ElitePlanner = () => {
   const { trip, updateTrip } = useTrip();
+  const [searchParams] = useSearchParams();
   const [currentStage, setCurrentStage] = useState(0);
+
+  useEffect(() => {
+    const step = searchParams.get("step") || searchParams.get("stage");
+    if (step === "budget" || step === "4" || step === "5") {
+      setCurrentStage(4); // Stage index 4 is Budget (the 5th step)
+    }
+  }, [searchParams]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [carSuggestions, setCarSuggestions] = useState<Array<{ brand: string; model: string; fuel: string; mileage: number }>>([]);
   const [customCarName, setCustomCarName] = useState("");
@@ -251,6 +262,14 @@ const ElitePlanner = () => {
   // Fetch real hotels when entering Lodging stage (Stage 6) or when destination changes
   useEffect(() => {
     if (currentStage === 6 && targetDestination) {
+      const destKey = targetDestination.trim().toLowerCase();
+      if (FRONTEND_HOTEL_CACHE.has(destKey)) {
+        setRealHotels(FRONTEND_HOTEL_CACHE.get(destKey)!);
+        setHotelsLoading(false);
+        setHotelsError(null);
+        return;
+      }
+
       const fetchDestinationHotels = async () => {
         setHotelsLoading(true);
         setHotelsError(null);
@@ -314,6 +333,7 @@ const ElitePlanner = () => {
                 category,
               };
             });
+            FRONTEND_HOTEL_CACHE.set(destKey, mapped);
             setRealHotels(mapped);
           } else {
             setHotelsError("No hotels found for " + targetDestination);

@@ -634,44 +634,14 @@ const AdminDashboard: React.FC = () => {
     setLoadingTripsModal(true);
 
     try {
-      const q = query(collection(db, "trips"), where("userId", "==", user.uid || user.id));
+      const targetUid = user.uid || user.id;
+      const q = query(collection(db, "trips"), where("userId", "==", targetUid));
       const snap = await getDocs(q);
 
       if (!snap.empty) {
         setUserTripsModal(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
       } else {
-        setUserTripsModal([
-          {
-            id: "trip_demo_1",
-            tripName: "Mumbai ➔ Goa Coastal Highway Trip",
-            startLocation: "Mumbai",
-            destinations: ["Alibaug", "Ganpatipule", "Panaji (Goa)"],
-            numberOfDays: 4,
-            numberOfMembers: 3,
-            vehicleType: "EV (Tesla Model 3)",
-            fuelType: "Electric",
-            budgetLevel: "Comfort",
-            totalCost: 14850,
-            moods: ["Nature", "Beach", "Relaxation"],
-            costBreakdown: { fuel: 2400, toll: 850, hotel: 7200, food: 3200, places: 1200 },
-            createdAt: new Date(Date.now() - 86400000 * 3),
-          },
-          {
-            id: "trip_demo_2",
-            tripName: "Delhi ➔ Manali Mountain Expedition",
-            startLocation: "Delhi",
-            destinations: ["Chandigarh", "Kullu", "Manali Valley"],
-            numberOfDays: 5,
-            numberOfMembers: 2,
-            vehicleType: "Gas (SUV Endeavour)",
-            fuelType: "Diesel",
-            budgetLevel: "Luxury",
-            totalCost: 22400,
-            moods: ["Adventure", "Mountains", "Scenery"],
-            costBreakdown: { fuel: 5200, toll: 1100, hotel: 11500, food: 3400, places: 1200 },
-            createdAt: new Date(Date.now() - 86400000 * 7),
-          },
-        ]);
+        setUserTripsModal([]);
       }
     } catch (error) {
       console.error("Error loading user planned trips:", error);
@@ -789,14 +759,14 @@ const AdminDashboard: React.FC = () => {
     const isGoogle =
       user.authProvider === "google.com" ||
       user.providerId === "google.com" ||
-      user.email?.toLowerCase().endsWith("@gmail.com");
+      user.providerData?.[0]?.providerId === "google.com";
 
     return isGoogle ? (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
         <svg className="h-3 w-3 fill-current text-blue-400" viewBox="0 0 24 24">
           <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 15.96 0 12.48 0 5.8 0 0 5.8 0 12.48s5.8 12.48 12.48 12.48c3.6 0 6.64-1.187 8.88-3.52 2.32-2.32 3.013-5.573 3.013-8.213 0-.573-.053-1.147-.133-1.64H12.48z" />
         </svg>
-        {/* Google Account */}
+        Google Account
       </span>
     ) : (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -2559,80 +2529,112 @@ const AdminDashboard: React.FC = () => {
                 </div>
               ) : userTripsModal.length > 0 ? (
                 <div className="space-y-4">
-                  {userTripsModal.map((trip, idx) => (
-                    <div
-                      key={idx}
-                      className="p-5 rounded-xl border border-white/10 bg-[#051124]/50 space-y-3 relative overflow-hidden group hover:border-[#D4AF37]/50 transition-all"
-                    >
-                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-white/5 pb-3">
-                        <div>
-                          <h5 className="font-bold text-white text-base group-hover:text-[#D4AF37] transition-colors">
-                            {trip.tripName || `${trip.startLocation || "Origin"} Trip`}
-                          </h5>
-                          <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
-                            <MapPin className="h-3.5 w-3.5 text-[#D4AF37]" />
-                            <span>Route: <strong className="text-white">{trip.startLocation || "Origin"}</strong> ➔ {Array.isArray(trip.destinations) ? trip.destinations.join(" ➔ ") : trip.destinations || "Destination"}</span>
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xs font-bold text-emerald-400 font-mono">
-                            Total Estimate: ₹{trip.totalCost?.toLocaleString() || "14,850"}
+                  {userTripsModal.map((trip, idx) => {
+                    const startLoc = trip.startLocation || trip.routeDetails?.startLocation || trip.tripData?.startLocation || "Origin";
+                    const destList = Array.isArray(trip.destinations) && trip.destinations.length
+                      ? trip.destinations
+                      : Array.isArray(trip.tripData?.destinations) && trip.tripData.destinations.length
+                      ? trip.tripData.destinations
+                      : trip.routeDetails?.destination
+                      ? [trip.routeDetails.destination]
+                      : [];
+                    const destStr = destList.join(" ➔ ") || "Destination";
+                    const title = trip.tripName || `${startLoc} ➔ ${destStr} Trip`;
+                    const totalCostVal = trip.totalCost || trip.financials?.totalCost || trip.costBreakdown?.total || 0;
+                    const daysVal = trip.numberOfDays || trip.itinerary?.length || 3;
+                    const membersVal = trip.numberOfMembers || trip.tripData?.numberOfMembers || 1;
+                    const vehicleVal = trip.vehicleType || trip.routeDetails?.vehicleType || trip.tripData?.vehicleType || "Car";
+                    const fuelVal = trip.fuelType || trip.routeDetails?.fuelType || trip.tripData?.fuelType || "Petrol";
+                    const budgetVal = trip.budgetLevel || trip.tripData?.genres?.[0] || "Standard";
+                    const breakdown = trip.costBreakdown || (trip.financials ? {
+                      fuel: trip.financials.fuelExpenditure || 0,
+                      toll: trip.financials.tollPricing || 0,
+                      hotel: trip.financials.totalLodging || 0,
+                      food: trip.financials.foodCost || 0,
+                      places: trip.financials.placesCost || 0,
+                      misc: trip.financials.miscCost || 0,
+                    } : null);
+                    const moodsList = (Array.isArray(trip.moods) && trip.moods.length)
+                      ? trip.moods
+                      : (Array.isArray(trip.tripData?.moods) && trip.tripData.moods.length)
+                      ? trip.tripData.moods
+                      : [];
+
+                    return (
+                      <div
+                        key={idx}
+                        className="p-5 rounded-xl border border-white/10 bg-[#051124]/50 space-y-3 relative overflow-hidden group hover:border-[#D4AF37]/50 transition-all"
+                      >
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-white/5 pb-3">
+                          <div>
+                            <h5 className="font-bold text-white text-base group-hover:text-[#D4AF37] transition-colors">
+                              {title}
+                            </h5>
+                            <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
+                              <MapPin className="h-3.5 w-3.5 text-[#D4AF37]" />
+                              <span>Route: <strong className="text-white">{startLoc}</strong> ➔ {destStr}</span>
+                            </p>
                           </div>
-                          <span className="text-[10px] text-gray-400 uppercase tracking-wider">
-                            Level: {trip.budgetLevel || "Standard"}
+                          <div className="text-right">
+                            <div className="text-sm font-bold text-emerald-400 font-mono">
+                              Total Estimate: ₹{totalCostVal.toLocaleString()}
+                            </div>
+                            <span className="text-[10px] text-gray-400 uppercase tracking-wider">
+                              Level: {budgetVal}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-300">
+                            ⏱️ Duration: <strong>{daysVal} Days</strong>
+                          </span>
+                          <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-300">
+                            👥 Travelers: <strong>{membersVal} Persons</strong>
+                          </span>
+                          <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-300">
+                            🚗 Vehicle: <strong>{vehicleVal}</strong> ({fuelVal})
                           </span>
                         </div>
+
+                        {breakdown && (
+                          <div className="p-3 rounded-lg border border-white/5 bg-white/5 text-xs grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                            <div>
+                              <div className="text-[10px] text-gray-400 uppercase font-semibold">Fuel</div>
+                              <div className="font-mono text-white font-bold">₹{breakdown.fuel?.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-gray-400 uppercase font-semibold">Tolls</div>
+                              <div className="font-mono text-white font-bold">₹{breakdown.toll?.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-gray-400 uppercase font-semibold">Hotel</div>
+                              <div className="font-mono text-white font-bold">₹{breakdown.hotel?.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-gray-400 uppercase font-semibold">Food</div>
+                              <div className="font-mono text-white font-bold">₹{breakdown.food?.toLocaleString()}</div>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-gray-400 uppercase font-semibold">Places</div>
+                              <div className="font-mono text-white font-bold">₹{breakdown.places?.toLocaleString()}</div>
+                            </div>
+                          </div>
+                        )}
+
+                        {moodsList.length > 0 && (
+                          <div className="flex items-center gap-1.5 text-xs pt-1">
+                            <span className="text-[10px] text-gray-400 uppercase font-bold">Vibes:</span>
+                            {moodsList.map((m: string, mIdx: number) => (
+                              <span key={mIdx} className="px-2 py-0.5 rounded-md bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[10px] font-semibold">
+                                {m}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-
-                      <div className="flex flex-wrap gap-2 text-xs">
-                        <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-300">
-                          ⏱️ Duration: <strong>{trip.numberOfDays || 4} Days</strong>
-                        </span>
-                        <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-300">
-                          👥 Travelers: <strong>{trip.numberOfMembers || 2} Persons</strong>
-                        </span>
-                        <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-300">
-                          🚗 Vehicle: <strong>{trip.vehicleType || "Standard Car"}</strong> ({trip.fuelType || "Petrol"})
-                        </span>
-                      </div>
-
-                      {trip.costBreakdown && (
-                        <div className="p-3 rounded-lg border border-white/5 bg-white/5 text-xs grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
-                          <div>
-                            <div className="text-[10px] text-gray-400 uppercase font-semibold">Fuel</div>
-                            <div className="font-mono text-white font-bold">₹{trip.costBreakdown.fuel}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-gray-400 uppercase font-semibold">Tolls</div>
-                            <div className="font-mono text-white font-bold">₹{trip.costBreakdown.toll}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-gray-400 uppercase font-semibold">Hotel</div>
-                            <div className="font-mono text-white font-bold">₹{trip.costBreakdown.hotel}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-gray-400 uppercase font-semibold">Food</div>
-                            <div className="font-mono text-white font-bold">₹{trip.costBreakdown.food}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] text-gray-400 uppercase font-semibold">Places</div>
-                            <div className="font-mono text-white font-bold">₹{trip.costBreakdown.places}</div>
-                          </div>
-                        </div>
-                      )}
-
-                      {Array.isArray(trip.moods) && trip.moods.length > 0 && (
-                        <div className="flex items-center gap-1.5 text-xs pt-1">
-                          <span className="text-[10px] text-gray-400 uppercase font-bold">Vibes:</span>
-                          {trip.moods.map((m: string, idx: number) => (
-                            <span key={idx} className="px-2 py-0.5 rounded-md bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[10px] font-semibold">
-                              {m}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="p-8 text-center rounded-xl border border-white/10 bg-[#051124]/40 text-gray-400 text-xs space-y-2">
