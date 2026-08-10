@@ -1340,7 +1340,7 @@ const AdminDashboard: React.FC = () => {
                         icon={{
                           path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
                           scale: 6,
-                          fillColor: v.model.includes("EV") ? "#10B981" : "#D4AF37",
+                          fillColor: v.model?.includes("EV") ? "#10B981" : "#D4AF37",
                           fillOpacity: 0.9,
                           strokeWeight: 2,
                           strokeColor: "#FFF",
