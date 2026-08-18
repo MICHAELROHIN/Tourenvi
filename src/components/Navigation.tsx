@@ -16,6 +16,7 @@ import {
   LifeBuoy,
   Megaphone,
   CalendarCheck,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import HelpSupportModal from "@/components/shared/HelpSupportModal";
@@ -38,6 +39,7 @@ const Navigation = () => {
   const [isEmergencyRadarOpen, setIsEmergencyRadarOpen] = useState(false);
   const [activeAnnouncements, setActiveAnnouncements] = useState<any[]>([]);
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [imgError, setImgError] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,6 +49,7 @@ const Navigation = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      setImgError(false);
     });
     return () => unsubscribe();
   }, []);
@@ -97,9 +100,7 @@ const Navigation = () => {
   }, [isOpen]);
 
   const navItems = [
-    // { icon: MapPin, label: "Route Planner", href: "/map" },
-    // { icon: BarChart3, label: "Dashboard", href: "/dashboard" },
-    // { icon: Sparkles, label: "Attractions", href: "/attractions" },
+    { icon: Home, label: "Home", href: "/hero" },
     { icon: Calculator, label: "Trip Builder", href: "/trip/new" },
     { icon: CalendarCheck, label: "Trip Planned", href: "/trips-planned" },
     { icon: MessageSquare, label: "AI Assistant", href: "/chatAI" },
@@ -182,17 +183,20 @@ const Navigation = () => {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="rounded-full border border-border bg-background hover:bg-muted"
+                  className="rounded-full border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 overflow-hidden"
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                 >
-                  {user?.photoURL ? (
+                  {user?.photoURL && !imgError ? (
                     <img
                       src={user.photoURL}
                       alt="Profile"
                       className="w-8 h-8 rounded-full object-cover"
+                      onError={() => setImgError(true)}
                     />
                   ) : (
-                    <User className="w-5 h-5 text-foreground" />
+                    <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-sm flex items-center justify-center shadow-sm">
+                      {(user?.displayName?.[0] || user?.email?.[0] || "U").toUpperCase()}
+                    </div>
                   )}
                 </Button>
 
@@ -312,15 +316,16 @@ const Navigation = () => {
                 }}
                 className="flex items-center space-x-3 w-full text-left p-2 rounded-lg hover:bg-muted transition-colors"
               >
-                {user.photoURL ? (
+                {user.photoURL && !imgError ? (
                   <img
                     src={user.photoURL}
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover shrink-0"
+                    onError={() => setImgError(true)}
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                    <User className="w-5 h-5 text-primary" />
+                  <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold text-base flex items-center justify-center shrink-0 shadow-sm">
+                    {(user.displayName?.[0] || user.email?.[0] || "U").toUpperCase()}
                   </div>
                 )}
                 <div className="overflow-hidden">

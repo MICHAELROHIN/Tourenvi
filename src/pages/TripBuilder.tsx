@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,20 @@ const steps = [
 
 const TripBuilder = () => {
   const [activeStep, setActiveStep] = useState("0");
+  const navigate = useNavigate();
+
+  const handlePrev = () => {
+    const stepNum = Number(activeStep);
+    if (stepNum > 0) {
+      setActiveStep(String(stepNum - 1));
+    } else {
+      if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        navigate("/hero");
+      }
+    }
+  };
   const { trip, updateTrip, setTrip } = useTrip();
 
   useEffect(() => {
@@ -195,10 +210,7 @@ const TripBuilder = () => {
       <div className="flex justify-between">
         <Button
           variant="outline"
-          disabled={Number(activeStep) === 0}
-          onClick={() =>
-            setActiveStep(String(Math.max(0, Number(activeStep) - 1)))
-          }
+          onClick={handlePrev}
           className="border border-emerald-300 text-emerald-700 bg-white hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all duration-200 font-medium shadow-sm"
         >
           Back

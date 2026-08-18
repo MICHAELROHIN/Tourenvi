@@ -528,6 +528,12 @@ const ElitePlanner = () => {
   const handlePrev = () => {
     if (currentStage > 0) {
       setCurrentStage(currentStage - 1);
+    } else {
+      if (window.history.length > 1) {
+        navigate(-1);
+      } else {
+        navigate("/hero");
+      }
     }
   };
 
@@ -1272,7 +1278,7 @@ const ElitePlanner = () => {
             <Button 
               variant="outline" 
               onClick={handlePrev}
-              disabled={currentStage === 0 || isSubmitting}
+              disabled={isSubmitting}
               className="px-6 border border-emerald-300 text-emerald-700 bg-white hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all duration-200 font-medium shadow-sm"
             >
               <ArrowLeft size={16} className="mr-2" /> Back
