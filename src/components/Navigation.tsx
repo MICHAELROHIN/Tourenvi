@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,7 @@ import {
 import { cn } from "@/lib/utils";
 import HelpSupportModal from "@/components/shared/HelpSupportModal";
 import EmergencyRadarModal from "@/components/shared/EmergencyRadarModal";
+import { useAuth } from "@/context/AuthContext";
 
 // --- FIREBASE IMPORTS ---
 import { auth, db, logout } from "@/firebase";
@@ -40,10 +41,30 @@ const Navigation = () => {
   const [activeAnnouncements, setActiveAnnouncements] = useState<any[]>([]);
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [imgError, setImgError] = useState(false);
+  const { userDoc } = useAuth();
 
   const navigate = useNavigate();
   const location = useLocation();
   const profileRef = useRef<HTMLDivElement>(null);
+
+  // Resolve the best profile photo URL:
+  // Priority: Firestore userDoc profilePhoto > Firestore userDoc photoURL > Firebase Auth photoURL (Google)
+  const resolvedPhotoURL = useMemo(() => {
+    const firestorePhoto = userDoc?.profilePhoto || userDoc?.photoURL || userDoc?.profilePicture;
+    if (firestorePhoto) return firestorePhoto;
+    return user?.photoURL || null;
+  }, [userDoc, user]);
+
+  // Resolve the best display name for the fallback initial letter:
+  // Priority: Firestore userDoc name (registration name) > Firebase Auth displayName (Google name) > email
+  const resolvedDisplayName = useMemo(() => {
+    return userDoc?.name || user?.displayName || user?.email || "U";
+  }, [userDoc, user]);
+
+  // Get the first letter for the avatar fallback
+  const avatarInitial = useMemo(() => {
+    return (resolvedDisplayName[0] || "U").toUpperCase();
+  }, [resolvedDisplayName]);
 
   // Monitor Auth State
   useEffect(() => {
@@ -186,16 +207,17 @@ const Navigation = () => {
                   className="rounded-full border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 overflow-hidden"
                   onClick={() => setIsProfileOpen(!isProfileOpen)}
                 >
-                  {user?.photoURL && !imgError ? (
+                  {resolvedPhotoURL && !imgError ? (
                     <img
-                      src={user.photoURL}
+                      src={resolvedPhotoURL}
                       alt="Profile"
                       className="w-8 h-8 rounded-full object-cover"
+                      referrerPolicy="no-referrer"
                       onError={() => setImgError(true)}
                     />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-emerald-600 text-white font-bold text-sm flex items-center justify-center shadow-sm">
-                      {(user?.displayName?.[0] || user?.email?.[0] || "U").toUpperCase()}
+                      {avatarInitial}
                     </div>
                   )}
                 </Button>
@@ -212,7 +234,7 @@ const Navigation = () => {
                         className="w-full text-left p-2 rounded-lg hover:bg-muted transition-colors"
                       >
                         <p className="text-sm font-semibold truncate text-foreground">
-                          {user?.displayName || "Michael Rohin"}
+                          {resolvedDisplayName}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">
                           {user?.email || "michaelrohin@gmail.com"}
@@ -316,21 +338,22 @@ const Navigation = () => {
                 }}
                 className="flex items-center space-x-3 w-full text-left p-2 rounded-lg hover:bg-muted transition-colors"
               >
-                {user.photoURL && !imgError ? (
+                {resolvedPhotoURL && !imgError ? (
                   <img
-                    src={user.photoURL}
+                    src={resolvedPhotoURL}
                     alt="Profile"
                     className="w-10 h-10 rounded-full object-cover shrink-0"
+                    referrerPolicy="no-referrer"
                     onError={() => setImgError(true)}
                   />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold text-base flex items-center justify-center shrink-0 shadow-sm">
-                    {(user.displayName?.[0] || user.email?.[0] || "U").toUpperCase()}
+                    {avatarInitial}
                   </div>
                 )}
                 <div className="overflow-hidden">
                   <p className="text-sm font-semibold truncate text-foreground">
-                    {user.displayName || "Guest User"}
+                    {resolvedDisplayName}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">
                     {user.email}
