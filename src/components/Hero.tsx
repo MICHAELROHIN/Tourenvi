@@ -151,7 +151,7 @@ const Hero = () => {
                     className="px-6 py-2 text-sm font-semibold shadow-[0_18px_40px_-22px_rgba(34,197,94,0.8)] transition-all duration-300 hover:bg-primary-hover hover:shadow-[0_22px_46px_-24px_rgba(34,197,94,0.9)]"
                     onClick={() => navigate("/trip/new")}
                   >
-                    Start Planning Your Trip
+                    Plan My Journey
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                   {/* <Button
