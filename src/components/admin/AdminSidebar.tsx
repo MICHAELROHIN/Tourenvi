@@ -189,16 +189,14 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab }) 
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-semibold tracking-wide transition-all duration-300 relative group cursor-pointer ${
-                  isActive
+                className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-semibold tracking-wide transition-all duration-300 relative group cursor-pointer ${isActive
                     ? "text-[#D4AF37] bg-[#F8F9FA]/5 border-l-4 border-[#D4AF37] shadow-[inset_4px_0_15px_rgba(212,175,55,0.05)]"
                     : "text-gray-300 hover:text-white hover:bg-white/5 hover:translate-x-1"
-                }`}
+                  }`}
               >
                 <Icon
-                  className={`h-5 w-5 transition-transform duration-300 group-hover:scale-110 ${
-                    isActive ? "text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]" : "text-gray-400 group-hover:text-white"
-                  }`}
+                  className={`h-5 w-5 transition-transform duration-300 group-hover:scale-110 ${isActive ? "text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]" : "text-gray-400 group-hover:text-white"
+                    }`}
                 />
                 <span>{item.label}</span>
 

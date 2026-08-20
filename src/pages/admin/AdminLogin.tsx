@@ -5,11 +5,12 @@ import { db } from "@/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
 import { toast } from "sonner";
-import { Compass, Mail, KeyRound, Loader2, ArrowLeft } from "lucide-react";
+import { Compass, Mail, KeyRound, Loader2, ArrowLeft, Eye, EyeOff } from "lucide-react";
 
 const AdminLogin: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -44,11 +45,11 @@ const AdminLogin: React.FC = () => {
     try {
       // 1. Sign in with isolated adminAuth instance
       const credential = await signInWithEmailAndPassword(adminAuth, email.trim(), password);
-      
+
       // 2. Fetch User Profile from Firestore to check Role (Check admins collection first)
       const adminSnap = await getDoc(doc(db, "admins", credential.user.uid));
       const userDocSnap = adminSnap.exists() ? adminSnap : await getDoc(doc(db, "users", credential.user.uid));
-      
+
       if (!userDocSnap.exists()) {
         await signOut(adminAuth);
         toast.error("Account profile not found.");
@@ -67,9 +68,9 @@ const AdminLogin: React.FC = () => {
       // Success
       toast.success("Welcome back, Commander.");
       navigate("/admin", { replace: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Admin sign in error:", error);
-      const errCode = error?.code || "";
+      const errCode = (error as { code?: string })?.code || "";
       let errMsg = "Failed to sign in.";
       if (errCode === "auth/invalid-credential" || errCode === "auth/wrong-password" || errCode === "auth/user-not-found") {
         errMsg = "Invalid email or password.";
@@ -90,7 +91,7 @@ const AdminLogin: React.FC = () => {
 
       {/* Main Login Card */}
       <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl p-8 shadow-[0_12px_40px_rgba(5,17,36,0.8)] relative z-10 transition-all duration-300 hover:border-white/15">
-        
+
         {/* Top Branding */}
         <div className="text-center mb-8">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#D4AF37] text-[#0B2B5C] shadow-[0_0_20px_rgba(212,175,55,0.4)] mb-4">
@@ -122,13 +123,21 @@ const AdminLogin: React.FC = () => {
             <div className="relative">
               <KeyRound className="absolute left-3.5 top-3.5 h-4 w-4 text-gray-400" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
-                className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all duration-300"
+                className="w-full pl-11 pr-11 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all duration-300"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-3.5 top-3.5 text-gray-400 transition-colors hover:text-[#D4AF37]"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
           </div>
 

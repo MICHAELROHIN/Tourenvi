@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import {
   Calendar,
   MapPin,
@@ -22,10 +23,12 @@ import {
   CheckCircle2,
   ArrowRight,
   ShieldCheck,
+  Navigation,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { RoadTripBudgetCard } from "@/components/cost/RoadTripBudgetCard";
+import { RouteOverviewCard } from "@/components/route/RouteOverviewCard";
 
 export interface PlannedTrip {
   id: string;
@@ -80,19 +83,39 @@ export interface PlannedTrip {
 }
 
 const TripsPlanned = () => {
+  const { currentUser } = useAuth();
+  const uid = currentUser?.uid;
+  const storageKey = useMemo(() => uid ? `tourenvi.planned.trips.${uid}` : "tourenvi.planned.trips.guest", [uid]);
+
   const [plannedTrips, setPlannedTrips] = useState<PlannedTrip[]>([]);
   const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
   const [selectedTab, setSelectedTab] = useState<Record<string, "itinerary" | "breakdown" | "places">>({});
   const navigate = useNavigate();
 
-  // Load saved trips from localStorage and IndexedDB
+  const handleStartJourney = (plannedTrip: PlannedTrip, event?: React.MouseEvent) => {
+    if (event) event.stopPropagation();
+    const startLoc = plannedTrip.routeDetails?.startLocation || plannedTrip.tripData?.startLocation || "Origin";
+    const destLoc = plannedTrip.routeDetails?.destination || plannedTrip.tripData?.destinations?.[0] || "Destination";
+
+    try {
+      const journeyKey = uid ? `tourenvi.active.journey.${uid}` : "tourenvi.active.journey.guest";
+      localStorage.setItem(journeyKey, JSON.stringify(plannedTrip));
+    } catch (e) {
+      console.error("Error setting active journey:", e);
+    }
+
+    toast.success(`🚀 Journey Started! Travelling from ${startLoc} to ${destLoc}.`);
+    navigate("/live");
+  };
+
+  // Load saved trips from localStorage and IndexedDB (re-load when user changes)
   useEffect(() => {
     loadTrips();
-  }, []);
+  }, [storageKey]);
 
   const loadTrips = () => {
     try {
-      const raw = localStorage.getItem("tourenvi.planned.trips");
+      const raw = localStorage.getItem(storageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -142,7 +165,7 @@ const TripsPlanned = () => {
 
               setPlannedTrips(formattedTrips);
               setExpandedTripId(formattedTrips[0].id);
-              localStorage.setItem("tourenvi.planned.trips", JSON.stringify(formattedTrips));
+              localStorage.setItem(storageKey, JSON.stringify(formattedTrips));
             }
           };
         }
@@ -158,7 +181,7 @@ const TripsPlanned = () => {
 
     const updated = plannedTrips.filter((t) => t.id !== tripId);
     setPlannedTrips(updated);
-    localStorage.setItem("tourenvi.planned.trips", JSON.stringify(updated));
+    localStorage.setItem(storageKey, JSON.stringify(updated));
 
     // Also delete from IndexedDB
     try {
@@ -346,6 +369,14 @@ const TripsPlanned = () => {
 
                         <div className="flex items-center gap-2">
                           <Button
+                            onClick={(e) => handleStartJourney(plannedTrip, e)}
+                            className="bg-gt-gold hover:bg-yellow-500 text-emerald-950 font-bold px-4 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-transform active:scale-95 text-xs"
+                          >
+                            <Navigation size={14} className="text-emerald-950 animate-pulse" />
+                            <span>Start Journey</span>
+                          </Button>
+
+                          <Button
                             variant="ghost"
                             size="icon"
                             onClick={(e) => handleDeleteTrip(plannedTrip.id, e)}
@@ -468,6 +499,15 @@ const TripsPlanned = () => {
                               <Download size={14} className="mr-1.5" /> Print / Save PDF
                             </Button>
                           </div>
+
+                          {/* Pre-Day 1 Route Breakdown ("Where to Where") */}
+                          <RouteOverviewCard
+                            startLocation={originName}
+                            destination={destinationName}
+                            distanceKm={routeDetails.distanceKm || 450}
+                            showStartJourneyButton
+                            onStartJourney={() => handleStartJourney(plannedTrip)}
+                          />
 
                           <div className="space-y-6">
                             {itinerary && itinerary.length > 0 ? (

@@ -177,7 +177,7 @@ const AdminDashboard: React.FC = () => {
 
   const [adminSearch, setAdminSearch] = useState("");
   const [adminPage, setAdminPage] = useState(1);
-  
+
   const itemsPerPage = 5;
 
   const [selectedUserModal, setSelectedUserModal] = useState<any | null>(null);
@@ -484,7 +484,7 @@ const AdminDashboard: React.FC = () => {
             progress: newProgress,
             lat: updated.lat,
             lng: updated.lng,
-          }).catch(() => {});
+          }).catch(() => { });
 
           return updated;
         })
@@ -1024,22 +1024,20 @@ const AdminDashboard: React.FC = () => {
                         <td className="px-6 py-4">{renderAuthProviderBadge(user)}</td>
                         <td className="px-6 py-4">
                           <span
-                            className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                              user.role === "guide"
+                            className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${user.role === "guide"
                                 ? "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30"
                                 : user.role === "support"
-                                ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                                : "bg-blue-500/15 text-blue-400 border border-blue-500/30"
-                            }`}
+                                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                                  : "bg-blue-500/15 text-blue-400 border border-blue-500/30"
+                              }`}
                           >
                             {user.role || "user"}
                           </span>
                         </td>
                         <td className="px-6 py-4">
                           <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                              user.status === "suspended" ? "text-red-400" : "text-emerald-400"
-                            }`}
+                            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${user.status === "suspended" ? "text-red-400" : "text-emerald-400"
+                              }`}
                           >
                             {user.status === "suspended" ? (
                               <>
@@ -1070,11 +1068,10 @@ const AdminDashboard: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleToggleSuspension(user.id, user.status)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer active:scale-95 ${
-                                user.status === "suspended"
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer active:scale-95 ${user.status === "suspended"
                                   ? "border-emerald-500/20 hover:border-emerald-500 bg-white/5 hover:bg-emerald-500/15 text-emerald-400"
                                   : "border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400"
-                              }`}
+                                }`}
                               title={user.status === "suspended" ? "Unsuspend account" : "Suspend account"}
                             >
                               <UserX className="h-3.5 w-3.5" />
@@ -1186,9 +1183,8 @@ const AdminDashboard: React.FC = () => {
                         </td>
                         <td className="px-6 py-4">
                           <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                              user.status === "suspended" ? "text-red-400" : "text-emerald-400"
-                            }`}
+                            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${user.status === "suspended" ? "text-red-400" : "text-emerald-400"
+                              }`}
                           >
                             {user.status === "suspended" ? (
                               <>
@@ -1212,11 +1208,10 @@ const AdminDashboard: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleToggleSuspension(user.id, user.status)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer active:scale-95 ${
-                                user.status === "suspended"
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer active:scale-95 ${user.status === "suspended"
                                   ? "border-emerald-500/20 hover:border-emerald-500 bg-white/5 hover:bg-emerald-500/15 text-emerald-400"
                                   : "border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400"
-                              }`}
+                                }`}
                               title={user.status === "suspended" ? "Unsuspend account" : "Suspend account"}
                             >
                               <UserX className="h-3.5 w-3.5" />
@@ -1370,11 +1365,10 @@ const AdminDashboard: React.FC = () => {
                       setMapZoom(11);
                       setSelectedVehicle(v);
                     }}
-                    className={`p-4 rounded-xl border transition-all duration-300 cursor-pointer flex flex-col gap-2.5 group ${
-                      selectedVehicle?.regNo === v.regNo
+                    className={`p-4 rounded-xl border transition-all duration-300 cursor-pointer flex flex-col gap-2.5 group ${selectedVehicle?.regNo === v.regNo
                         ? "border-[#D4AF37] bg-[#D4AF37]/5 shadow-[0_0_15px_rgba(212,175,55,0.1)]"
                         : "border-white/10 bg-white/5 hover:border-white/20"
-                    }`}
+                      }`}
                   >
                     <div className="flex justify-between items-start">
                       <div>
@@ -1384,13 +1378,12 @@ const AdminDashboard: React.FC = () => {
                         <div className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">{v.model}</div>
                       </div>
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
-                          v.status === "In Transit"
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${v.status === "In Transit"
                             ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
                             : v.status === "Delayed"
-                            ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                            : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                        }`}
+                              ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                          }`}
                       >
                         {v.status}
                       </span>
@@ -1675,11 +1668,10 @@ const AdminDashboard: React.FC = () => {
                     <button
                       key={filter}
                       onClick={() => setSupportFilter(filter)}
-                      className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
-                        supportFilter === filter
+                      className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${supportFilter === filter
                           ? "bg-[#D4AF37] text-[#0B2B5C] shadow-md"
                           : "text-gray-400 hover:text-white"
-                      }`}
+                        }`}
                     >
                       {filter}
                     </button>
@@ -1734,22 +1726,20 @@ const AdminDashboard: React.FC = () => {
                             </td>
                             <td className="px-6 py-4">
                               <span
-                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${
-                                  inq.status === "Open"
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${inq.status === "Open"
                                     ? "bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.2)]"
                                     : inq.status === "In Progress"
-                                    ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                                    : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                }`}
+                                      ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                      : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                  }`}
                               >
                                 <span
-                                  className={`h-1.5 w-1.5 rounded-full ${
-                                    inq.status === "Open"
+                                  className={`h-1.5 w-1.5 rounded-full ${inq.status === "Open"
                                       ? "bg-red-400 animate-pulse"
                                       : inq.status === "In Progress"
-                                      ? "bg-amber-400"
-                                      : "bg-emerald-400"
-                                  }`}
+                                        ? "bg-amber-400"
+                                        : "bg-emerald-400"
+                                    }`}
                                 />
                                 {inq.status}
                               </span>
@@ -2326,13 +2316,12 @@ const AdminDashboard: React.FC = () => {
                             <td className="p-3 text-blue-400 font-medium">{ann.targetAudience}</td>
                             <td className="p-3">
                               <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                  ann.severity === "Urgent"
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${ann.severity === "Urgent"
                                     ? "bg-red-500/20 text-red-400 border border-red-500/30"
                                     : ann.severity === "High"
-                                    ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                                    : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                                }`}
+                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                      : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                                  }`}
                               >
                                 {ann.severity}
                               </span>
@@ -2340,11 +2329,10 @@ const AdminDashboard: React.FC = () => {
                             <td className="p-3">
                               <button
                                 onClick={() => handleToggleBroadcastStatus(ann.id, ann.isActive)}
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-all ${
-                                  ann.isActive
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-all ${ann.isActive
                                     ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                                     : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
-                                }`}
+                                  }`}
                               >
                                 {ann.isActive ? "Live / Active" : "Inactive"}
                               </button>
@@ -2534,10 +2522,10 @@ const AdminDashboard: React.FC = () => {
                     const destList = Array.isArray(trip.destinations) && trip.destinations.length
                       ? trip.destinations
                       : Array.isArray(trip.tripData?.destinations) && trip.tripData.destinations.length
-                      ? trip.tripData.destinations
-                      : trip.routeDetails?.destination
-                      ? [trip.routeDetails.destination]
-                      : [];
+                        ? trip.tripData.destinations
+                        : trip.routeDetails?.destination
+                          ? [trip.routeDetails.destination]
+                          : [];
                     const destStr = destList.join(" ➔ ") || "Destination";
                     const title = trip.tripName || `${startLoc} ➔ ${destStr} Trip`;
                     const totalCostVal = trip.totalCost || trip.financials?.totalCost || trip.costBreakdown?.total || 0;
@@ -2557,8 +2545,8 @@ const AdminDashboard: React.FC = () => {
                     const moodsList = (Array.isArray(trip.moods) && trip.moods.length)
                       ? trip.moods
                       : (Array.isArray(trip.tripData?.moods) && trip.tripData.moods.length)
-                      ? trip.tripData.moods
-                      : [];
+                        ? trip.tripData.moods
+                        : [];
 
                     return (
                       <div
@@ -2694,13 +2682,12 @@ const AdminDashboard: React.FC = () => {
                       Support Ticket #{selectedTicket.id?.substring(0, 6)}
                     </h3>
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        selectedTicket.status === "Open"
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${selectedTicket.status === "Open"
                           ? "bg-red-500/10 text-red-400 border border-red-500/20"
                           : selectedTicket.status === "In Progress"
-                          ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                          : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                      }`}
+                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                            : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        }`}
                     >
                       {selectedTicket.status}
                     </span>
@@ -2812,5 +2799,5 @@ const AdminDashboard: React.FC = () => {
     </div>
   );
 };
-
 export default AdminDashboard;
+

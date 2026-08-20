@@ -7,11 +7,12 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
 import { Leaf, MapPin, Coffee, Camera, Bed, CheckCircle2, Navigation } from "lucide-react";
-import { getRoute } from "@/utils/osmRouteService";
+import { getRoute, watchLiveLocation, clearLocationWatch } from "@/utils/Livelocationservice";
 import { MapContainer, Marker, Popup, Polyline, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { RoadTripBudgetCard } from "@/components/cost/RoadTripBudgetCard";
+import { RouteOverviewCard } from "@/components/route/RouteOverviewCard";
 
 delete (L.Icon.Default.prototype as any)._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -21,6 +22,25 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
   shadowUrl:
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+});
+
+// Custom pulsing "you are here" marker for the user's live GPS position
+const liveLocationIcon = L.divIcon({
+  className: "live-location-marker",
+  html: `
+    <div style="position:relative;width:22px;height:22px;">
+      <span style="position:absolute;inset:0;border-radius:9999px;background:rgba(37,99,235,0.35);animation:live-loc-pulse 1.8s ease-out infinite;"></span>
+      <span style="position:absolute;top:5px;left:5px;width:12px;height:12px;border-radius:9999px;background:#2563eb;border:2px solid #ffffff;box-shadow:0 0 0 1px rgba(0,0,0,0.15);"></span>
+    </div>
+    <style>
+      @keyframes live-loc-pulse {
+        0% { transform: scale(0.4); opacity: 0.8; }
+        100% { transform: scale(2.2); opacity: 0; }
+      }
+    </style>
+  `,
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
 });
 
 type RoutePoint = { lat: number; lng: number };
@@ -37,6 +57,24 @@ const FitRouteBounds = ({ points }: { points: RoutePoint[] }) => {
   return null;
 };
 
+/** Small overlay button that pans/zooms the map to the user's live GPS position. */
+const RecenterOnMeButton = ({ position }: { position: RoutePoint | null }) => {
+  const map = useMap();
+
+  if (!position) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={() => map.flyTo([position.lat, position.lng], 14, { duration: 0.75 })}
+      className="absolute top-4 right-4 z-[1000] bg-white/95 hover:bg-white text-blue-600 shadow-lg border border-gray-200 rounded-full p-2.5 transition-colors"
+      title="Center map on my live location"
+    >
+      <Navigation size={16} />
+    </button>
+  );
+};
+
 // Mock coordinates for India
 const center = { lat: 20.5937, lng: 78.9629 };
 
@@ -46,14 +84,17 @@ const EliteDashboard = () => {
   const uid = currentUser?.uid;
   const navigate = useNavigate();
 
-  // Load real calculation data from localStorage (populated by backend)
+  // Load real calculation data from localStorage (populated by backend) — scoped per user
   const calcData = useMemo(() => {
-    const saved = localStorage.getItem("tourenvi.trip.calculations");
+    const calcKey = uid ? `tourenvi.trip.calculations.${uid}` : "tourenvi.trip.calculations.guest";
+    const saved = localStorage.getItem(calcKey);
     return saved ? JSON.parse(saved) : null;
-  }, []);
+  }, [uid]);
 
   const [routePath, setRoutePath] = useState<RoutePoint[]>([]);
   const [activePieIndex, setActivePieIndex] = useState<number | null>(null);
+  const [liveUserPosition, setLiveUserPosition] = useState<RoutePoint | null>(null);
+  const [liveLocationError, setLiveLocationError] = useState<string | null>(null);
 
   const mockDistanceKm = calcData?.routeDetails?.distanceKm || 450;
   const fuelExpenditure = calcData?.financials?.fuelCost || 0;
@@ -146,6 +187,31 @@ const EliteDashboard = () => {
       cancelled = true;
     };
   }, [endLatLng, startLatLng]);
+
+  // Live-track the user's real-world GPS position for a "you are here" marker on the map
+  useEffect(() => {
+    const watchId = watchLiveLocation(
+      (position) => {
+        setLiveUserPosition({
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        });
+        setLiveLocationError(null);
+      },
+      (error) => {
+        console.warn("Live location watch error:", error);
+        setLiveLocationError(
+          error?.code === error?.PERMISSION_DENIED
+            ? "Location permission denied"
+            : "Live location unavailable"
+        );
+      }
+    );
+
+    return () => {
+      clearLocationWatch(watchId);
+    };
+  }, []);
 
   // Center is midpoint if coordinates exist
   const mapCenter = useMemo(() => {
@@ -473,6 +539,13 @@ const EliteDashboard = () => {
               </div>
             ) : null}
 
+            {/* Pre-Day 1 Route Breakdown ("Where to Where") */}
+            <RouteOverviewCard
+              startLocation={trip.startLocation || "Origin"}
+              destination={trip.destinations[0] || "Destination"}
+              distanceKm={mockDistanceKm}
+            />
+
             {itineraryDays.map((day, idx) => (
               <div key={idx} className="relative">
                 {/* Timeline connector */}
@@ -558,6 +631,12 @@ const EliteDashboard = () => {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               />
               <FitRouteBounds points={routePath} />
+              <RecenterOnMeButton position={liveUserPosition} />
+              {liveUserPosition ? (
+                <Marker position={liveUserPosition} icon={liveLocationIcon} zIndexOffset={1000}>
+                  <Popup>You are here (live GPS)</Popup>
+                </Marker>
+              ) : null}
               {startLatLng ? (
                 <Marker position={startLatLng}>
                   <Popup>Start point: {trip.startLocation || "Selected origin"}</Popup>

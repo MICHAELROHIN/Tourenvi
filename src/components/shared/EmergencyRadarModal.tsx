@@ -73,6 +73,11 @@ interface EmergencyRadarModalProps {
 const BACKEND_URL = "http://localhost:8000";
 const CACHE_KEY = "tourenvi_emergency_radar_cache";
 const SEARCH_RADIUS_KM = 5;
+// How far the vehicle has to move before we bother re-scanning. Too small a
+// value re-fetches constantly (GPS jitter is often 10-30m even standing
+// still); too large a value means the "5km radius" list goes stale while
+// actually driving. 300m is a reasonable middle ground for a moving vehicle.
+const RESCAN_DISTANCE_METERS = 300;
 
 /** Maps our UI category tabs to Google Places API type param */
 const CATEGORY_TO_GOOGLE_TYPE: Record<EmergencyCategory, string> = {
@@ -126,6 +131,12 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
 
   // Prevent double-fetching on mount
   const lastFetchRef = useRef<string>("");
+
+  // Live GPS tracking: watchPosition subscription id + the last coords we
+  // actually re-scanned from (used to compare against RESCAN_DISTANCE_METERS
+  // so we don't spam the backend on every tiny GPS jitter).
+  const watchIdRef = useRef<number | null>(null);
+  const lastScannedCoordsRef = useRef<{ lat: number; lng: number } | null>(null);
 
   // ─── Network status listener ──────────────────────────────────────────────
 
@@ -218,7 +229,7 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
 
   const { trip } = useTrip();
 
-  // ─── GPS Geolocation ──────────────────────────────────────────────────────
+  // ─── GPS Geolocation (one-shot, used for "Refresh GPS" + fallback) ────────
 
   const handleScanLocation = useCallback(() => {
     if (!navigator.geolocation) {
@@ -232,6 +243,7 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
+        lastScannedCoordsRef.current = { lat: latitude, lng: longitude };
         setCurrentCoords({ lat: latitude, lng: longitude });
         setHasGpsLock(true);
         setIsLocating(false);
@@ -257,6 +269,7 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
             if (data && data[0]) {
               const lat = parseFloat(data[0].lat);
               const lng = parseFloat(data[0].lon);
+              lastScannedCoordsRef.current = { lat, lng };
               setCurrentCoords({ lat, lng });
               lastFetchRef.current = "";
               return;
@@ -270,6 +283,47 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
       { enableHighAccuracy: true, timeout: 8000 }
     );
   }, [trip]);
+
+  // ─── Live GPS tracking while the modal is open ─────────────────────────────
+  // This is what makes the radar actually behave like a "radar" for a moving
+  // vehicle: instead of scanning once and going stale, we subscribe to
+  // continuous position updates and re-center the 5km search whenever the
+  // vehicle has moved far enough (RESCAN_DISTANCE_METERS) to matter.
+
+  useEffect(() => {
+    if (!isOpen || !navigator.geolocation) return;
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const last = lastScannedCoordsRef.current;
+        const movedMeters = last
+          ? haversineDistanceKm(last.lat, last.lng, latitude, longitude) * 1000
+          : Infinity;
+
+        setHasGpsLock(true);
+
+        if (movedMeters >= RESCAN_DISTANCE_METERS) {
+          lastScannedCoordsRef.current = { lat: latitude, lng: longitude };
+          lastFetchRef.current = ""; // allow the fetch effect below to re-run
+          setCurrentCoords({ lat: latitude, lng: longitude });
+        }
+      },
+      (error) => {
+        // Don't spam toasts on every watch error (e.g. brief signal loss);
+        // the one-shot handleScanLocation flow already surfaces failures.
+        console.warn("GPS watch error:", error.message);
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
+    );
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
+  }, [isOpen]);
 
   // ─── Auto-fetch when coords or category change ────────────────────────────
 
@@ -288,6 +342,7 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
     }
     if (!isOpen) {
       hasAutoScanned.current = false;
+      lastScannedCoordsRef.current = null;
     }
   }, [isOpen, handleScanLocation]);
 

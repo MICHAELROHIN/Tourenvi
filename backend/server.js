@@ -1,5 +1,3 @@
-// server.js (FINAL - Google-Only Price Estimation Model)
-
 import express from "express";
 import cors from "cors";
 import axios from "axios";
@@ -635,7 +633,7 @@ async function resolveWikidataImage(wikidataId) {
       }
     }
   } catch (e) {
-    // Silently fail, will use fallback
+   
   }
   return null;
 }
@@ -1101,9 +1099,144 @@ app.post("/api/predict-hotel-cost", (req, res) => {
         : "You can usually find same-week deals in this season",
   });
 });
+// ---------------------- GOOGLE MAPS REVERSE GEOCODE PROXY ----------------------
+// Proxies reverse geocoding requests through the backend so the API key stays
+// server-side. The frontend calls GET /api/reverse-geocode?lat=...&lng=...
 
-// Helper to geocode a place name using Nominatim
+const GOOGLE_GEOCODE_KEY = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_API_KEY;
+
+app.get("/api/reverse-geocode", async (req, res) => {
+  const { lat, lng } = req.query;
+
+  if (!lat || !lng) {
+    return res.status(400).json({ success: false, error: "Missing 'lat' and 'lng' query parameters." });
+  }
+
+  const latNum = parseFloat(lat);
+  const lngNum = parseFloat(lng);
+  if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+    return res.status(400).json({ success: false, error: "Invalid lat/lng values." });
+  }
+
+  // Try Google Maps Geocoding API first
+  if (GOOGLE_GEOCODE_KEY) {
+    try {
+      const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latNum},${lngNum}&key=${GOOGLE_GEOCODE_KEY}&result_type=locality|sublocality|administrative_area_level_2`;
+      const googleRes = await axios.get(googleUrl, { timeout: 5000 });
+      const data = googleRes.data;
+
+      if (data.status === "OK" && data.results && data.results.length > 0) {
+        const bestResult = data.results[0];
+        const components = bestResult.address_components || [];
+
+        // Extract meaningful place name parts
+        const sublocality = components.find(c => c.types.includes("sublocality_level_1") || c.types.includes("sublocality"))?.long_name;
+        const locality = components.find(c => c.types.includes("locality"))?.long_name;
+        const adminArea2 = components.find(c => c.types.includes("administrative_area_level_2"))?.long_name;
+        const adminArea1 = components.find(c => c.types.includes("administrative_area_level_1"))?.long_name;
+
+        // Build a concise "Area, City" or "City, State" label
+        const parts = [sublocality, locality, adminArea1].filter(
+          (v, i, arr) => v && arr.indexOf(v) === i // dedupe
+        );
+        const placeName = parts.slice(0, 3).join(", ") || bestResult.formatted_address;
+
+        return res.json({
+          success: true,
+          placeName,
+          formattedAddress: bestResult.formatted_address,
+          lat: latNum,
+          lon: lngNum,
+          source: "google",
+        });
+      }
+    } catch (err) {
+      console.warn("[reverse-geocode] Google Maps API failed, falling back:", err.message);
+    }
+  }
+
+  // Fallback: BigDataCloud (free, no key)
+  try {
+    const bdcUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latNum}&longitude=${lngNum}&localityLanguage=en`;
+    const bdcRes = await axios.get(bdcUrl, { timeout: 5000 });
+    const d = bdcRes.data;
+    if (d) {
+      const parts = [d.locality, d.city, d.principalSubdivision].filter(
+        (v, i, arr) => typeof v === "string" && v.trim().length > 0 && arr.indexOf(v) === i
+      );
+      if (parts.length > 0) {
+        return res.json({
+          success: true,
+          placeName: parts.slice(0, 3).join(", "),
+          formattedAddress: parts.join(", "),
+          lat: latNum,
+          lon: lngNum,
+          source: "bigdatacloud",
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("[reverse-geocode] BigDataCloud failed, falling back:", err.message);
+  }
+
+  // Fallback: OSM Nominatim
+  try {
+    const osmUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latNum}&lon=${lngNum}&zoom=14&addressdetails=1`;
+    const osmRes = await axios.get(osmUrl, {
+      headers: { "User-Agent": "Tourenvi/1.0 (student-project)", "Accept-Language": "en" },
+      timeout: 5000,
+    });
+    const d = osmRes.data;
+    if (d) {
+      const addr = d.address || {};
+      const parts = [
+        addr.suburb || addr.neighbourhood || addr.village || addr.town || addr.city_district,
+        addr.city || addr.county,
+        addr.state,
+      ].filter((v, i, arr) => typeof v === "string" && v.trim().length > 0 && arr.indexOf(v) === i);
+
+      const placeName = parts.length > 0 ? parts.join(", ") : (d.display_name || null);
+      if (placeName) {
+        return res.json({
+          success: true,
+          placeName,
+          formattedAddress: d.display_name || placeName,
+          lat: latNum,
+          lon: lngNum,
+          source: "osm",
+        });
+      }
+    }
+  } catch (err) {
+    console.warn("[reverse-geocode] OSM Nominatim failed:", err.message);
+  }
+
+  return res.status(404).json({ success: false, error: "Could not resolve coordinates to a place name." });
+});
+
+// ---------------------- FORWARD GEOCODE HELPER ----------------------
+// Tries Google Maps Geocoding API first for accuracy, falls back to Nominatim.
 async function geocodePlace(name) {
+  // 1. Try Google Maps Geocoding
+  if (GOOGLE_GEOCODE_KEY) {
+    try {
+      const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(name)}&key=${GOOGLE_GEOCODE_KEY}`;
+      const googleRes = await axios.get(googleUrl, { timeout: 5000 });
+      const data = googleRes.data;
+      if (data.status === "OK" && data.results && data.results.length > 0) {
+        const loc = data.results[0].geometry.location;
+        return {
+          lat: loc.lat,
+          lon: loc.lng,
+          display_name: data.results[0].formatted_address,
+        };
+      }
+    } catch (err) {
+      console.warn("[geocodePlace] Google failed for:", name, err.message);
+    }
+  }
+
+  // 2. Fallback: Nominatim
   try {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(name)}&limit=1`;
     const res = await axios.get(url, {
@@ -1209,10 +1342,10 @@ async function getAttractionImageUrl(placeName, destinationKey = "") {
   };
 
   const pool = lowercasePlace.includes("lake") ? imagePools.lake
-             : (lowercasePlace.includes("garden") || lowercasePlace.includes("park")) ? imagePools.garden
-             : (lowercasePlace.includes("waterfall") || lowercasePlace.includes("falls")) ? imagePools.waterfall
-             : lowercasePlace.includes("point") || lowercasePlace.includes("rock") ? imagePools.mountains
-             : imagePools.default;
+    : (lowercasePlace.includes("garden") || lowercasePlace.includes("park")) ? imagePools.garden
+      : (lowercasePlace.includes("waterfall") || lowercasePlace.includes("falls")) ? imagePools.waterfall
+        : lowercasePlace.includes("point") || lowercasePlace.includes("rock") ? imagePools.mountains
+          : imagePools.default;
 
   const fallback = pool[seed % pool.length];
   ATTRACTION_IMAGE_CACHE.set(cacheKey, fallback);
@@ -1451,7 +1584,7 @@ Respond ONLY with raw JSON (no markdown delimiters, no \`\`\`json wrappers) foll
                 image: item.type === "food"
                   ? (item.slot === "breakfast" ? "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=1200&auto=format&fit=crop&q=80"
                     : item.slot === "lunch" ? "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?w=1200&auto=format&fit=crop&q=80"
-                    : "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80")
+                      : "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80")
                   : (item.placeName ? await getAttractionImageUrl(item.placeName, destination) : null),
               }))
             );
@@ -1957,6 +2090,26 @@ app.get("/api/fuel-price", async (req, res) => {
 });
 
 // --------------------------- NEARBY EMERGENCY SERVICES (OpenStreetMap Overpass API - FREE) ---------------------------
+//
+// IMPORTANT: This endpoint used to fall back to hard-coded, fabricated places
+// (fake names + lat/lng computed as userLat +/- 0.005 etc.) whenever the
+// Overpass API failed or returned zero real results. Those coordinates do not
+// correspond to real businesses, which is why "Navigate" was sending users to
+// random unrelated buildings. That fallback has been removed entirely.
+// Instead this endpoint:
+//   1. Queries Overpass properly (longer timeout, more mirrors, real retries).
+//   2. Expands the search radius in steps (5km -> 10km -> 20km) ONLY if the
+//      initial radius has zero real results, so drivers in low-POI-density
+//      areas still get something rather than nothing.
+//   3. Always computes real haversine distance server-side and filters/sorts
+//      by it, so "5km radius" is enforced against the actual coordinates
+//      returned by OSM, not just trusted from the Overpass query.
+//   4. Caches short-lived results per rounded coordinate+type so that a
+//      vehicle moving and re-polling every few seconds doesn't hammer the
+//      public Overpass servers (and won't get rate-limited into failure).
+//   5. Returns an honest empty array (never fake data) if truly nothing is
+//      found nearby, with `source` and `radiusUsedMeters` telling the
+//      frontend exactly what happened.
 
 /**
  * Maps our frontend category types to Overpass QL filter expressions.
@@ -2016,16 +2169,104 @@ function resolveOpenStatus(tags) {
   }
 }
 
+/** Haversine distance in meters between two lat/lng points */
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+/** Round a coordinate to ~110m precision for cache-key bucketing */
+function roundCoord(n) {
+  return Math.round(n * 1000) / 1000; // 3 decimals ≈ 111m at the equator
+}
+
+// Short-lived cache: a moving vehicle polling every few seconds should not
+// re-hit the public Overpass servers for coordinates it was just at.
+const NEARBY_EMERGENCY_CACHE = new Map(); // key -> { timestamp, payload }
+const NEARBY_CACHE_TTL_MS = 45 * 1000;
+
+function getNearbyCacheKey(lat, lng, type, radiusMeters) {
+  return `${type}_${radiusMeters}_${roundCoord(lat)}_${roundCoord(lng)}`;
+}
+
+/** Build an Overpass QL query for the given filters/center/radius */
+function buildOverpassQuery(filters, latNum, lngNum, radiusMeters) {
+  const filterStatements = filters
+    .map((f) => `${f}(around:${radiusMeters},${latNum},${lngNum});`)
+    .join("\n      ");
+  return `
+    [out:json][timeout:20];
+    (
+      ${filterStatements}
+    );
+    out center body 40;
+  `;
+}
+
+// A handful of public Overpass mirrors. We try each, and retry once on
+// transient failure, before giving up on that mirror. A short 2.5s timeout
+// was the root cause of most "no results" -> fake-data fallbacks, so this
+// uses a realistic timeout that matches how long Overpass actually takes.
+const OVERPASS_SERVERS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.openstreetmap.ru/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+];
+
+/**
+ * Query Overpass for a given radius, trying every mirror (with one retry
+ * each) until one returns a real (non-error) response. Returns the raw
+ * elements array, or [] if every mirror failed outright (network/HTTP
+ * error) — as opposed to a mirror successfully confirming zero results.
+ */
+async function queryOverpassElements(filters, latNum, lngNum, radiusMeters) {
+  const overpassQuery = buildOverpassQuery(filters, latNum, lngNum, radiusMeters);
+  const body = `data=${encodeURIComponent(overpassQuery)}`;
+
+  for (const serverUrl of OVERPASS_SERVERS) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await axios.post(serverUrl, body, {
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Tourenvi/1.0 (student-project)",
+          },
+          timeout: 9000,
+        });
+        // A successful HTTP response (even with 0 elements) is a real
+        // answer from OSM — no need to keep trying other mirrors.
+        return Array.isArray(response.data?.elements) ? response.data.elements : [];
+      } catch (err) {
+        const reason = err.response ? `HTTP ${err.response.status}` : err.message;
+        console.warn(`Overpass ${serverUrl} attempt ${attempt} failed: ${reason}`);
+        // Only retry same server on timeout/network errors, not on a
+        // definitive HTTP error response (e.g. 400 bad query).
+        if (err.response) break;
+      }
+    }
+  }
+  // Every mirror failed to even respond — signal "unknown", not "confirmed empty".
+  return null;
+}
+
 app.get("/api/nearby-emergency", async (req, res) => {
-  const { lat, lng, type } = req.query;
+  const { lat, lng, type, radiusKm } = req.query;
 
   // Validate required params
   const latNum = parseFloat(lat);
   const lngNum = parseFloat(lng);
-  if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) {
+  if (!Number.isFinite(latNum) || !Number.isFinite(lngNum) ||
+    Math.abs(latNum) > 90 || Math.abs(lngNum) > 180) {
     return res.status(400).json({
       success: false,
-      error: "Missing or invalid 'lat' and 'lng' query parameters. Both must be valid numbers.",
+      error: "Missing or invalid 'lat' and 'lng' query parameters. Both must be valid numbers (lat in [-90,90], lng in [-180,180]).",
     });
   }
 
@@ -2037,103 +2278,75 @@ app.get("/api/nearby-emergency", async (req, res) => {
     });
   }
 
-  // Fast Reverse Geocoding to get City/Town Name for accurate fallbacks
+  // Base search radius defaults to 5km (the app's stated feature). Callers
+  // may request a different starting radius via ?radiusKm=.
+  const requestedRadiusKm = Number.isFinite(parseFloat(radiusKm)) ? Math.max(1, Math.min(50, parseFloat(radiusKm))) : 5;
+  const baseRadiusMeters = Math.round(requestedRadiusKm * 1000);
+
+  // Serve from short-lived cache if we scanned this exact area very recently
+  // (this is what makes "keeps scanning while the vehicle moves" cheap: the
+  // frontend can poll on every GPS update and we only actually hit Overpass
+  // when the vehicle has moved far enough that the rounded cache key changes,
+  // or the cache entry has expired).
+  const cacheKey = getNearbyCacheKey(latNum, lngNum, placeType, baseRadiusMeters);
+  const cached = NEARBY_EMERGENCY_CACHE.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < NEARBY_CACHE_TTL_MS) {
+    return res.json({ ...cached.payload, cached: true });
+  }
+
+  // Fast reverse geocoding — used only for human-readable address fallback
+  // text, never to fabricate a place.
   let cityName = "";
   try {
     const revUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latNum}&lon=${lngNum}`;
     const revRes = await axios.get(revUrl, {
       headers: { "User-Agent": "Tourenvi/1.0 (student-project)" },
-      timeout: 2000,
+      timeout: 2500,
     });
     if (revRes.data && revRes.data.address) {
       cityName = revRes.data.address.city || revRes.data.address.town || revRes.data.address.suburb || revRes.data.address.state_district || revRes.data.address.state || "";
     }
   } catch (revErr) {
-    // Non-blocking timeo  // Search Nominatim & Overpass for real verified nearby amenities
-  let elements = [];
-  const searchQueries = {
-    gas_station: "petrol pump fuel station",
-    car_repair: "car repair mechanic puncture",
-    brand_service: "car service center authorized",
-    hospital: "hospital emergency ER medical",
-  };
-  const categorySearchTerm = searchQueries[placeType] || "fuel station";
-
-  try {
-    const nomUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(categorySearchTerm)}&lat=${latNum}&lon=${lngNum}&bounded=1&viewbox=${lngNum - 0.08},${latNum + 0.08},${lngNum + 0.08},${latNum - 0.08}&limit=12`;
-    const nomRes = await axios.get(nomUrl, {
-      headers: { "User-Agent": "Tourenvi/1.0 (student-project)" },
-      timeout: 2500,
-    });
-    if (nomRes.data && Array.isArray(nomRes.data) && nomRes.data.length > 0) {
-      elements = nomRes.data.map((item, idx) => {
-        const parts = (item.display_name || "").split(",");
-        const realName = parts[0]?.trim() || categorySearchTerm;
-        const realStreet = parts.slice(1, 3).join(", ").trim() || (cityName ? `${cityName}` : "Nearby Highway");
-        return {
-          id: `nom_${item.place_id || idx}`,
-          type: item.type || "node",
-          lat: parseFloat(item.lat),
-          lon: parseFloat(item.lon),
-          tags: {
-            name: realName,
-            "addr:street": realStreet,
-          },
-        };
-      });
-    }
-  } catch (nomErr) {
-    // Fallback to Overpass if Nominatim fails
+    // Non-blocking timeout/fail
   }
 
-  if (elements.length === 0) {
-    const radiusMeters = 5000; // 5 km
-    const filters = EMERGENCY_OVERPASS_FILTERS[placeType] || EMERGENCY_OVERPASS_FILTERS.car_repair;
+  const filters = EMERGENCY_OVERPASS_FILTERS[placeType] || EMERGENCY_OVERPASS_FILTERS.car_repair;
 
-    const filterStatements = filters
-      .map((f) => `${f}(around:${radiusMeters},${latNum},${lngNum});`)
-      .join("\n    ");
+  // Try the requested radius first. If it comes back confirmed-empty (a real
+  // response with 0 elements — not a network failure), progressively widen
+  // the search rather than inventing data. We never widen past 4x the
+  // requested radius or 20km, whichever is smaller.
+  const radiusStepsMeters = [
+    baseRadiusMeters,
+    Math.min(baseRadiusMeters * 2, 20000),
+    Math.min(baseRadiusMeters * 4, 20000),
+  ].filter((v, i, arr) => arr.indexOf(v) === i); // dedupe
 
-    const overpassQuery = `
-      [out:json][timeout:5];
-      (
-        ${filterStatements}
-      );
-      out center body 15;
-    `;
+  let elements = null;
+  let radiusUsedMeters = baseRadiusMeters;
+  let overpassReachable = false;
 
-    const overpassServers = [
-      "https://overpass-api.de/api/interpreter",
-      "https://overpass.kumi.systems/api/interpreter",
-    ];
-
-    for (const serverUrl of overpassServers) {
-      try {
-        const overpassResponse = await axios.post(
-          serverUrl,
-          `data=${encodeURIComponent(overpassQuery)}`,
-          {
-            headers: {
-              "Content-Type": "application/x-www-form-urlencoded",
-              "User-Agent": "Tourenvi/1.0 (student-project)",
-            },
-            timeout: 2500,
-          }
-        );
-        if (overpassResponse.data && overpassResponse.data.elements && overpassResponse.data.elements.length > 0) {
-          elements = overpassResponse.data.elements;
-          break;
-        }
-      } catch (err) {
-        continue;
-      }
+  for (const radiusMeters of radiusStepsMeters) {
+    const result = await queryOverpassElements(filters, latNum, lngNum, radiusMeters);
+    if (result === null) {
+      // This particular attempt couldn't reach any mirror at all — don't
+      // widen the radius on a failure, just stop and report it honestly.
+      break;
     }
+    overpassReachable = true;
+    radiusUsedMeters = radiusMeters;
+    if (result.length > 0) {
+      elements = result;
+      break;
+    }
+    // Confirmed zero real results at this radius — try the next, wider step.
+    elements = [];
   }
 
-  // Transform elements into structured results
+  // Transform OSM elements into structured results
   const results = [];
 
-  for (const el of elements) {
+  for (const el of elements || []) {
     const tags = el.tags || {};
     const name = tags.name || tags["name:en"];
     if (!name) continue; // Skip unnamed places
@@ -2142,7 +2355,31 @@ app.get("/api/nearby-emergency", async (req, res) => {
     const elLng = el.lon || (el.center && el.center.lon);
     if (!elLat || !elLng) continue;
 
-    const address = tags["addr:street"] || (cityName ? `${cityName}` : `Near (${elLat.toFixed(3)}, ${elLng.toFixed(3)})`);
+    // Build address from OSM tags
+    const addrParts = [
+      tags["addr:street"],
+      tags["addr:suburb"] || tags["addr:neighbourhood"] || tags["addr:village"] || tags["addr:city"],
+      tags["addr:state"],
+    ].filter(Boolean);
+    const address = addrParts.length > 0
+      ? addrParts.join(", ")
+      : (tags["addr:full"] || `Near (${elLat.toFixed(3)}, ${elLng.toFixed(3)})`);
+
+    // Resolve open/closed status
+    let isOpenNow = null;
+    if (tags.opening_hours) {
+      const raw = String(tags.opening_hours).trim();
+      if (/^24\s*[\/\\]\s*7$/i.test(raw)) {
+        isOpenNow = true;
+      } else {
+        try {
+          const oh = new OpeningHours(raw, { address: { country_code: "in" } });
+          isOpenNow = oh.getState();
+        } catch {
+          isOpenNow = null;
+        }
+      }
+    }
 
     const typeTags = [];
     if (tags.brand) typeTags.push(tags.brand);
@@ -2151,18 +2388,27 @@ app.get("/api/nearby-emergency", async (req, res) => {
     if (tags["fuel:octane_95"] === "yes" || tags["fuel:petrol"] === "yes" || tags["fuel:gasoline"] === "yes") typeTags.push("Petrol");
     if (tags["fuel:cng"] === "yes") typeTags.push("CNG");
     if (tags["socket:type2"] || tags["socket:ccs2"] || tags["socket:chademo"]) typeTags.push("EV Charging");
+    if (tags.emergency === "yes") typeTags.push("Emergency");
+    if (tags.healthcare) typeTags.push(tags.healthcare);
 
     const phone = tags.phone || tags["contact:phone"] || tags["phone:emergency"] || null;
 
+    // Real distance from the driver's actual current coordinates to this
+    // real place — this is what enforces "within Xkm radius", not trust in
+    // whatever the Overpass mirror returned.
+    const distanceMeters = haversineMeters(latNum, lngNum, elLat, elLng);
+    if (distanceMeters > radiusUsedMeters) continue; // safety net past `around:` filter (way centroids etc.)
+
     results.push({
-      id: `place_${el.id}`,
+      id: `osm_${el.type}_${el.id}`,
       name,
       address,
-      rating: 4.6,
-      totalRatings: 180,
-      isOpenNow: true,
+      rating: null, // OSM doesn't provide ratings — we no longer fabricate one
+      totalRatings: 0,
+      isOpenNow: isOpenNow ?? null,
       location: { lat: elLat, lng: elLng },
-      mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name + " " + address)}`,
+      distanceMeters: Math.round(distanceMeters),
+      mapsUrl: `https://www.google.com/maps/dir/?api=1&destination=${elLat},${elLng}`,
       types: typeTags.length > 0 ? typeTags : [placeType.replace(/_/g, " ")],
       businessStatus: null,
       icon: null,
@@ -2172,141 +2418,236 @@ app.get("/api/nearby-emergency", async (req, res) => {
     });
   }
 
-  // Guaranteed category-accurate search links if API queries fail
-  if (results.length === 0) {
-    const locArea = cityName ? `${cityName}` : `Your Location`;
+  // Closest first — real distance, not insertion order.
+  results.sort((a, b) => a.distanceMeters - b.distanceMeters);
 
-    if (placeType === "hospital") {
-      results.push(
-        {
-          id: `hosp_1`,
-          name: `24/7 Emergency Hospital & Trauma Center`,
-          address: `Hospitals & Emergency ER near ${locArea}`,
-          rating: 4.9,
-          totalRatings: 320,
-          isOpenNow: true,
-          location: { lat: latNum + 0.005, lng: lngNum + 0.005 },
-          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("hospital emergency ER medical")}&center=${latNum},${lngNum}`,
-          types: ["24/7 ER", "Trauma ICU", "Ambulance Hub"],
-          phone: "108",
-          brand: "National Health ER",
-        },
-        {
-          id: `hosp_2`,
-          name: `Apollo / Fortis Emergency Medical Ward`,
-          address: `Multi-Specialty Emergency Care near ${locArea}`,
-          rating: 4.8,
-          totalRatings: 210,
-          isOpenNow: true,
-          location: { lat: latNum - 0.007, lng: lngNum + 0.006 },
-          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("hospital emergency care")}&center=${latNum},${lngNum}`,
-          types: ["Multi-Specialty", "Emergency Ward", "Blood Bank"],
-          phone: "112",
-          brand: "Apollo Care",
-        }
-      );
-    } else if (placeType === "brand_service") {
-      results.push(
-        {
-          id: `brand_1`,
-          name: `Maruti Suzuki & Tata Motors Authorized 24/7 RSA`,
-          address: `Authorized Car Service Hubs near ${locArea}`,
-          rating: 4.8,
-          totalRatings: 280,
-          isOpenNow: true,
-          location: { lat: latNum + 0.006, lng: lngNum - 0.007 },
-          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("car authorized service center Maruti Tata Hyundai")}&center=${latNum},${lngNum}`,
-          types: ["Authorized RSA", "Computer Diagnostics", "Engine Repair"],
-          phone: "1800 102 1800",
-          brand: "Maruti Suzuki / Tata Motors",
-        },
-        {
-          id: `brand_2`,
-          name: `Hyundai & Mahindra Authorized Emergency Service Hub`,
-          address: `Authorized Service Centers near ${locArea}`,
-          rating: 4.7,
-          totalRatings: 195,
-          isOpenNow: true,
-          location: { lat: latNum - 0.008, lng: lngNum - 0.009 },
-          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("Hyundai Mahindra authorized car service center")}&center=${latNum},${lngNum}`,
-          types: ["Authorized RSA", "Breakdown Crane Patrol", "Spare Parts"],
-          phone: "1800 102 4645",
-          brand: "Hyundai / Mahindra",
-        }
-      );
-    } else if (placeType === "car_repair") {
-      results.push(
-        {
-          id: `mech_1`,
-          name: `24/7 Mobile Mechanic Patrol & Hydraulic Towing`,
-          address: `Car Repair & Tire Puncture Shops near ${locArea}`,
-          rating: 4.8,
-          totalRatings: 180,
-          isOpenNow: true,
-          location: { lat: latNum + 0.004, lng: lngNum - 0.005 },
-          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("car repair mechanic puncture towing")}&center=${latNum},${lngNum}`,
-          types: ["Tire Puncture", "Jumpstart", "Flatbed Towing"],
-          phone: "1033",
-          brand: "NHAI Highway Patrol",
-        },
-        {
-          id: `mech_2`,
-          name: `Express Auto Repair & Breakdown Clinic`,
-          address: `Auto Mechanic Garages near ${locArea}`,
-          rating: 4.6,
-          totalRatings: 145,
-          isOpenNow: true,
-          location: { lat: latNum - 0.006, lng: lngNum - 0.008 },
-          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("car repair mechanic workshop")}&center=${latNum},${lngNum}`,
-          types: ["Engine Diagnostics", "AC & Electrical", "Brake Overhaul"],
-          phone: "1800 209 8282",
-          brand: "Express Auto RSA",
-        }
-      );
-    } else {
-      results.push(
-        {
-          id: `fuel_1`,
-          name: `IndianOil 24/7 Swagat Fuel Station & EV Supercharger`,
-          address: `IndianOil & BPCL Petrol Pumps near ${locArea}`,
-          rating: 4.7,
-          totalRatings: 540,
-          isOpenNow: true,
-          location: { lat: latNum + 0.003, lng: lngNum + 0.004 },
-          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("IndianOil BPCL petrol pump fuel station")}&center=${latNum},${lngNum}`,
-          types: ["Petrol", "Diesel", "CNG", "EV Fast Charger"],
-          phone: "1800 233 3555",
-          brand: "IndianOil",
-        },
-        {
-          id: `fuel_2`,
-          name: `HPCL Highway Fuel Hub & Tata Power 60kW EV Fast Charger`,
-          address: `HPCL & Shell Petrol Pumps near ${locArea}`,
-          rating: 4.6,
-          totalRatings: 390,
-          isOpenNow: true,
-          location: { lat: latNum - 0.005, lng: lngNum + 0.007 },
-          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("HPCL petrol pump fuel station EV charger")}&center=${latNum},${lngNum}`,
-          types: ["Petrol", "Diesel", "CCS2 EV Charger"],
-          phone: "1800 209 5161",
-          brand: "HPCL",
-        }
-      );
-    }
-  }  );
-    }
-  }
-
-  return res.json({
+  const payload = {
     success: true,
     count: results.length,
     searchCenter: { lat: latNum, lng: lngNum },
     cityName,
-    radiusMeters,
+    requestedRadiusMeters: baseRadiusMeters,
+    radiusUsedMeters, // may be wider than requested if we had to expand to find anything
+    radiusExpanded: radiusUsedMeters > baseRadiusMeters,
     placeType,
-    source: elements.length > 0 ? "openstreetmap" : "verified_city_radar",
+    // "openstreetmap": got real data. "no_results_in_range": reached OSM
+    // fine, genuinely nothing nearby. "overpass_unreachable": every mirror
+    // failed — this is the ONLY case that should be surfaced as an error to
+    // the user, and we never substitute fake data for it.
+    source: results.length > 0
+      ? "openstreetmap"
+      : overpassReachable
+        ? "no_results_in_range"
+        : "overpass_unreachable",
     data: results,
-  });
+  };
+
+  // Only cache genuine outcomes (real data or confirmed-empty), never a
+  // transient "servers unreachable" state — that should be retried promptly.
+  if (payload.source !== "overpass_unreachable") {
+    NEARBY_EMERGENCY_CACHE.set(cacheKey, { timestamp: Date.now(), payload });
+    // Opportunistic cleanup so this Map doesn't grow unbounded on a
+    // long-running server.
+    if (NEARBY_EMERGENCY_CACHE.size > 500) {
+      const cutoff = Date.now() - NEARBY_CACHE_TTL_MS;
+      for (const [k, v] of NEARBY_EMERGENCY_CACHE) {
+        if (v.timestamp < cutoff) NEARBY_EMERGENCY_CACHE.delete(k);
+      }
+    }
+  }
+
+  if (payload.source === "overpass_unreachable") {
+    return res.status(503).json({
+      ...payload,
+      success: false,
+      error: "Live map data is temporarily unreachable. Please retry — no fabricated results are shown.",
+    });
+  }
+
+  return res.json(payload);
+});
+
+// --------------------------- REVERSE GEOCODE (GPS → Place Name) ---------------------------
+app.get("/api/reverse-geocode", async (req, res) => {
+  const { lat, lng } = req.query;
+
+  if (!lat || !lng) {
+    return res.status(400).json({ success: false, error: "Missing lat or lng query parameters." });
+  }
+
+  const latitude = parseFloat(lat);
+  const longitude = parseFloat(lng);
+
+  if (isNaN(latitude) || isNaN(longitude)) {
+    return res.status(400).json({ success: false, error: "Invalid lat or lng values." });
+  }
+
+  // Use Google Places API key (same key works for Geocoding API)
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_API_KEY;
+
+  if (!apiKey) {
+    console.warn("[reverse-geocode] No Google API key found in environment. Falling back to OSM.");
+    // Fallback to OSM Nominatim if no Google key
+    try {
+      const osmUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
+      const osmRes = await axios.get(osmUrl, {
+        headers: { "User-Agent": "Tourenvi/1.0", "Accept-Language": "en" },
+        timeout: 8000,
+      });
+      const data = osmRes.data;
+      const addr = data.address || {};
+      const parts = [
+        addr.suburb || addr.neighbourhood || addr.village || addr.hamlet || addr.town || addr.city_district,
+        addr.city || addr.county || addr.state_district,
+        addr.state,
+      ].filter((v) => typeof v === "string" && v.trim().length > 0);
+      const deduped = [...new Set(parts)];
+      const placeName = deduped.length > 0 ? deduped.join(", ") : data.display_name || null;
+      return res.json({ success: !!placeName, placeName, source: "osm" });
+    } catch (osmErr) {
+      console.error("[reverse-geocode] OSM fallback also failed:", osmErr.message);
+      return res.status(500).json({ success: false, error: "Reverse geocoding failed." });
+    }
+  }
+
+  try {
+    // Use Google Geocoding API with result_type to get precise location
+    const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}&result_type=sublocality|locality|neighborhood|route&language=en`;
+
+    const googleRes = await axios.get(googleUrl, { timeout: 8000 });
+    const data = googleRes.data;
+
+    if (data.status === "OK" && data.results && data.results.length > 0) {
+      // Try to find the most precise result
+      // Priority: sublocality_level_1 > neighborhood > locality > route
+      let bestResult = null;
+
+      for (const result of data.results) {
+        const types = result.types || [];
+        if (types.includes("sublocality_level_1") || types.includes("sublocality")) {
+          bestResult = result;
+          break;
+        }
+        if (!bestResult && (types.includes("neighborhood") || types.includes("locality"))) {
+          bestResult = result;
+        }
+      }
+
+      if (!bestResult) {
+        bestResult = data.results[0];
+      }
+
+      // Extract a clean place name from address components
+      const components = bestResult.address_components || [];
+      const parts = [];
+
+      // Get neighborhood / sublocality
+      const sublocality = components.find(
+        (c) => c.types.includes("sublocality_level_1") || c.types.includes("sublocality") || c.types.includes("neighborhood")
+      );
+      if (sublocality) parts.push(sublocality.long_name);
+
+      // Get locality (city)
+      const locality = components.find((c) => c.types.includes("locality"));
+      if (locality && locality.long_name !== (sublocality && sublocality.long_name)) {
+        parts.push(locality.long_name);
+      }
+
+      // Get state
+      const state = components.find((c) => c.types.includes("administrative_area_level_1"));
+      if (state) parts.push(state.long_name);
+
+      const placeName = parts.length > 0 ? parts.join(", ") : bestResult.formatted_address;
+
+      console.log(`[reverse-geocode] Resolved (${latitude}, ${longitude}) → "${placeName}" via Google`);
+      return res.json({ success: true, placeName, source: "google" });
+    }
+
+    // If Google returned no results with specific types, try without result_type filter
+    const fallbackUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}&language=en`;
+    const fallbackRes = await axios.get(fallbackUrl, { timeout: 8000 });
+    const fallbackData = fallbackRes.data;
+
+    if (fallbackData.status === "OK" && fallbackData.results && fallbackData.results.length > 0) {
+      // Pick the result that's most "place-like" (not a street address or plus code)
+      let chosen = fallbackData.results.find((r) => {
+        const types = r.types || [];
+        return (
+          types.includes("sublocality") ||
+          types.includes("locality") ||
+          types.includes("neighborhood") ||
+          types.includes("political")
+        );
+      });
+
+      if (!chosen) {
+        chosen = fallbackData.results[0];
+      }
+
+      const components = chosen.address_components || [];
+      const parts = [];
+
+      const sublocality = components.find(
+        (c) => c.types.includes("sublocality_level_1") || c.types.includes("sublocality") || c.types.includes("neighborhood")
+      );
+      if (sublocality) parts.push(sublocality.long_name);
+
+      const locality = components.find((c) => c.types.includes("locality"));
+      if (locality && locality.long_name !== (sublocality && sublocality.long_name)) {
+        parts.push(locality.long_name);
+      }
+
+      const state = components.find((c) => c.types.includes("administrative_area_level_1"));
+      if (state) parts.push(state.long_name);
+
+      const placeName = parts.length > 0 ? parts.join(", ") : chosen.formatted_address;
+
+      console.log(`[reverse-geocode] Resolved (${latitude}, ${longitude}) → "${placeName}" via Google (fallback)`);
+      return res.json({ success: true, placeName, source: "google" });
+    }
+
+    // Google failed entirely, fall back to OSM
+    console.warn(`[reverse-geocode] Google returned status: ${data.status}. Falling back to OSM.`);
+    const osmUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
+    const osmRes = await axios.get(osmUrl, {
+      headers: { "User-Agent": "Tourenvi/1.0", "Accept-Language": "en" },
+      timeout: 8000,
+    });
+    const osmData = osmRes.data;
+    const addr = osmData.address || {};
+    const osmParts = [
+      addr.suburb || addr.neighbourhood || addr.village || addr.hamlet || addr.town || addr.city_district,
+      addr.city || addr.county || addr.state_district,
+      addr.state,
+    ].filter((v) => typeof v === "string" && v.trim().length > 0);
+    const deduped = [...new Set(osmParts)];
+    const placeName = deduped.length > 0 ? deduped.join(", ") : osmData.display_name || null;
+
+    console.log(`[reverse-geocode] Resolved (${latitude}, ${longitude}) → "${placeName}" via OSM`);
+    return res.json({ success: !!placeName, placeName, source: "osm" });
+  } catch (err) {
+    console.error("[reverse-geocode] Error:", err.message);
+    // Final fallback to OSM
+    try {
+      const osmUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
+      const osmRes = await axios.get(osmUrl, {
+        headers: { "User-Agent": "Tourenvi/1.0", "Accept-Language": "en" },
+        timeout: 8000,
+      });
+      const osmData = osmRes.data;
+      const addr = osmData.address || {};
+      const osmParts = [
+        addr.suburb || addr.neighbourhood || addr.village || addr.hamlet || addr.town || addr.city_district,
+        addr.city || addr.county || addr.state_district,
+        addr.state,
+      ].filter((v) => typeof v === "string" && v.trim().length > 0);
+      const deduped = [...new Set(osmParts)];
+      const placeName = deduped.length > 0 ? deduped.join(", ") : osmData.display_name || null;
+      return res.json({ success: !!placeName, placeName, source: "osm" });
+    } catch (osmErr) {
+      return res.status(500).json({ success: false, error: "All reverse geocoding providers failed." });
+    }
+  }
 });
 
 // --------------------------- HEALTH CHECK (for Render) ---------------------------

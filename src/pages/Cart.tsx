@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Toaster, toast } from "react-hot-toast";
 import {
@@ -20,6 +20,7 @@ import {
   ShoppingBag,
   CreditCard
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 // Matches the structure saved in Hotels.tsx
 interface CartItem {
@@ -37,12 +38,14 @@ interface CartItem {
 }
 
 const Cart = () => {
+  const { currentUser } = useAuth();
+  const cartKey = useMemo(() => currentUser?.uid ? `tripCart.${currentUser.uid}` : "tripCart.guest", [currentUser?.uid]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [total, setTotal] = useState(0);
 
   // Load items from local storage on mount
   useEffect(() => {
-    const savedCart = localStorage.getItem("tripCart");
+    const savedCart = localStorage.getItem(cartKey);
     if (savedCart) {
       const parsedCart: CartItem[] = JSON.parse(savedCart);
       setCartItems(parsedCart);
@@ -62,7 +65,7 @@ const Cart = () => {
   const removeItem = (indexToRemove: number) => {
     const updatedCart = cartItems.filter((_, index) => index !== indexToRemove);
     setCartItems(updatedCart);
-    localStorage.setItem("tripCart", JSON.stringify(updatedCart));
+    localStorage.setItem(cartKey, JSON.stringify(updatedCart));
     calculateTotal(updatedCart);
     toast.success("Item removed from cart");
   };

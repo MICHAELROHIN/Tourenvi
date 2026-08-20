@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
+  Eye,
+  EyeOff,
   KeyRound,
   Leaf,
   Mail,
@@ -43,6 +45,7 @@ const Login: React.FC = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState(""); // Added Phone State
   const [isRecoveryOpen, setIsRecoveryOpen] = useState(false);
 
@@ -324,14 +327,22 @@ const Login: React.FC = () => {
             <div className="relative mb-4 w-full">
               <KeyRound className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 peer-focus:text-[#2ecc71] transition-colors" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
                 minLength={6}
                 required
-                className="peer w-full rounded-xl border-2 border-transparent bg-[#f0f4f8] px-4 py-3 pl-11 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:border-[#2ecc71]"
+                className="peer w-full rounded-xl border-2 border-transparent bg-[#f0f4f8] px-4 py-3 pl-11 pr-11 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:border-[#2ecc71]"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-[#2ecc71]"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
 
             <button
@@ -386,13 +397,21 @@ const Login: React.FC = () => {
             <div className="relative mb-3 w-full">
               <KeyRound className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 peer-focus:text-[#2ecc71] transition-colors" />
               <input
-                type="password"
+                type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
                 required
-                className="peer w-full rounded-xl border-2 border-transparent bg-[#f0f4f8] px-4 py-3 pl-11 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:border-[#2ecc71]"
+                className="peer w-full rounded-xl border-2 border-transparent bg-[#f0f4f8] px-4 py-3 pl-11 pr-11 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:border-[#2ecc71]"
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-[#2ecc71]"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
 
             <button
