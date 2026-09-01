@@ -6,7 +6,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
-import { Leaf, MapPin, Coffee, Camera, Bed, CheckCircle2, Navigation } from "lucide-react";
+import { Leaf, MapPin, Coffee, Camera, Bed, CheckCircle2, Navigation, Sparkles } from "lucide-react";
 import { getRoute, watchLiveLocation, clearLocationWatch } from "@/utils/Livelocationservice";
 import { MapContainer, Marker, Popup, Polyline, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
@@ -49,28 +49,30 @@ const FitRouteBounds = ({ points }: { points: RoutePoint[] }) => {
   const map = useMap();
 
   useEffect(() => {
-    if (points.length < 2) return;
-    const bounds = L.latLngBounds(points.map((point) => [point.lat, point.lng] as [number, number]));
-    map.fitBounds(bounds, { padding: [32, 32] });
-  }, [map, points]);
+    if (points && points.length > 0) {
+      const bounds = L.latLngBounds(points.map((p) => [p.lat, p.lng]));
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [points, map]);
 
   return null;
 };
 
-/** Small overlay button that pans/zooms the map to the user's live GPS position. */
 const RecenterOnMeButton = ({ position }: { position: RoutePoint | null }) => {
   const map = useMap();
-
   if (!position) return null;
 
   return (
     <button
       type="button"
-      onClick={() => map.flyTo([position.lat, position.lng], 14, { duration: 0.75 })}
-      className="absolute top-4 right-4 z-[1000] bg-white/95 hover:bg-white text-blue-600 shadow-lg border border-gray-200 rounded-full p-2.5 transition-colors"
-      title="Center map on my live location"
+      onClick={() => {
+        map.flyTo([position.lat, position.lng], 13, { duration: 1.2 });
+      }}
+      className="leaflet-control absolute top-3 right-3 z-[1000] bg-white text-blue-600 hover:bg-blue-50 border border-blue-200 shadow-md rounded-lg px-2.5 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+      title="Recenter map on my live GPS position"
     >
-      <Navigation size={16} />
+      <Navigation size={13} className="text-blue-600 animate-pulse" />
+      <span>My GPS</span>
     </button>
   );
 };
@@ -83,6 +85,7 @@ const EliteDashboard = () => {
   const { currentUser } = useAuth();
   const uid = currentUser?.uid;
   const navigate = useNavigate();
+  const [mobileTab, setMobileTab] = useState<"itinerary" | "map" | "analysis">("itinerary");
 
   // Load real calculation data from localStorage (populated by backend) — scoped per user
   const calcData = useMemo(() => {
@@ -434,6 +437,7 @@ const EliteDashboard = () => {
           fuelType: trip.fuelType,
           startLocation: trip.startLocation || "Origin",
           destination: trip.destinations[0] || "Destination",
+          routePriority: trip.routePriority || "fastest",
         },
         itinerary: itineraryDays,
         destinationShowcase,
@@ -484,52 +488,94 @@ const EliteDashboard = () => {
   };
 
   return (
-    <div className="h-screen pt-16 bg-gt-offwhite flex flex-col overflow-hidden">
+    <div className="min-h-screen lg:h-screen pt-16 bg-gt-offwhite flex flex-col lg:overflow-hidden font-sans">
+      {/* Mobile Tab Switcher */}
+      <div className="lg:hidden bg-white border-b border-gray-200 px-3 py-2.5 sticky top-16 z-30 shadow-xs">
+        <div className="grid grid-cols-3 gap-1 bg-gray-100 p-1 rounded-xl">
+          <button
+            type="button"
+            onClick={() => setMobileTab("itinerary")}
+            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              mobileTab === "itinerary"
+                ? "bg-white text-emerald-800 shadow-xs"
+                : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            <Sparkles size={14} className={mobileTab === "itinerary" ? "text-emerald-600" : ""} />
+            Itinerary
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("map")}
+            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              mobileTab === "map"
+                ? "bg-white text-emerald-800 shadow-xs"
+                : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            <Navigation size={14} className={mobileTab === "map" ? "text-emerald-600" : ""} />
+            Map & Route
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab("analysis")}
+            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+              mobileTab === "analysis"
+                ? "bg-white text-emerald-800 shadow-xs"
+                : "text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            <Leaf size={14} className={mobileTab === "analysis" ? "text-emerald-600" : ""} />
+            Analysis
+          </button>
+        </div>
+      </div>
+
       {/* Container for the 3 columns */}
-      <div className="w-full flex flex-col lg:flex-row flex-1 overflow-hidden">
+      <div className="w-full flex flex-col lg:flex-row flex-1 lg:overflow-hidden">
 
         {/* Column A: The Itinerary (Left) */}
-        <div className="w-full lg:w-1/3 p-6 lg:p-8 bg-white border-r border-gray-100 overflow-y-auto h-full custom-scrollbar pb-24">
-          <h2 className="text-3xl font-serif font-bold text-gt-blue mb-2">Bespoke Itinerary</h2>
-          <p className="text-gray-500 mb-8 font-sans">Crafted exclusively for your {trip.tripType} journey.</p>
+        <div className={`w-full lg:w-1/3 p-4 sm:p-6 lg:p-8 bg-white border-r border-gray-100 lg:overflow-y-auto lg:h-full custom-scrollbar pb-24 ${mobileTab === "itinerary" ? "block" : "hidden lg:block"}`}>
+          <h2 className="text-2xl sm:text-3xl font-serif font-bold text-gt-blue mb-1.5 sm:mb-2">Bespoke Itinerary</h2>
+          <p className="text-xs sm:text-sm text-gray-500 mb-6 sm:mb-8 font-sans">Crafted exclusively for your {trip.tripType} journey.</p>
 
-          <div className="space-y-8">
+          <div className="space-y-6 sm:space-y-8">
             {destinationShowcase.length > 0 ? (
-              <div className="space-y-5">
+              <div className="space-y-4 sm:space-y-5">
                 <div>
-                  <h3 className="text-xl font-serif font-semibold text-gt-blue">Sightseeing Highlights</h3>
-                  <p className="text-sm text-gray-500">Curated from the India Tourism Dataset with destination-matched imagery.</p>
+                  <h3 className="text-lg sm:text-xl font-serif font-semibold text-gt-blue">Sightseeing Highlights</h3>
+                  <p className="text-xs sm:text-sm text-gray-500">Curated from the India Tourism Dataset with destination-matched imagery.</p>
                 </div>
 
                 {destinationShowcase.map((group: any) => (
                   <div key={group.id} className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-semibold text-gt-blue">{group.matchedDestination || group.destination}</h4>
+                        <h4 className="font-semibold text-gt-blue text-sm sm:text-base">{group.matchedDestination || group.destination}</h4>
                         {group.region ? <p className="text-xs text-gray-500">{group.region}</p> : null}
                       </div>
-                      <span className="text-[11px] uppercase tracking-[0.18em] text-gt-gold font-semibold">Premium Picks</span>
+                      <span className="text-[10px] sm:text-[11px] uppercase tracking-[0.18em] text-gt-gold font-semibold">Premium Picks</span>
                     </div>
 
-                    <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       {(Array.isArray(group.attractions) ? group.attractions : []).slice(0, 4).map((place: any) => (
                         <div key={place.id} className="group overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg">
-                          <div className="relative h-40 overflow-hidden">
+                          <div className="relative h-36 sm:h-40 overflow-hidden">
                             <img
                               src={place.image || place.imageUrl}
                               alt={place.name}
                               className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent" />
-                            <div className="absolute bottom-3 left-3 right-3">
-                              <span className="inline-flex rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-gt-blue">
+                            <div className="absolute bottom-2.5 left-2.5 right-2.5 sm:bottom-3 sm:left-3 sm:right-3">
+                              <span className="inline-flex rounded-full bg-white/90 px-2 py-0.5 text-[9px] sm:text-[10px] font-semibold uppercase tracking-[0.15em] text-gt-blue">
                                 {place.category || "Tourism"}
                               </span>
-                              <h4 className="mt-2 text-lg font-serif font-semibold text-white drop-shadow-sm">{place.name}</h4>
+                              <h4 className="mt-1 sm:mt-2 text-base sm:text-lg font-serif font-semibold text-white drop-shadow-sm">{place.name}</h4>
                             </div>
                           </div>
-                          <div className="p-4">
-                            <p className="text-sm text-gray-600 leading-relaxed line-clamp-3">{place.description || "Recommended sightseeing stop from the tourism dataset."}</p>
+                          <div className="p-3 sm:p-4">
+                            <p className="text-xs sm:text-sm text-gray-600 leading-relaxed line-clamp-3">{place.description || "Recommended sightseeing stop from the tourism dataset."}</p>
                           </div>
                         </div>
                       ))}
@@ -553,47 +599,47 @@ const EliteDashboard = () => {
                   <div className="absolute left-[19px] top-12 bottom-[-2rem] w-0.5 bg-gray-100"></div>
                 )}
 
-                <h3 className="text-xl font-serif font-semibold text-gt-blue mb-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gt-gold/10 text-gt-gold flex items-center justify-center font-bold z-10">
+                <h3 className="text-lg sm:text-xl font-serif font-semibold text-gt-blue mb-3 sm:mb-4 flex items-center gap-3">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gt-gold/10 text-gt-gold flex items-center justify-center font-bold text-sm sm:text-base z-10">
                     D{day.day}
                   </div>
                   {day.title}
                 </h3>
 
-                <div className="ml-5 pl-8 space-y-6">
+                <div className="ml-4 sm:ml-5 pl-6 sm:pl-8 space-y-4 sm:space-y-6">
                   {day.items.map((item, itemIdx) => (
                     <div key={itemIdx} className="relative group">
-                      <div className="absolute -left-10 top-1 w-4 h-4 rounded-full border-2 border-white bg-gray-200 group-hover:bg-gt-gold transition-colors shadow-sm"></div>
+                      <div className="absolute -left-8 sm:-left-10 top-1 w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full border-2 border-white bg-gray-200 group-hover:bg-gt-gold transition-colors shadow-sm"></div>
                       <div className="bg-gray-50 border border-gray-100 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all group-hover:border-gt-gold/30">
                         {item.image && (
-                          <div className="relative h-44 w-full overflow-hidden">
+                          <div className="relative h-36 sm:h-44 w-full overflow-hidden">
                             <img
                               src={item.image}
                               alt={item.title}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
-                            <div className="absolute bottom-3 left-4 right-4">
-                              <span className="px-2 py-0.5 bg-gt-gold text-white font-bold rounded text-[10px] uppercase tracking-wider">
+                            <div className="absolute bottom-2.5 left-3 right-3 sm:bottom-3 sm:left-4 sm:right-4">
+                              <span className="px-2 py-0.5 bg-gt-gold text-white font-bold rounded text-[9px] sm:text-[10px] uppercase tracking-wider">
                                 Sightseeing Landmark
                               </span>
                             </div>
                           </div>
                         )}
-                        <div className="p-4">
-                          <div className="flex items-center gap-3 mb-2">
+                        <div className="p-3.5 sm:p-4">
+                          <div className="flex items-center gap-2.5 sm:gap-3 mb-1.5 sm:mb-2">
                             {item.type === "food" || item.iconName === "Coffee" ? (
-                              <Coffee size={16} className="text-gt-gold animate-bounce-subtle" />
+                              <Coffee size={15} className="text-gt-gold animate-bounce-subtle" />
                             ) : item.type === "lodging" || item.iconName === "Bed" ? (
-                              <Bed size={16} className="text-gt-gold animate-bounce-subtle" />
+                              <Bed size={15} className="text-gt-gold animate-bounce-subtle" />
                             ) : item.type === "sightseeing" || item.iconName === "Camera" ? (
-                              <Camera size={16} className="text-gt-gold animate-bounce-subtle" />
+                              <Camera size={15} className="text-gt-gold animate-bounce-subtle" />
                             ) : (
-                              <MapPin size={16} className="text-gt-gold animate-bounce-subtle" />
+                              <MapPin size={15} className="text-gt-gold animate-bounce-subtle" />
                             )}
                             <span className="text-xs font-semibold text-gray-500">{item.time}</span>
                           </div>
-                          <h4 className="font-semibold text-gt-blue mb-1">{item.title}</h4>
+                          <h4 className="font-semibold text-sm sm:text-base text-gt-blue mb-1">{item.title}</h4>
                           {item.description && (
                             <p className="text-xs text-gray-500 font-sans leading-relaxed">{item.description}</p>
                           )}
@@ -606,11 +652,11 @@ const EliteDashboard = () => {
             ))}
 
             {/* End state placeholder */}
-            <div className="relative mt-8">
-              <div className="ml-5 pl-8">
+            <div className="relative mt-6 sm:mt-8">
+              <div className="ml-4 sm:ml-5 pl-6 sm:pl-8">
                 <div className="flex items-center gap-3 text-gray-400">
-                  <CheckCircle2 size={24} className="text-green-500" />
-                  <span className="font-serif font-medium">Journey Concludes</span>
+                  <CheckCircle2 size={22} className="text-green-500" />
+                  <span className="font-serif font-medium text-sm sm:text-base">Journey Concludes</span>
                 </div>
               </div>
             </div>
@@ -618,7 +664,7 @@ const EliteDashboard = () => {
         </div>
 
         {/* Column B: The Map Infrastructure (Center) */}
-        <div className="w-full lg:w-1/3 bg-gray-100 relative h-[400px] lg:h-full flex flex-col">
+        <div className={`w-full lg:w-1/3 bg-gray-100 relative h-[420px] sm:h-[480px] lg:h-full flex flex-col ${mobileTab === "map" ? "block" : "hidden lg:block"}`}>
           <div className="relative h-full w-full">
             <MapContainer
               center={mapCenter}
@@ -659,27 +705,28 @@ const EliteDashboard = () => {
               ) : null}
             </MapContainer>
 
-            <div className="absolute bottom-6 left-6 right-6 bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-lg border border-white flex justify-between items-center z-[1000] pointer-events-none">
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Distance</p>
-                <p className="font-bold text-gt-blue text-lg">~{mockDistanceKm} km</p>
+            {/* Floating Route Stats Overlay */}
+            <div className="absolute bottom-3 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6 bg-white/95 backdrop-blur-md p-2.5 sm:p-4 rounded-xl shadow-lg border border-white flex justify-between items-center z-[500] pointer-events-none">
+              <div className="text-center sm:text-left">
+                <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide font-bold">Distance</p>
+                <p className="font-bold text-gt-blue text-sm sm:text-lg">~{mockDistanceKm} km</p>
               </div>
-              <div className="h-8 w-px bg-gray-300"></div>
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Vehicle</p>
-                <p className="font-bold text-gt-blue text-lg capitalize">{trip.vehicleType}</p>
+              <div className="h-6 sm:h-8 w-px bg-gray-200"></div>
+              <div className="text-center sm:text-left">
+                <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide font-bold">Vehicle</p>
+                <p className="font-bold text-gt-blue text-sm sm:text-lg capitalize">{trip.vehicleType}</p>
               </div>
-              <div className="h-8 w-px bg-gray-300"></div>
-              <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wide">Fuel</p>
-                <p className="font-bold text-gt-blue text-lg capitalize">{trip.fuelType}</p>
+              <div className="h-6 sm:h-8 w-px bg-gray-200"></div>
+              <div className="text-center sm:text-left">
+                <p className="text-[10px] sm:text-xs text-gray-500 uppercase tracking-wide font-bold">Fuel</p>
+                <p className="font-bold text-gt-blue text-sm sm:text-lg capitalize">{trip.fuelType}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Column C: Financial & Eco Analysis (Right) */}
-        <div className="w-full lg:w-1/3 p-6 lg:p-8 bg-white border-l border-gray-100 overflow-y-auto h-full custom-scrollbar pb-24">
+        <div className={`w-full lg:w-1/3 p-4 sm:p-6 lg:p-8 bg-white border-l border-gray-100 lg:overflow-y-auto lg:h-full custom-scrollbar pb-24 ${mobileTab === "analysis" ? "block" : "hidden lg:block"}`}>
           <h2 className="text-3xl font-serif font-bold text-emerald-800 mb-2">Analysis</h2>
           <p className="text-gray-500 mb-8 font-sans">Financial metrics and ecological impact.</p>
 

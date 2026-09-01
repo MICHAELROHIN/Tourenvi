@@ -70,7 +70,10 @@ interface EmergencyRadarModalProps {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = (
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV ? "http://localhost:8000" : "")
+).replace(/\/$/, "");
 const CACHE_KEY = "tourenvi_emergency_radar_cache";
 const SEARCH_RADIUS_KM = 5;
 // How far the vehicle has to move before we bother re-scanning. Too small a
@@ -362,33 +365,46 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
 
   if (!isOpen) return null;
 
+  const categoryTabs: { key: EmergencyCategory; icon: React.ReactNode; label: string }[] = [
+    { key: "fuel", icon: <Fuel className="h-4 w-4" />, label: "Fuel & EV" },
+    { key: "mechanics", icon: <Wrench className="h-4 w-4" />, label: "Mechanics" },
+    { key: "brand_service", icon: <Car className="h-4 w-4" />, label: "Brand Service" },
+    { key: "emergency_medical", icon: <Hospital className="h-4 w-4" />, label: "Medical" },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#051124]/80 backdrop-blur-xl animate-fade-in">
-      <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-3xl border border-white/15 bg-[#0B2B5C] text-white shadow-[0_25px_60px_-15px_rgba(5,17,36,0.9)] overflow-hidden">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col rounded-2xl bg-white border border-gray-200/80 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)] overflow-hidden animate-in zoom-in-95 duration-300">
+        {/* Decorative top gradient bar */}
+        <div className="h-1 w-full bg-gradient-to-r from-red-400 via-orange-400 to-red-500" />
+
         {/* Header Bar */}
-        <div className="p-6 border-b border-white/10 bg-gradient-to-r from-[#0B2B5C] via-[#051124] to-[#0B2B5C] flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-gray-100 bg-white flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-2xl bg-red-500/20 text-red-400 border border-red-500/40 shadow-[0_0_20px_rgba(239,68,68,0.3)] animate-pulse">
-              <AlertTriangle className="h-6 w-6" />
+            <div className="p-2.5 rounded-xl bg-red-50 border border-red-200/60 text-red-500 shadow-sm">
+              <AlertTriangle className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-xl font-black text-white tracking-wide">
-                  Emergency Break-Down & Fuel Assist Radar
+                <h3 className="text-lg font-bold text-gray-900 tracking-tight">
+                  Emergency Assist Radar
                 </h3>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 uppercase tracking-wider flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 uppercase tracking-wider flex items-center gap-1">
                   <Zap className="h-3 w-3" /> Live GPS
                 </span>
               </div>
-              <p className="text-xs text-gray-300 mt-0.5 flex items-center gap-2">
-                <MapPin className="h-3.5 w-3.5 text-[#D4AF37]" />
+              <p className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+                <MapPin className="h-3 w-3 text-emerald-500" />
                 {hasGpsLock ? (
                   <>
-                    <span className="text-emerald-400 font-semibold">GPS Locked</span> — Scanning {SEARCH_RADIUS_KM}km radius around ({currentCoords.lat.toFixed(3)},{" "}
+                    <span className="text-emerald-600 font-semibold">GPS Locked</span> — {SEARCH_RADIUS_KM}km radius ({currentCoords.lat.toFixed(3)},{" "}
                     {currentCoords.lng.toFixed(3)})
                   </>
                 ) : (
-                  <>Scanning {SEARCH_RADIUS_KM}km radius around ({currentCoords.lat.toFixed(3)}, {currentCoords.lng.toFixed(3)})</>
+                  <>Scanning {SEARCH_RADIUS_KM}km radius ({currentCoords.lat.toFixed(3)}, {currentCoords.lng.toFixed(3)})</>
                 )}
               </p>
             </div>
@@ -401,177 +417,146 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
                 handleScanLocation();
               }}
               disabled={isLocating}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 text-white text-xs font-semibold hover:bg-white/20 transition-all border border-white/15 cursor-pointer"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gray-50 text-gray-700 text-xs font-semibold hover:bg-gray-100 transition-all border border-gray-200 cursor-pointer"
             >
-              <RefreshCw className={`h-4 w-4 text-[#D4AF37] ${isLocating ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-3.5 w-3.5 text-emerald-500 ${isLocating ? "animate-spin" : ""}`} />
               {isLocating ? "Locating..." : "Refresh GPS"}
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-white/10 text-gray-300 hover:text-white hover:bg-white/20 transition-all cursor-pointer"
+              className="p-2 rounded-xl bg-gray-50 text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all cursor-pointer"
             >
-              <X className="h-5 w-5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
         {/* Offline Safety Mode Banner */}
         {isOffline && (
-          <div className="bg-amber-500/20 border-b border-amber-500/30 px-6 py-2.5 flex items-center justify-between text-xs text-amber-200">
+          <div className="bg-amber-50 border-b border-amber-200/60 px-6 py-2.5 flex items-center justify-between text-xs text-amber-800">
             <div className="flex items-center gap-2 font-medium">
-              <WifiOff className="h-4 w-4 text-amber-400" />
+              <WifiOff className="h-4 w-4 text-amber-500" />
               <span>
-                <strong>Offline Safety Mode Active:</strong> Showing cached emergency services from your last GPS scan.
+                <strong>Offline Safety Mode:</strong> Showing cached services from last GPS scan.
               </span>
             </div>
-            <span className="text-[10px] font-bold bg-amber-500/30 px-2 py-0.5 rounded-full">
-              Cached {SEARCH_RADIUS_KM}km Radius
+            <span className="text-[10px] font-bold bg-amber-200/60 text-amber-700 px-2 py-0.5 rounded-full">
+              Cached {SEARCH_RADIUS_KM}km
             </span>
           </div>
         )}
 
-        {/* Toll-Free National Emergency Quick Dial Bar */}
-        <div className="bg-[#051124] border-b border-white/10 px-6 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Toll-Free Emergency Quick Dial Bar */}
+        <div className="bg-gray-50/80 border-b border-gray-100 px-6 py-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           <a
             href="tel:1033"
-            className="flex items-center justify-between p-2.5 rounded-xl bg-red-600/20 border border-red-500/40 text-red-300 hover:bg-red-600/30 transition-all group"
+            className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-red-200/60 text-red-700 hover:bg-red-50 hover:border-red-300 transition-all group shadow-sm"
           >
             <div className="flex items-center gap-2">
-              <ShieldAlert className="h-4 w-4 text-red-400 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-bold">NHAI Highway Helpline</span>
+              <ShieldAlert className="h-4 w-4 text-red-500 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-bold">NHAI Highway</span>
             </div>
-            <span className="font-mono font-black text-white text-xs bg-red-600/40 px-2 py-0.5 rounded-md">1033</span>
+            <span className="font-mono font-black text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-md">1033</span>
           </a>
 
           <a
             href="tel:112"
-            className="flex items-center justify-between p-2.5 rounded-xl bg-blue-600/20 border border-blue-500/40 text-blue-300 hover:bg-blue-600/30 transition-all group"
+            className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-blue-200/60 text-blue-700 hover:bg-blue-50 hover:border-blue-300 transition-all group shadow-sm"
           >
             <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-blue-400 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-bold">National Emergency</span>
+              <Phone className="h-4 w-4 text-blue-500 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-bold">Emergency</span>
             </div>
-            <span className="font-mono font-black text-white text-xs bg-blue-600/40 px-2 py-0.5 rounded-md">112</span>
+            <span className="font-mono font-black text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-md">112</span>
           </a>
 
           <a
             href="tel:108"
-            className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-600/30 transition-all group"
+            className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-emerald-200/60 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition-all group shadow-sm"
           >
             <div className="flex items-center gap-2">
-              <Hospital className="h-4 w-4 text-emerald-400 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-bold">Ambulance Service</span>
+              <Hospital className="h-4 w-4 text-emerald-500 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-bold">Ambulance</span>
             </div>
-            <span className="font-mono font-black text-white text-xs bg-emerald-600/40 px-2 py-0.5 rounded-md">108</span>
+            <span className="font-mono font-black text-xs bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-md">108</span>
           </a>
 
           <a
             href="tel:1091"
-            className="flex items-center justify-between p-2.5 rounded-xl bg-purple-600/20 border border-purple-500/40 text-purple-300 hover:bg-purple-600/30 transition-all group"
+            className="flex items-center justify-between p-2.5 rounded-xl bg-white border border-purple-200/60 text-purple-700 hover:bg-purple-50 hover:border-purple-300 transition-all group shadow-sm"
           >
             <div className="flex items-center gap-2">
-              <Phone className="h-4 w-4 text-purple-400 group-hover:scale-110 transition-transform" />
-              <span className="text-xs font-bold">Women Helpline</span>
+              <Phone className="h-4 w-4 text-purple-500 group-hover:scale-110 transition-transform" />
+              <span className="text-[11px] font-bold">Women Help</span>
             </div>
-            <span className="font-mono font-black text-white text-xs bg-purple-600/40 px-2 py-0.5 rounded-md">1091</span>
+            <span className="font-mono font-black text-xs bg-purple-100 text-purple-600 px-2 py-0.5 rounded-md">1091</span>
           </a>
         </div>
 
         {/* Category Tabs & Search Bar */}
-        <div className="p-6 pb-3 border-b border-white/10 space-y-4">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <button
-              onClick={() => setActiveCategory("fuel")}
-              className={`flex items-center justify-center gap-2 p-3 rounded-2xl font-bold text-xs transition-all cursor-pointer ${
-                activeCategory === "fuel"
-                  ? "bg-[#D4AF37] text-[#0B2B5C] shadow-[0_0_15px_rgba(212,175,55,0.4)] scale-102"
-                  : "bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10"
-              }`}
-            >
-              <Fuel className="h-4 w-4" />
-              <span>Fuel & EV Stations</span>
-            </button>
-
-            <button
-              onClick={() => setActiveCategory("mechanics")}
-              className={`flex items-center justify-center gap-2 p-3 rounded-2xl font-bold text-xs transition-all cursor-pointer ${
-                activeCategory === "mechanics"
-                  ? "bg-[#D4AF37] text-[#0B2B5C] shadow-[0_0_15px_rgba(212,175,55,0.4)] scale-102"
-                  : "bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10"
-              }`}
-            >
-              <Wrench className="h-4 w-4" />
-              <span>24/7 Mechanics & Puncture</span>
-            </button>
-
-            <button
-              onClick={() => setActiveCategory("brand_service")}
-              className={`flex items-center justify-center gap-2 p-3 rounded-2xl font-bold text-xs transition-all cursor-pointer ${
-                activeCategory === "brand_service"
-                  ? "bg-[#D4AF37] text-[#0B2B5C] shadow-[0_0_15px_rgba(212,175,55,0.4)] scale-102"
-                  : "bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10"
-              }`}
-            >
-              <Car className="h-4 w-4" />
-              <span>Brand Service Centers</span>
-            </button>
-
-            <button
-              onClick={() => setActiveCategory("emergency_medical")}
-              className={`flex items-center justify-center gap-2 p-3 rounded-2xl font-bold text-xs transition-all cursor-pointer ${
-                activeCategory === "emergency_medical"
-                  ? "bg-[#D4AF37] text-[#0B2B5C] shadow-[0_0_15px_rgba(212,175,55,0.4)] scale-102"
-                  : "bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10"
-              }`}
-            >
-              <Hospital className="h-4 w-4" />
-              <span>Medical & Towing</span>
-            </button>
+        <div className="px-6 pt-4 pb-3 border-b border-gray-100 space-y-3 bg-white">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            {categoryTabs.map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveCategory(tab.key)}
+                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                  activeCategory === tab.key
+                    ? "bg-emerald-600 text-white shadow-md shadow-emerald-200"
+                    : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200/80"
+                }`}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+              </button>
+            ))}
           </div>
 
           <div className="relative">
-            <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-gray-400" />
             <input
               type="text"
               placeholder="Search by name or address..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#051124] border border-white/15 text-white placeholder-gray-400 text-xs focus:outline-none focus:border-[#D4AF37]"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-gray-50/80 border border-gray-200 text-gray-900 placeholder-gray-400 text-xs focus:outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 transition-all"
             />
           </div>
         </div>
 
         {/* Results List */}
-        <div className="p-6 flex-1 overflow-y-auto space-y-4 max-h-[480px]">
+        <div className="px-6 py-4 flex-1 overflow-y-auto space-y-3 max-h-[480px] bg-gray-50/40">
           {/* Loading State */}
           {(isFetching || isLocating) && (
             <div className="py-12 text-center space-y-3">
               <div className="relative mx-auto w-16 h-16">
-                <div className="absolute inset-0 rounded-full border-2 border-[#D4AF37]/30 animate-ping" />
-                <div className="absolute inset-2 rounded-full border-2 border-[#D4AF37]/50 animate-ping animation-delay-150" />
-                <div className="absolute inset-4 rounded-full bg-[#D4AF37]/20 flex items-center justify-center">
-                  <Loader2 className="h-5 w-5 text-[#D4AF37] animate-spin" />
+                <div className="absolute inset-0 rounded-full border-2 border-emerald-200 animate-ping" />
+                <div className="absolute inset-2 rounded-full border-2 border-emerald-300 animate-ping animation-delay-150" />
+                <div className="absolute inset-4 rounded-full bg-emerald-50 flex items-center justify-center">
+                  <Loader2 className="h-5 w-5 text-emerald-600 animate-spin" />
                 </div>
               </div>
-              <p className="text-sm font-semibold text-white">
-                {isLocating ? "Acquiring GPS coordinates..." : `Scanning ${SEARCH_RADIUS_KM}km radius for nearby services...`}
+              <p className="text-sm font-semibold text-gray-800">
+                {isLocating ? "Acquiring GPS coordinates..." : `Scanning ${SEARCH_RADIUS_KM}km radius...`}
               </p>
-              <p className="text-xs text-gray-400">Using Google Places real-time data</p>
+              <p className="text-xs text-gray-500">Using Google Places real-time data</p>
             </div>
           )}
 
           {/* Error State */}
           {!isFetching && !isLocating && fetchError && services.length === 0 && (
-            <div className="py-12 text-center text-gray-400 space-y-3">
-              <AlertTriangle className="h-10 w-10 text-red-400 mx-auto opacity-80" />
-              <p className="font-semibold text-sm text-red-300">Failed to load nearby services</p>
-              <p className="text-xs max-w-md mx-auto">{fetchError}</p>
+            <div className="py-12 text-center text-gray-500 space-y-3">
+              <div className="mx-auto w-14 h-14 rounded-full bg-red-50 border border-red-200/60 flex items-center justify-center">
+                <AlertTriangle className="h-7 w-7 text-red-400" />
+              </div>
+              <p className="font-semibold text-sm text-red-600">Failed to load nearby services</p>
+              <p className="text-xs max-w-md mx-auto text-gray-500">{fetchError}</p>
               <button
                 onClick={() => {
                   lastFetchRef.current = "";
                   fetchNearbyServices(currentCoords.lat, currentCoords.lng, activeCategory);
                 }}
-                className="mt-2 px-4 py-2 rounded-xl bg-[#D4AF37] text-[#0B2B5C] font-bold text-xs hover:bg-[#c49f27] transition-all cursor-pointer"
+                className="mt-2 px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 transition-all cursor-pointer shadow-sm"
               >
                 <RefreshCw className="h-3.5 w-3.5 inline mr-1.5" /> Retry
               </button>
@@ -580,10 +565,12 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
 
           {/* Empty State */}
           {!isFetching && !isLocating && !fetchError && filteredServices.length === 0 && (
-            <div className="py-12 text-center text-gray-400 space-y-2">
-              <AlertTriangle className="h-10 w-10 text-amber-400 mx-auto opacity-60" />
-              <p className="font-semibold text-sm">No emergency services found within {SEARCH_RADIUS_KM}km radius.</p>
-              <p className="text-xs">Call National Highway Emergency Line <strong>1033</strong> for immediate dispatch.</p>
+            <div className="py-12 text-center text-gray-500 space-y-2">
+              <div className="mx-auto w-14 h-14 rounded-full bg-amber-50 border border-amber-200/60 flex items-center justify-center">
+                <AlertTriangle className="h-7 w-7 text-amber-400" />
+              </div>
+              <p className="font-semibold text-sm text-gray-700">No services found within {SEARCH_RADIUS_KM}km</p>
+              <p className="text-xs">Call National Highway Emergency <strong className="text-red-600">1033</strong> for immediate dispatch.</p>
             </div>
           )}
 
@@ -592,44 +579,44 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
             filteredServices.map((service) => (
               <div
                 key={service.id}
-                className="p-5 rounded-2xl border border-white/10 bg-[#051124]/60 backdrop-blur-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-[#D4AF37]/40 transition-all shadow-md group"
+                className="p-4 rounded-xl border border-gray-200/80 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-emerald-300 hover:shadow-md transition-all group"
               >
-                <div className="space-y-2 flex-1 min-w-0">
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <h4 className="font-bold text-white text-sm group-hover:text-[#D4AF37] transition-colors">
+                <div className="space-y-1.5 flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h4 className="font-bold text-gray-900 text-sm group-hover:text-emerald-700 transition-colors">
                       {service.name}
                     </h4>
                     {service.brand && (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/30 uppercase">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200/60 uppercase">
                         {service.brand}
                       </span>
                     )}
                     {service.isOpenNow === true && (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center gap-1">
                         <CheckCircle2 className="h-3 w-3" /> Open Now
                       </span>
                     )}
                     {service.isOpenNow === false && (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-500/20 text-red-400 border border-red-500/30 flex items-center gap-1">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-50 text-red-600 border border-red-200/60 flex items-center gap-1">
                         <Clock className="h-3 w-3" /> Closed
                       </span>
                     )}
                     {service.isOpenNow === null && (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-500/20 text-gray-300 border border-gray-500/30">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-50 text-gray-500 border border-gray-200/60">
                         Hours unknown
                       </span>
                     )}
                   </div>
 
-                  <p className="text-xs text-gray-300 flex items-center gap-1.5">
+                  <p className="text-xs text-gray-500 flex items-center gap-1.5">
                     <MapPin className="h-3.5 w-3.5 text-gray-400 shrink-0" />
                     {service.address}
                   </p>
 
                   {/* Rating & Types */}
-                  <div className="flex items-center gap-3 flex-wrap pt-0.5">
+                  <div className="flex items-center gap-2.5 flex-wrap pt-0.5">
                     {service.rating != null && (
-                      <span className="flex items-center gap-1 text-xs text-amber-300 font-semibold">
+                      <span className="flex items-center gap-1 text-xs text-amber-600 font-semibold">
                         <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                         {service.rating.toFixed(1)}
                         {service.totalRatings > 0 && (
@@ -642,7 +629,7 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
                     {service.types.slice(0, 3).map((type, idx) => (
                       <span
                         key={`${service.id}_type_${type}_${idx}`}
-                        className="px-2 py-0.5 rounded-full text-[10px] bg-white/5 text-gray-300 border border-white/10 capitalize"
+                        className="px-2 py-0.5 rounded-full text-[10px] bg-gray-50 text-gray-500 border border-gray-200/60 capitalize"
                       >
                         {type.replace(/_/g, " ")}
                       </span>
@@ -650,10 +637,10 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
                   </div>
                 </div>
 
-                <div className="flex flex-row md:flex-col items-end justify-between w-full md:w-auto gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-white/5">
+                <div className="flex flex-row md:flex-col items-end justify-between w-full md:w-auto gap-3 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-gray-100">
                   <div className="text-right">
-                    <div className="text-sm font-black text-emerald-400 font-mono">
-                      {service.distanceKm} km <span className="text-[10px] font-normal text-emerald-300/80">(Direct)</span>
+                    <div className="text-sm font-black text-emerald-600 font-mono">
+                      {service.distanceKm} km <span className="text-[10px] font-normal text-emerald-500">(Direct)</span>
                     </div>
                     <div className="text-[10px] text-gray-400">
                       Est. Road: ~{(service.distanceKm * 1.5).toFixed(1)} km ({Math.max(1, Math.round(service.distanceKm * 2.5))} mins)
@@ -664,7 +651,7 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
                     {service.phone && (
                       <a
                         href={`tel:${service.phone}`}
-                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all shadow-md cursor-pointer"
+                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-all shadow-sm cursor-pointer"
                       >
                         <Phone className="h-3.5 w-3.5" /> Call
                       </a>
@@ -673,7 +660,7 @@ export const EmergencyRadarModal: React.FC<EmergencyRadarModalProps> = ({
                       href={service.mapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#D4AF37] hover:bg-[#c49f27] text-[#0B2B5C] font-bold text-xs transition-all shadow-md cursor-pointer"
+                      className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-all shadow-sm cursor-pointer"
                     >
                       <Navigation className="h-3.5 w-3.5" /> Navigate
                     </a>

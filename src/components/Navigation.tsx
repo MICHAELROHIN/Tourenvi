@@ -221,37 +221,61 @@ const Navigation = () => {
                     </div>
                   )}
                 </Button>
-
                 {/* Dropdown Menu */}
                 {isProfileOpen && (
-                  <div className="absolute right-0 mt-2 w-64 bg-background border border-border rounded-xl shadow-xl py-2 z-50 animate-in fade-in zoom-in-95 duration-200">
-                    <div className="px-3 py-2 border-b border-border">
+                  <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200/80 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.12)] z-50 animate-in fade-in zoom-in-95 duration-200 overflow-hidden">
+                    {/* Top gradient accent */}
+                    <div className="h-0.5 w-full bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500" />
+
+                    {/* Profile section with avatar */}
+                    <div className="px-4 py-3.5 border-b border-gray-100 bg-gradient-to-b from-emerald-50/40 to-white">
                       <button
                         onClick={() => {
                           setIsProfileOpen(false);
                           setIsDeleteModalOpen(true);
                         }}
-                        className="w-full text-left p-2 rounded-lg hover:bg-muted transition-colors"
+                        className="w-full flex items-center gap-3 text-left p-1.5 rounded-xl hover:bg-emerald-50/60 transition-all group"
                       >
-                        <p className="text-sm font-semibold truncate text-foreground">
-                          {resolvedDisplayName}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {user?.email || "michaelrohin@gmail.com"}
-                        </p>
+                        {resolvedPhotoURL && !imgError ? (
+                          <img
+                            src={resolvedPhotoURL}
+                            alt="Profile"
+                            className="w-10 h-10 rounded-full object-cover shrink-0 border-2 border-emerald-200 shadow-sm group-hover:border-emerald-300 transition-all"
+                            referrerPolicy="no-referrer"
+                            onError={() => setImgError(true)}
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-bold text-base flex items-center justify-center shrink-0 shadow-sm border-2 border-emerald-200">
+                            {avatarInitial}
+                          </div>
+                        )}
+                        <div className="overflow-hidden">
+                          <p className="text-sm font-semibold truncate text-gray-900">
+                            {resolvedDisplayName}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">
+                            {user?.email || ""}
+                          </p>
+                        </div>
                       </button>
                     </div>
 
-                    <div className="py-1 border-b border-border">
+                    {/* Menu items */}
+                    <div className="py-1.5 px-1.5 border-b border-gray-100">
                       <button
                         onClick={() => {
                           setIsProfileOpen(false);
                           setIsHelpModalOpen(true);
                         }}
-                        className="w-full flex items-center px-4 py-2.5 text-sm font-medium text-[#D4AF37] hover:bg-[#D4AF37]/10 transition-colors text-left"
+                        className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all text-left group"
                       >
-                        <LifeBuoy className="w-4 h-4 mr-2.5 shrink-0 text-[#D4AF37]" />
-                        Help & Support
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 group-hover:bg-emerald-100 flex items-center justify-center mr-3 transition-colors">
+                          <LifeBuoy className="w-4 h-4 text-emerald-600" />
+                        </div>
+                        <div>
+                          <span className="block">Help &amp; Support</span>
+                          <span className="block text-[10px] text-gray-400 font-normal">Report issues or get help</span>
+                        </div>
                       </button>
 
                       <button
@@ -259,19 +283,26 @@ const Navigation = () => {
                           setIsProfileOpen(false);
                           setIsEmergencyRadarOpen(true);
                         }}
-                        className="w-full flex items-center px-4 py-2.5 text-sm font-bold text-red-500 hover:bg-red-50 hover:text-red-600 transition-colors text-left"
+                        className="w-full flex items-center px-3 py-2.5 text-sm font-bold text-red-600 hover:bg-red-50 rounded-xl transition-all text-left group"
                       >
-                        <AlertTriangle className="w-4 h-4 mr-2.5 shrink-0 text-red-500 animate-pulse" />
-                        Emergency Assist
+                        <div className="w-8 h-8 rounded-lg bg-red-50 group-hover:bg-red-100 flex items-center justify-center mr-3 transition-colors">
+                          <AlertTriangle className="w-4 h-4 text-red-500" />
+                        </div>
+                        <div>
+                          <span className="block">Emergency Assist</span>
+                          <span className="block text-[10px] text-gray-400 font-normal">Nearby services &amp; helplines</span>
+                        </div>
                       </button>
                     </div>
 
-                    <div className="pt-1">
+                    <div className="py-1.5 px-1.5">
                       <button
                         onClick={handleLogout}
-                        className="w-full flex items-center px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors text-left"
+                        className="w-full flex items-center px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-red-600 rounded-xl transition-all text-left group"
                       >
-                        <LogOut className="w-4 h-4 mr-2.5 shrink-0" />
+                        <div className="w-8 h-8 rounded-lg bg-gray-50 group-hover:bg-red-50 flex items-center justify-center mr-3 transition-colors">
+                          <LogOut className="w-4 h-4 text-gray-400 group-hover:text-red-500 transition-colors" />
+                        </div>
                         Log Out
                       </button>
                     </div>
@@ -387,10 +418,15 @@ const Navigation = () => {
                 setIsOpen(false);
                 setIsHelpModalOpen(true);
               }}
-              className="w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 hover:bg-[#D4AF37]/20 transition-colors duration-200 text-left font-semibold"
+              className="w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-emerald-700 bg-emerald-50 border border-emerald-200/60 hover:bg-emerald-100 transition-colors duration-200 text-left font-semibold"
             >
-              <LifeBuoy className="w-5 h-5 shrink-0 text-[#D4AF37]" />
-              <span className="text-sm">Help & Support</span>
+              <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                <LifeBuoy className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div>
+                <span className="text-sm block">Help &amp; Support</span>
+                <span className="text-[10px] text-gray-400 font-normal block">Report issues or get help</span>
+              </div>
             </button>
 
             <button
@@ -398,10 +434,15 @@ const Navigation = () => {
                 setIsOpen(false);
                 setIsEmergencyRadarOpen(true);
               }}
-              className="w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-red-500 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 transition-colors duration-200 text-left font-bold"
+              className="w-full flex items-center space-x-3 px-3 py-3 rounded-lg text-red-600 bg-red-50 border border-red-200/60 hover:bg-red-100 transition-colors duration-200 text-left font-bold"
             >
-              <AlertTriangle className="w-5 h-5 shrink-0 text-red-500 animate-pulse" />
-              <span className="text-sm">Emergency Assist</span>
+              <div className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4 text-red-500" />
+              </div>
+              <div>
+                <span className="text-sm block">Emergency Assist</span>
+                <span className="text-[10px] text-gray-400 font-normal block">Nearby services &amp; helplines</span>
+              </div>
             </button>
           </div>
 
