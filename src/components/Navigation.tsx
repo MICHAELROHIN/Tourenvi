@@ -77,14 +77,20 @@ const Navigation = () => {
 
   // Monitor Active Broadcast Announcements from Firestore
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "announcements"), (snap) => {
-      if (!snap.empty) {
-        const list = snap.docs
-          .map((doc) => doc.data())
-          .filter((a) => a.isActive);
-        setActiveAnnouncements(list);
+    const unsub = onSnapshot(
+      collection(db, "announcements"),
+      (snap) => {
+        if (!snap.empty) {
+          const list = snap.docs
+            .map((doc) => doc.data())
+            .filter((a) => a.isActive);
+          setActiveAnnouncements(list);
+        }
+      },
+      (error) => {
+        console.warn("Announcements subscription note:", error.message);
       }
-    });
+    );
     return () => unsub();
   }, []);
 

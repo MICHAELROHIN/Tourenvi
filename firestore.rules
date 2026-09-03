@@ -9,11 +9,45 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isAuth() && (request.auth.uid == uid || role() == 'admin');
       allow create, update: if isAuth() && request.auth.uid == uid;
+
+      match /{subcollection=**} {
+        allow read, write: if isAuth() && (request.auth.uid == uid || role() == 'admin');
+      }
     }
 
     match /admins/{uid} {
       allow read: if isAuth() && (request.auth.uid == uid || role() == 'admin');
       allow write: if isAuth() && (request.auth.uid == uid || role() == 'admin');
+    }
+
+    match /announcements/{id} {
+      allow read: if true;
+      allow write: if isAuth() && role() == 'admin';
+    }
+
+    match /inquiries/{id} {
+      allow create: if true;
+      allow read, update, delete: if isAuth() && (role() == 'admin' || role() == 'support');
+    }
+
+    match /audit_logs/{id} {
+      allow read, write: if isAuth() && role() == 'admin';
+    }
+
+    match /budget_logs/{id} {
+      allow read, write: if isAuth() && role() == 'admin';
+    }
+
+    match /active_fleet/{id} {
+      allow read, write: if isAuth() && role() == 'admin';
+    }
+
+    match /fuel_overrides/{id} {
+      allow read, write: if isAuth() && role() == 'admin';
+    }
+
+    match /tripEvents/{id} {
+      allow read, write: if isAuth();
     }
 
     match /trips/{tripId} {
