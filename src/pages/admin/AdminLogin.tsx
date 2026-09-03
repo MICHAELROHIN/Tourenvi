@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { adminAuth } from "@/lib/firebaseAdminAuth";
+import { adminAuth, adminDb } from "@/lib/firebaseAdminAuth";
 import { db } from "@/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from "firebase/auth";
@@ -20,8 +20,8 @@ const AdminLogin: React.FC = () => {
     const unsubscribe = onAuthStateChanged(adminAuth, async (user) => {
       if (user) {
         try {
-          const adminSnap = await getDoc(doc(db, "admins", user.uid));
-          const userDocSnap = adminSnap.exists() ? adminSnap : await getDoc(doc(db, "users", user.uid));
+          const adminSnap = await getDoc(doc(adminDb, "admins", user.uid));
+          const userDocSnap = adminSnap.exists() ? adminSnap : await getDoc(doc(adminDb, "users", user.uid));
           if (userDocSnap.exists() && userDocSnap.data().role === "admin") {
             const from = (location.state as { from?: string } | null)?.from || "/admin";
             navigate(from, { replace: true });
@@ -46,21 +46,25 @@ const AdminLogin: React.FC = () => {
       // 1. Sign in with isolated adminAuth instance
       const credential = await signInWithEmailAndPassword(adminAuth, email.trim(), password);
 
-      // 2. Fetch User Profile from Firestore to check Role (Check admins collection first)
-      const adminSnap = await getDoc(doc(db, "admins", credential.user.uid));
-      const userDocSnap = adminSnap.exists() ? adminSnap : await getDoc(doc(db, "users", credential.user.uid));
-
-      if (!userDocSnap.exists()) {
-        await signOut(adminAuth);
-        toast.error("Account profile not found.");
-        setLoading(false);
-        return;
+      // 2. Fetch User Profile from Firestore to check Role (Check admins collection first, then users)
+      let role: string | null = null;
+      try {
+        const adminSnap = await getDoc(doc(adminDb, "admins", credential.user.uid));
+        if (adminSnap.exists()) {
+          role = adminSnap.data().role || "admin";
+        } else {
+          const userDocSnap = await getDoc(doc(adminDb, "users", credential.user.uid));
+          if (userDocSnap.exists()) {
+            role = userDocSnap.data().role;
+          }
+        }
+      } catch (firestoreErr) {
+        console.warn("Admin Firestore role check error:", firestoreErr);
       }
 
-      const role = userDocSnap.data().role;
       if (role !== "admin") {
         await signOut(adminAuth);
-        toast.error("Access denied. Admin credentials required.");
+        toast.error("Access denied. Admin privileges required for this portal.");
         setLoading(false);
         return;
       }
@@ -72,10 +76,16 @@ const AdminLogin: React.FC = () => {
       console.error("Admin sign in error:", error);
       const errCode = (error as { code?: string })?.code || "";
       let errMsg = "Failed to sign in.";
-      if (errCode === "auth/invalid-credential" || errCode === "auth/wrong-password" || errCode === "auth/user-not-found") {
+      if (errCode === "auth/invalid-credential" || errCode === "auth/wrong-password" || errCode === "auth/user-not-found" || errCode === "auth/invalid-email") {
         errMsg = "Invalid email or password.";
       } else if (errCode === "auth/too-many-requests") {
         errMsg = "Too many failed attempts. Try again later.";
+      } else if (errCode === "auth/unauthorized-domain") {
+        errMsg = "Domain not authorized. Please add tourenvi-web.vercel.app to Firebase Authentication Authorized Domains.";
+      } else if (errCode === "auth/network-request-failed") {
+        errMsg = "Network error. Please check your internet connection.";
+      } else if (error instanceof Error && error.message) {
+        errMsg = error.message;
       }
       toast.error(errMsg);
     } finally {

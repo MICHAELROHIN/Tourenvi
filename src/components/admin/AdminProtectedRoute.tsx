@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { adminAuth } from "@/lib/firebaseAdminAuth";
-import { db } from "@/firebase";
+import { adminAuth, adminDb } from "@/lib/firebaseAdminAuth";
 import { doc, getDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { Loader2, ShieldAlert, LogOut, ArrowLeft } from "lucide-react";
@@ -26,11 +25,11 @@ const AdminProtectedRoute = ({ children }: { children: React.ReactNode }) => {
       setCurrentUser(user);
 
       try {
-        const adminDocSnap = await getDoc(doc(db, "admins", user.uid));
+        const adminDocSnap = await getDoc(doc(adminDb, "admins", user.uid));
         if (adminDocSnap.exists()) {
           setUserRole(adminDocSnap.data().role || "admin");
         } else {
-          const userDocSnap = await getDoc(doc(db, "users", user.uid));
+          const userDocSnap = await getDoc(doc(adminDb, "users", user.uid));
           if (userDocSnap.exists()) {
             setUserRole(userDocSnap.data().role || "user");
           } else {

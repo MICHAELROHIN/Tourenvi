@@ -11,6 +11,11 @@ service cloud.firestore {
       allow create, update: if isAuth() && request.auth.uid == uid;
     }
 
+    match /admins/{uid} {
+      allow read: if isAuth() && (request.auth.uid == uid || role() == 'admin');
+      allow write: if isAuth() && (request.auth.uid == uid || role() == 'admin');
+    }
+
     match /trips/{tripId} {
       allow read: if isAuth() &&
         (resource.data.userId == request.auth.uid || resource.data.memberIds.hasAny([request.auth.uid]));

@@ -84,7 +84,7 @@ const PortalSafe = ({
 const AppRoutes = () => {
   return (
     <Routes>
-      <Route path="/" element={<RootRedirect />} />
+      <Route path="/" element={<Index />} />
       <Route
         path="/login"
         element={
@@ -93,14 +93,7 @@ const AppRoutes = () => {
           </AuthGate>
         }
       />
-      <Route
-        path="/hero"
-        element={
-          <ProtectedRoute allowedRoles={["user", "admin", "guide", "support"]}>
-            <Index />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/hero" element={<Index />} />
 
       <Route
         path="/dashboard"
