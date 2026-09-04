@@ -13,7 +13,10 @@ import {
   User,
   Mail,
   Tag,
+  ChevronDown,
+  Sparkles,
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 interface HelpSupportModalProps {
   isOpen: boolean;
@@ -29,6 +32,15 @@ const CATEGORIES = [
   "Other Technical Issue",
 ];
 
+const CATEGORY_ICONS: Record<string, string> = {
+  "Budget Calculation Bug": "🧮",
+  "Route Navigation Issue": "🗺️",
+  "Hotel/Stay Query": "🏨",
+  "General Feedback": "💬",
+  "Account & Billing": "💳",
+  "Other Technical Issue": "🔧",
+};
+
 const HelpSupportModal: React.FC<HelpSupportModalProps> = ({ isOpen, onClose }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [category, setCategory] = useState(CATEGORIES[0]);
@@ -37,17 +49,18 @@ const HelpSupportModal: React.FC<HelpSupportModalProps> = ({ isOpen, onClose }) 
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const { userDoc } = useAuth();
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        setName(currentUser.displayName || "");
+        setName(userDoc?.name || currentUser.displayName || "");
         setEmail(currentUser.email || "");
       }
     });
     return () => unsub();
-  }, []);
+  }, [userDoc]);
 
   if (!isOpen) return null;
 
@@ -89,46 +102,55 @@ const HelpSupportModal: React.FC<HelpSupportModalProps> = ({ isOpen, onClose }) 
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-white/10 bg-[#0B2B5C] p-6 shadow-2xl text-white">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white border border-gray-200/80 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.15)] animate-in zoom-in-95 duration-300">
+        {/* Decorative top gradient bar */}
+        <div className="h-1 w-full bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500" />
+
         {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white rounded-full hover:bg-white/10 transition-colors"
+          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-all z-10"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
 
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37]">
-            <LifeBuoy className="h-6 w-6 animate-pulse" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-white">Help & Support Desk</h2>
-            <p className="text-xs text-gray-300">
-              Run into an issue? We're here to assist your journey.
-            </p>
+        <div className="p-6 pb-0">
+          {/* Header */}
+          <div className="flex items-center gap-3.5 mb-6">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200/60 text-emerald-600 shadow-sm">
+              <LifeBuoy className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 tracking-tight">Help & Support</h2>
+              <p className="text-xs text-gray-500">
+                Run into an issue? We're here to assist your journey.
+              </p>
+            </div>
           </div>
         </div>
 
         {submitted ? (
-          <div className="py-8 text-center space-y-4">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400">
-              <CheckCircle2 className="h-10 w-10 animate-bounce" />
+          <div className="px-6 py-10 text-center space-y-4">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50 border border-emerald-200 text-emerald-500">
+              <CheckCircle2 className="h-9 w-9" />
             </div>
-            <h3 className="text-lg font-bold text-white">Ticket Submitted Successfully!</h3>
-            <p className="text-sm text-gray-300 max-w-xs mx-auto">
-              Our team has received your ticket and set status to <span className="text-emerald-400 font-semibold">Open</span>. We will follow up via email at <span className="text-[#D4AF37] font-semibold">{email}</span>.
+            <h3 className="text-lg font-bold text-gray-900">Ticket Submitted!</h3>
+            <p className="text-sm text-gray-500 max-w-xs mx-auto">
+              Our team has received your ticket. We'll follow up via email at{" "}
+              <span className="text-emerald-600 font-semibold">{email}</span>.
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="px-6 pb-6 space-y-4">
             {/* User Details */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-[#D4AF37]" /> Your Name *
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-1.5">
+                  <User className="w-3.5 h-3.5 text-emerald-500" /> Your Name
                 </label>
                 <input
                   type="text"
@@ -136,13 +158,13 @@ const HelpSupportModal: React.FC<HelpSupportModalProps> = ({ isOpen, onClose }) 
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="John Doe"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder-gray-400 focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 transition-all"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
-                  <Mail className="w-3.5 h-3.5 text-[#D4AF37]" /> Email Address *
+                <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-1.5">
+                  <Mail className="w-3.5 h-3.5 text-emerald-500" /> Email Address
                 </label>
                 <input
                   type="email"
@@ -150,65 +172,68 @@ const HelpSupportModal: React.FC<HelpSupportModalProps> = ({ isOpen, onClose }) 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="john@example.com"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder-gray-400 focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 transition-all"
                 />
               </div>
             </div>
 
             {/* Issue Category */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
-                <Tag className="w-3.5 h-3.5 text-[#D4AF37]" /> Issue Category *
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-1.5">
+                <Tag className="w-3.5 h-3.5 text-emerald-500" /> Issue Category
               </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-[#051124] px-3.5 py-2.5 text-sm text-white focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37]"
-              >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm text-gray-900 focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 transition-all appearance-none pr-10"
+                >
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {CATEGORY_ICONS[cat]} {cat}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             {/* Message Body */}
             <div>
-              <label className="block text-xs font-semibold text-gray-300 mb-1 flex items-center gap-1.5">
-                <MessageSquare className="w-3.5 h-3.5 text-[#D4AF37]" /> Describe Your Issue or Query *
+              <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600 mb-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-500" /> Describe Your Issue
               </label>
               <textarea
                 required
                 rows={4}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder="Explain what went wrong (e.g., fuel calculation mismatch on Mumbai-Goa route...)"
-                className="w-full rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-sm text-white placeholder-gray-400 focus:border-[#D4AF37] focus:outline-none focus:ring-1 focus:ring-[#D4AF37] resize-none"
+                placeholder="Tell us what went wrong (e.g., fuel calculation mismatch on Mumbai-Goa route...)"
+                className="w-full rounded-xl border border-gray-200 bg-gray-50/80 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-100 transition-all resize-none"
               />
             </div>
 
             {/* Logged in badge indicator */}
             {user && (
-              <div className="flex items-center gap-2 p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
-                <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>Automatically linking to your logged-in account (UID: {user.uid.substring(0, 8)}...)</span>
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-200/60 text-xs text-emerald-700">
+                <Sparkles className="w-4 h-4 shrink-0 text-emerald-500" />
+                <span>Linked to your account <span className="font-semibold text-emerald-600">({user.uid.substring(0, 8)}...)</span></span>
               </div>
             )}
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-2">
+            <div className="flex items-center justify-end gap-3 pt-1">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm font-semibold text-gray-300 hover:bg-white/10 transition-colors"
+                className="px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-800 transition-all"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#D4AF37] text-[#0B2B5C] text-sm font-bold shadow-lg hover:bg-[#c49f27] active:scale-95 transition-all disabled:opacity-50"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-bold shadow-md shadow-emerald-200 hover:bg-emerald-700 active:scale-[0.97] transition-all disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <span>Submitting...</span>

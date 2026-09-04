@@ -311,43 +311,43 @@ const TripsPlanned = () => {
                   {/* Trip Card Header Banner */}
                   <div
                     onClick={() => toggleExpand(plannedTrip.id)}
-                    className="p-6 md:p-8 bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 text-white cursor-pointer relative overflow-hidden"
+                    className="p-4 sm:p-6 md:p-8 bg-gradient-to-r from-emerald-800 via-emerald-700 to-emerald-900 text-white cursor-pointer relative overflow-hidden"
                   >
                     {/* Decorative leaf/overlay background icon */}
                     <div className="absolute right-[-20px] top-[-20px] opacity-10 pointer-events-none">
                       <Sparkles size={200} />
                     </div>
 
-                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="px-3 py-1 bg-gt-gold text-emerald-900 font-bold rounded-full text-xs uppercase tracking-wider">
+                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
+                      <div className="space-y-2 min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                          <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 bg-gt-gold text-emerald-900 font-bold rounded-full text-[10px] sm:text-xs uppercase tracking-wider">
                             Trip #{plannedTrips.length - index}
                           </span>
-                          <span className="px-3 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-xs font-semibold flex items-center gap-1">
+                          <span className="px-2.5 sm:px-3 py-0.5 sm:py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded-full text-[10px] sm:text-xs font-semibold flex items-center gap-1">
                             <ShieldCheck size={12} /> Saved & Finalized
                           </span>
-                          <span className="text-xs text-gray-300">
+                          <span className="text-[11px] sm:text-xs text-gray-300">
                             Created {formatDate(plannedTrip.createdAt)}
                           </span>
                         </div>
 
-                        <h2 className="text-2xl md:text-3xl font-serif font-bold text-white flex items-center gap-2">
-                          <MapPin size={24} className="text-gt-gold shrink-0" />
-                          <span>
-                            {originName} → <span className="text-gt-gold">{destinationName}</span>
-                          </span>
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-serif font-bold text-white flex flex-wrap items-center gap-1.5 sm:gap-2 leading-tight break-words">
+                          <MapPin size={22} className="text-gt-gold shrink-0 inline-block" />
+                          <span className="break-words">{originName}</span>
+                          <span className="text-gt-gold">→</span>
+                          <span className="text-gt-gold break-words">{destinationName}</span>
                         </h2>
 
                         {/* Travel Dates Display */}
                         {(tripData.startDate || tripData.endDate) && (
-                          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-200 pt-1">
-                            <Calendar size={16} className="text-gt-gold" />
+                          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-gray-200 pt-0.5">
+                            <Calendar size={15} className="text-gt-gold" />
                             <span className="font-medium">
                               {formatDate(tripData.startDate)} — {formatDate(tripData.endDate)}
                             </span>
                             {nightsText && (
-                              <span className="px-2.5 py-0.5 bg-white/10 rounded-md text-xs font-semibold text-gt-gold border border-white/10">
+                              <span className="px-2 py-0.5 bg-white/10 rounded-md text-[11px] sm:text-xs font-semibold text-gt-gold border border-white/10">
                                 {nightsText}
                               </span>
                             )}
@@ -356,13 +356,13 @@ const TripsPlanned = () => {
                       </div>
 
                       {/* Right summary metrics */}
-                      <div className="flex flex-wrap items-center gap-4 border-t md:border-t-0 md:border-l border-white/15 pt-4 md:pt-0 md:pl-6">
+                      <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 sm:gap-4 border-t md:border-t-0 md:border-l border-white/15 pt-3 sm:pt-4 md:pt-0 md:pl-6">
                         <div>
-                          <p className="text-xs text-gray-300 uppercase tracking-wider">Total Estimate</p>
-                          <p className="text-2xl font-bold text-gt-gold">
+                          <p className="text-[10px] sm:text-xs text-gray-300 uppercase tracking-wider">Total Estimate</p>
+                          <p className="text-xl sm:text-2xl font-bold text-gt-gold">
                             ₹{(financials.totalCost || 0).toLocaleString()}
                           </p>
-                          <p className="text-[11px] text-gray-400">
+                          <p className="text-[10px] sm:text-[11px] text-gray-400">
                             Budget Cap: ₹{(tripData.budgetCap || 50000).toLocaleString()}
                           </p>
                         </div>
@@ -370,9 +370,9 @@ const TripsPlanned = () => {
                         <div className="flex items-center gap-2">
                           <Button
                             onClick={(e) => handleStartJourney(plannedTrip, e)}
-                            className="bg-gt-gold hover:bg-yellow-500 text-emerald-950 font-bold px-4 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-transform active:scale-95 text-xs"
+                            className="bg-gt-gold hover:bg-yellow-500 text-emerald-950 font-bold px-3.5 sm:px-4 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-transform active:scale-95 text-xs"
                           >
-                            <Navigation size={14} className="text-emerald-950 animate-pulse" />
+                            <Navigation size={13} className="text-emerald-950 animate-pulse" />
                             <span>Start Journey</span>
                           </Button>
 
@@ -380,17 +380,17 @@ const TripsPlanned = () => {
                             variant="ghost"
                             size="icon"
                             onClick={(e) => handleDeleteTrip(plannedTrip.id, e)}
-                            className="text-gray-300 hover:text-red-400 hover:bg-white/10 rounded-full"
+                            className="text-gray-300 hover:text-red-400 hover:bg-white/10 rounded-full h-8 w-8 sm:h-9 sm:w-9"
                             title="Delete Trip"
                           >
-                            <Trash2 size={18} />
+                            <Trash2 size={16} />
                           </Button>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="text-white hover:bg-white/10 rounded-full"
+                            className="text-white hover:bg-white/10 rounded-full h-8 w-8 sm:h-9 sm:w-9"
                           >
-                            {isExpanded ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
+                            {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                           </Button>
                         </div>
                       </div>
@@ -398,38 +398,38 @@ const TripsPlanned = () => {
                   </div>
 
                   {/* Summary Bar - Always visible */}
-                  <div className="p-4 md:px-8 bg-gray-50 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4 text-xs font-medium text-gray-600">
-                    <div className="flex flex-wrap items-center gap-4">
-                      <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-2xs">
+                  <div className="p-3 sm:p-4 md:px-8 bg-gray-50 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2.5 sm:gap-4 text-xs font-medium text-gray-600">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                      <span className="flex items-center gap-1.5 bg-white px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-gray-200 shadow-2xs text-[11px] sm:text-xs">
                         {tripData.vehicleType === "bike" ? (
-                          <Bike size={14} className="text-emerald-600" />
+                          <Bike size={13} className="text-emerald-600" />
                         ) : (
-                          <Car size={14} className="text-emerald-600" />
+                          <Car size={13} className="text-emerald-600" />
                         )}
                         <span className="capitalize">{tripData.vehicleType}</span> ({tripData.fuelType})
                       </span>
 
-                      <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-2xs">
-                        <Users size={14} className="text-emerald-600" />
+                      <span className="flex items-center gap-1.5 bg-white px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-gray-200 shadow-2xs text-[11px] sm:text-xs">
+                        <Users size={13} className="text-emerald-600" />
                         <span className="capitalize">{tripData.tripType}</span> ({tripData.numberOfMembers} person{tripData.numberOfMembers > 1 ? "s" : ""})
                       </span>
 
-                      <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-2xs">
-                        <Leaf size={14} className="text-green-600" />
+                      <span className="flex items-center gap-1.5 bg-white px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-gray-200 shadow-2xs text-[11px] sm:text-xs">
+                        <Leaf size={13} className="text-green-600" />
                         <span>Eco Score: {ecoData.co2} kg CO₂</span>
                       </span>
 
                       {tripData.selectedHotelName && (
-                        <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-xl border border-emerald-200 font-semibold">
-                          <Bed size={14} className="text-emerald-600" />
-                          <span>{tripData.selectedHotelName}</span>
+                        <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-emerald-200 font-semibold text-[11px] sm:text-xs">
+                          <Bed size={13} className="text-emerald-600" />
+                          <span className="truncate max-w-[140px] sm:max-w-[200px]">{tripData.selectedHotelName}</span>
                         </span>
                       )}
                     </div>
 
                     <button
                       onClick={() => toggleExpand(plannedTrip.id)}
-                      className="text-emerald-600 font-semibold hover:underline flex items-center gap-1"
+                      className="text-emerald-600 font-semibold hover:underline flex items-center gap-1 text-xs"
                     >
                       {isExpanded ? "Hide Details" : "View Full Itinerary & Breakdown"}
                       {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -438,12 +438,12 @@ const TripsPlanned = () => {
 
                   {/* Expanded Content View */}
                   {isExpanded && (
-                    <div className="p-6 md:p-8 space-y-6 animate-in fade-in duration-300">
+                    <div className="p-4 sm:p-6 md:p-8 space-y-4 sm:space-y-6 animate-in fade-in duration-300">
                       {/* Tabs Navigation */}
-                      <div className="flex border-b border-gray-200 space-x-6">
+                      <div className="flex border-b border-gray-200 space-x-3 sm:space-x-6 overflow-x-auto no-scrollbar pb-0.5">
                         <button
                           onClick={() => setTabForTrip(plannedTrip.id, "itinerary")}
-                          className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${
+                          className={`pb-2.5 sm:pb-3 font-semibold text-xs sm:text-sm whitespace-nowrap transition-colors border-b-2 ${
                             activeTab === "itinerary"
                               ? "border-emerald-600 text-emerald-700"
                               : "border-transparent text-gray-400 hover:text-gray-700"
@@ -453,7 +453,7 @@ const TripsPlanned = () => {
                         </button>
                         <button
                           onClick={() => setTabForTrip(plannedTrip.id, "breakdown")}
-                          className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${
+                          className={`pb-2.5 sm:pb-3 font-semibold text-xs sm:text-sm whitespace-nowrap transition-colors border-b-2 ${
                             activeTab === "breakdown"
                               ? "border-emerald-600 text-emerald-700"
                               : "border-transparent text-gray-400 hover:text-gray-700"
@@ -464,7 +464,7 @@ const TripsPlanned = () => {
                         {destinationShowcase && destinationShowcase.length > 0 && (
                           <button
                             onClick={() => setTabForTrip(plannedTrip.id, "places")}
-                            className={`pb-3 font-semibold text-sm transition-colors border-b-2 ${
+                            className={`pb-2.5 sm:pb-3 font-semibold text-xs sm:text-sm whitespace-nowrap transition-colors border-b-2 ${
                               activeTab === "places"
                                 ? "border-emerald-600 text-emerald-700"
                                 : "border-transparent text-gray-400 hover:text-gray-700"
@@ -474,6 +474,7 @@ const TripsPlanned = () => {
                           </button>
                         )}
                       </div>
+
 
                       {/* TAB 1: ITINERARY */}
                       {activeTab === "itinerary" && (

@@ -246,14 +246,14 @@ const Login: React.FC = () => {
   );
 
   return (
-    <div className="relative flex h-screen w-full items-center justify-center overflow-hidden font-['Poppins',sans-serif]">
+    <div className="relative flex min-h-screen w-full items-center justify-center overflow-y-auto p-4 font-['Poppins',sans-serif]">
 
       {/* --- FULLPAGE BLURRED BACKGROUND --- */}
       <div
-        className="absolute inset-0 z-0 bg-cover bg-center blur-[24px] scale-110"
+        className="fixed inset-0 z-0 bg-cover bg-center blur-[24px] scale-110"
         style={{ backgroundImage: `url(${bgImage})` }}
       />
-      <div className="absolute inset-0 z-0 bg-black/25" />
+      <div className="fixed inset-0 z-0 bg-black/25" />
 
       {/* --- 1. SHUTTER --- */}
       <div
@@ -271,9 +271,228 @@ const Login: React.FC = () => {
         </div>
       </div>
 
-      {/* --- 2. MAIN CARD --- */}
+      {/* --- 2. MOBILE CARD (Visible on Mobile Only: < md) --- */}
       <div
-        className={`relative z-10 min-h-[600px] w-[950px] max-w-[92%] overflow-hidden rounded-[30px] bg-white shadow-2xl transition-all duration-1000 delay-[400ms] ease-out
+        className={`relative z-10 w-full max-w-[370px] sm:max-w-[400px] overflow-hidden rounded-[26px] bg-white p-6 sm:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.25)] transition-all duration-700 delay-[300ms] ease-out md:hidden
+          ${isLoaded ? "translate-y-0 opacity-100 scale-100" : "translate-y-12 opacity-0 scale-95"}
+        `}
+      >
+        {/* SLIDING CAROUSEL TRACK */}
+        <div
+          className={`flex w-[200%] transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+            isRegister ? "-translate-x-1/2" : "translate-x-0"
+          }`}
+        >
+          {/* --- PANEL 1: SIGN IN --- */}
+          <div
+            className={`w-1/2 pr-3.5 transition-opacity duration-300 ${
+              isRegister ? "opacity-0 pointer-events-none" : "opacity-100"
+            }`}
+          >
+            <div className="mb-5 text-left">
+              <h1 className="text-2xl sm:text-[26px] font-bold font-sans text-[#1e3b34]">
+                Welcome Back
+              </h1>
+              <p className="mt-1 text-xs sm:text-sm text-gray-500 font-normal">
+                Please enter your details to sign in.
+              </p>
+            </div>
+
+            <form onSubmit={handleLogin} className="flex flex-col">
+              <div className="relative mb-3.5 w-full">
+                <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 peer-focus:text-[#2ecc71] transition-colors" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="michaelrohin@gmail.com"
+                  required
+                  className="peer w-full rounded-xl border border-transparent bg-[#f4f7f6] px-4 py-3 pl-11 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:border-[#2ecc71] focus:ring-2 focus:ring-[#2ecc71]/20"
+                />
+              </div>
+
+              <div className="relative mb-5 w-full">
+                <KeyRound className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 peer-focus:text-[#2ecc71] transition-colors" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  required
+                  className="peer w-full rounded-xl border border-transparent bg-[#f4f7f6] px-4 py-3 pl-11 pr-11 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:border-[#2ecc71] focus:ring-2 focus:ring-[#2ecc71]/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-[#2ecc71]"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="group flex w-full items-center justify-center gap-2 rounded-xl bg-[#2ecc71] py-3.5 text-sm font-bold font-sans text-white shadow-[0_6px_20px_rgba(46,204,113,0.35)] transition-all hover:bg-[#27ae60] active:scale-[0.98] disabled:opacity-70"
+              >
+                {loading ? "Please wait..." : "Log In"}
+                {!loading && <ArrowRight className="h-4 w-4 stroke-[2.5]" />}
+              </button>
+
+              <div className="mt-4 text-center text-xs sm:text-sm text-gray-600 font-medium">
+                Don't have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => setIsRegister(true)}
+                  className="text-[#2ecc71] font-bold hover:underline ml-0.5"
+                >
+                  Sign Up
+                </button>
+              </div>
+
+              <div className="my-4 flex w-full items-center">
+                <hr className="w-full border-gray-200" />
+                <span className="px-3 text-xs text-gray-400 font-medium">OR</span>
+                <hr className="w-full border-gray-200" />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoogleAuth}
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold font-sans text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-[0.98]"
+              >
+                <GoogleIcon />
+                {loading ? "Please wait..." : "Continue with Google"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsRecoveryOpen(true)}
+                className="mt-4 text-xs sm:text-sm font-semibold font-sans text-[#1e3b34] transition-all hover:underline"
+              >
+                Forgot Password?
+              </button>
+            </form>
+          </div>
+
+          {/* --- PANEL 2: SIGN UP --- */}
+          <div
+            className={`w-1/2 pl-3.5 transition-opacity duration-300 ${
+              isRegister ? "opacity-100" : "opacity-0 pointer-events-none"
+            }`}
+          >
+            <div className="mb-5 text-left">
+              <h1 className="text-2xl sm:text-[26px] font-bold font-sans text-[#1e3b34]">
+                Create Account
+              </h1>
+              <p className="mt-1 text-xs sm:text-sm text-gray-500 font-normal">
+                Join our sustainable travel community.
+              </p>
+            </div>
+
+            <form onSubmit={handleRegister} className="flex flex-col">
+              <div className="relative mb-3 w-full">
+                <User2 className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 peer-focus:text-[#2ecc71] transition-colors" />
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Full Name"
+                  required
+                  className="peer w-full rounded-xl border border-transparent bg-[#f4f7f6] px-4 py-3 pl-11 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:border-[#2ecc71] focus:ring-2 focus:ring-[#2ecc71]/20"
+                />
+              </div>
+
+              <div className="relative mb-3 w-full">
+                <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 peer-focus:text-[#2ecc71] transition-colors" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Email Address"
+                  required
+                  className="peer w-full rounded-xl border border-transparent bg-[#f4f7f6] px-4 py-3 pl-11 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:border-[#2ecc71] focus:ring-2 focus:ring-[#2ecc71]/20"
+                />
+              </div>
+
+              <div className="relative mb-3 w-full">
+                <Phone className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 peer-focus:text-[#2ecc71] transition-colors" />
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="Phone Number"
+                  required
+                  className="peer w-full rounded-xl border border-transparent bg-[#f4f7f6] px-4 py-3 pl-11 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:border-[#2ecc71] focus:ring-2 focus:ring-[#2ecc71]/20"
+                />
+              </div>
+
+              <div className="relative mb-4 w-full">
+                <KeyRound className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 peer-focus:text-[#2ecc71] transition-colors" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Password"
+                  minLength={6}
+                  required
+                  className="peer w-full rounded-xl border border-transparent bg-[#f4f7f6] px-4 py-3 pl-11 pr-11 text-sm text-gray-700 outline-none transition-all focus:bg-white focus:border-[#2ecc71] focus:ring-2 focus:ring-[#2ecc71]/20"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-[#2ecc71]"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="group flex w-full items-center justify-center gap-2 rounded-xl bg-[#2ecc71] py-3.5 text-sm font-bold font-sans text-white shadow-[0_6px_20px_rgba(46,204,113,0.35)] transition-all hover:bg-[#27ae60] active:scale-[0.98] disabled:opacity-70"
+              >
+                {loading ? "Please wait..." : "Register"}
+                {!loading && <ArrowRight className="h-4 w-4 stroke-[2.5]" />}
+              </button>
+
+              <div className="mt-4 text-center text-xs sm:text-sm text-gray-600 font-medium">
+                Already have an account?{" "}
+                <button
+                  type="button"
+                  onClick={() => setIsRegister(false)}
+                  className="text-[#2ecc71] font-bold hover:underline ml-0.5"
+                >
+                  Sign In
+                </button>
+              </div>
+
+              <div className="my-4 flex w-full items-center">
+                <hr className="w-full border-gray-200" />
+                <span className="px-3 text-xs text-gray-400 font-medium">OR</span>
+                <hr className="w-full border-gray-200" />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleGoogleAuth}
+                disabled={loading}
+                className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-200 bg-white py-3 text-sm font-semibold font-sans text-gray-700 shadow-sm transition-all hover:bg-gray-50 active:scale-[0.98]"
+              >
+                <GoogleIcon />
+                {loading ? "Please wait..." : "Sign up with Google"}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      {/* --- 3. DESKTOP MAIN CARD (Unchanged, Visible on >= md only) --- */}
+      <div
+        className={`relative z-10 hidden md:block min-h-[600px] w-[950px] max-w-[92%] overflow-hidden rounded-[30px] bg-white shadow-2xl transition-all duration-1000 delay-[400ms] ease-out
           ${isLoaded ? "translate-y-0 opacity-100 scale-100" : "translate-y-16 opacity-0 scale-95"}
         `}
       >

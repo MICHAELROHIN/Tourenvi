@@ -19,7 +19,10 @@ export interface LiveLocationResult {
   source: "google" | "bigdatacloud" | "osm";
 }
 
-const BACKEND_URL = "http://localhost:8000";
+const BACKEND_URL = (
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV ? "http://localhost:8000" : "")
+).replace(/\/$/, "");
 const BDC_ENDPOINT = "https://api.bigdatacloud.net/data/reverse-geocode-client";
 const OSM_ENDPOINT = "https://nominatim.openstreetmap.org/reverse";
 
@@ -51,30 +54,92 @@ function formatBigDataCloud(data: unknown): string | null {
 
   if (deduped.length === 0) return null;
 
-  // Keep it concise: "Area, State" or "Area, State, Country"
   return deduped.slice(0, 3).join(", ");
 }
 
-/** Build a short place label from Nominatim's address block. */
+/** Build a detailed, accurate place label from Nominatim's address block. */
 function formatOsm(data: unknown): string | null {
   if (!isRecord(data)) return null;
   const addr = isRecord(data.address) ? data.address : {};
 
-  const candidates = [
-    addr.suburb || addr.neighbourhood || addr.village || addr.town || addr.city_district,
-    addr.city || addr.county,
-    addr.state,
-  ].filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+  // 1. Specific point (junction, road, landmark, building, amenity)
+  const specificName =
+    addr.junction ||
+    addr.road ||
+    addr.street ||
+    addr.amenity ||
+    addr.building ||
+    addr.shop ||
+    addr.tourism ||
+    addr.pedestrian;
 
-  const deduped = candidates.filter((v, i) => candidates.indexOf(v) === i);
+  // 2. Immediate village / locality / neighborhood
+  const localArea =
+    addr.village ||
+    addr.hamlet ||
+    addr.suburb ||
+    addr.neighbourhood ||
+    addr.quarter ||
+    addr.residential ||
+    addr.town;
+
+  // 3. City / Municipality / District
+  const districtOrCity =
+    addr.city ||
+    addr.municipality ||
+    addr.city_district ||
+    addr.county ||
+    addr.state_district;
+
+  // 4. State
+  const state = addr.state;
+
+  const parts = [
+    typeof specificName === "string" ? specificName.trim() : "",
+    typeof localArea === "string" ? localArea.trim() : "",
+    typeof districtOrCity === "string" ? districtOrCity.trim() : "",
+    typeof state === "string" ? state.trim() : "",
+  ].filter((v): v is string => v.length > 0);
+
+  // Deduplicate
+  const deduped = parts.filter((v, i) => parts.indexOf(v) === i);
 
   if (deduped.length > 0) return deduped.join(", ");
   return typeof data.display_name === "string" ? data.display_name : null;
 }
 
 /**
+ * Reverse geocode via OpenStreetMap Nominatim.
+ * Uses zoom=18 for exact street & village precision matching Leaflet map tiles.
+ */
+async function reverseGeocodeOsm(
+  latitude: number,
+  longitude: number
+): Promise<string | null> {
+  const { signal, cancel } = withTimeout(FETCH_TIMEOUT_MS);
+  try {
+    const url = `${OSM_ENDPOINT}?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
+    const res = await fetch(url, {
+      signal,
+      headers: { "Accept-Language": "en", "User-Agent": "Tourenvi-App/1.0" },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const result = formatOsm(data);
+    if (result) {
+      console.log(`[GPS] OSM Nominatim resolved: "${result}"`);
+    }
+    return result;
+  } catch (err) {
+    console.warn("[GPS] OSM Nominatim lookup failed:", err);
+    return null;
+  } finally {
+    cancel();
+  }
+}
+
+/**
  * Reverse geocode via Google Maps Geocoding API through the backend proxy.
- * This is the most accurate provider — returns exact locality and sublocality.
  */
 async function reverseGeocodeGoogle(
   latitude: number,
@@ -127,37 +192,11 @@ async function reverseGeocodeBigDataCloud(
   }
 }
 
-async function reverseGeocodeOsm(
-  latitude: number,
-  longitude: number
-): Promise<string | null> {
-  const { signal, cancel } = withTimeout(FETCH_TIMEOUT_MS);
-  try {
-    // Use zoom=18 for street-level precision
-    const url = `${OSM_ENDPOINT}?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
-    const res = await fetch(url, {
-      signal,
-      headers: { "Accept-Language": "en" },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    const result = formatOsm(data);
-    if (result) {
-      console.log(`[GPS] OSM Nominatim resolved: "${result}"`);
-    }
-    return result;
-  } catch (err) {
-    console.warn("[GPS] OSM Nominatim lookup failed:", err);
-    return null;
-  } finally {
-    cancel();
-  }
-}
-
 /**
- * Resolve a lat/lon pair to a short, human-readable place name.
- * Tries Google Maps first (via backend proxy), then BigDataCloud,
- * then OSM Nominatim. Returns `null` if all fail.
+ * Resolve a lat/lon pair to an exact, human-readable place name.
+ * Priority 1: OSM Nominatim (matches the exact Leaflet map data)
+ * Priority 2: Google Maps Geocoding
+ * Priority 3: BigDataCloud
  */
 export async function getLiveLocationName(
   latitude: number,
@@ -165,17 +204,17 @@ export async function getLiveLocationName(
 ): Promise<string | null> {
   console.log(`[GPS] Resolving place name for coordinates: (${latitude}, ${longitude})`);
 
-  // 1. Google Maps via backend proxy (most accurate — exact road-level addresses)
+  // 1. OSM Nominatim (exact match with the Leaflet map dataset)
+  const osmResult = await reverseGeocodeOsm(latitude, longitude);
+  if (osmResult) return osmResult;
+
+  // 2. Google Maps via backend proxy
   const googleResult = await reverseGeocodeGoogle(latitude, longitude);
   if (googleResult) return googleResult;
 
-  // 2. BigDataCloud (free fallback)
+  // 3. BigDataCloud (fallback)
   const bdcResult = await reverseGeocodeBigDataCloud(latitude, longitude);
   if (bdcResult) return bdcResult;
-
-  // 3. OSM Nominatim (last resort)
-  const osmResult = await reverseGeocodeOsm(latitude, longitude);
-  if (osmResult) return osmResult;
 
   console.error("[GPS] All reverse geocoding providers failed!");
   return null;

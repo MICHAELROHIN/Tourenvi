@@ -28,7 +28,7 @@ const HeroVideo = ({
           "absolute inset-0 h-full w-full object-cover",
           videoClassName,
         )}
-        poster="/video-poster.jpg" // Add a poster image if you have one
+        poster="/placeholder.svg"
       >
         <source src={tamilNaduVideo} type="video/mp4" />
         Your browser does not support the video tag.

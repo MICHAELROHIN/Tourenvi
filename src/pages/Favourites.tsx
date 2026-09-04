@@ -28,14 +28,20 @@ const Favourites = () => {
     }
 
     const ref = collection(db, "users", uid, "favourites");
-    const unsubscribe = onSnapshot(ref, (snapshot) => {
-      setItems(
-        snapshot.docs.map((docItem) => ({
-          id: docItem.id,
-          ...(docItem.data() as Omit<FavouriteItem, "id">),
-        })),
-      );
-    });
+    const unsubscribe = onSnapshot(
+      ref,
+      (snapshot) => {
+        setItems(
+          snapshot.docs.map((docItem) => ({
+            id: docItem.id,
+            ...(docItem.data() as Omit<FavouriteItem, "id">),
+          })),
+        );
+      },
+      (err) => {
+        console.warn("Favourites snapshot error:", err.message);
+      }
+    );
 
     return () => unsubscribe();
   }, []);

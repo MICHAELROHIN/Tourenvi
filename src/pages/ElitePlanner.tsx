@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useTrip } from "@/context/TripContext";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -38,6 +38,7 @@ import {
 import { toast } from "sonner";
 import axios from "axios";
 import { getLiveLocationName, getCurrentPositionAsync } from "@/utils/Livelocationservice";
+import { API_BASE_URL } from "@/config/api";
 
 interface RealHotel {
   id: string;
@@ -81,6 +82,15 @@ const ElitePlanner = () => {
   const { currentUser } = useAuth();
   const [searchParams] = useSearchParams();
   const [currentStage, setCurrentStage] = useState(0);
+  const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    stepRefs.current[currentStage]?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [currentStage]);
 
   useEffect(() => {
     const step = searchParams.get("step") || searchParams.get("stage");
@@ -175,11 +185,11 @@ const ElitePlanner = () => {
   };
 
   useEffect(() => {
-    // Auto-detect live GPS location when user reaches Step 2 (Route stage) if starting location is empty
-    if (currentStage === 1 && !trip.startLocation && !locationDetected) {
+    // Auto-detect live GPS location when user reaches Step 2 (Route stage)
+    if (currentStage === 1 && !locationDetected) {
       detectLiveLocation(true);
     }
-  }, [currentStage, trip.startLocation, locationDetected]);
+  }, [currentStage, locationDetected]);
 
   // Real Hotels state
   const [realHotels, setRealHotels] = useState<RealHotel[]>([]);
@@ -203,7 +213,7 @@ const ElitePlanner = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/api/fuel-price?city=${encodeURIComponent(city)}&fuelType=${encodeURIComponent(normalizedFuel)}`,
+        `${API_BASE_URL}/api/fuel-price?city=${encodeURIComponent(city)}&fuelType=${encodeURIComponent(normalizedFuel)}`,
         {
           method: "GET",
           signal,
@@ -254,7 +264,7 @@ const ElitePlanner = () => {
   useEffect(() => {
     const fetchCars = async () => {
       try {
-        const res = await axios.get("http://localhost:8000/api/cars");
+        const res = await axios.get(`${API_BASE_URL}/api/cars`);
         setCarSuggestions(res.data);
       } catch (err) {
         console.error("Failed to fetch car suggestions:", err);
@@ -262,7 +272,7 @@ const ElitePlanner = () => {
     };
     fetchCars();
 
-    fetch(`http://localhost:8000/brands`)
+    fetch(`${API_BASE_URL}/brands`)
       .then((r) => r.json())
       .then((data) => setBrands(data || []))
       .catch(() => setBrands([]));
@@ -275,7 +285,7 @@ const ElitePlanner = () => {
     setModels([]);
     setFuels([]);
     try {
-      const res = await fetch(`http://localhost:8000/models?brand=${encodeURIComponent(value)}`);
+      const res = await fetch(`${API_BASE_URL}/models?brand=${encodeURIComponent(value)}`);
       const data = await res.json();
       setModels(data || []);
     } catch (e) { setModels([]); }
@@ -287,7 +297,7 @@ const ElitePlanner = () => {
     setFuels([]);
     try {
       const res = await fetch(
-        `http://localhost:8000/fuel?brand=${encodeURIComponent(carBrand)}&model=${encodeURIComponent(value)}`
+        `${API_BASE_URL}/fuel?brand=${encodeURIComponent(carBrand)}&model=${encodeURIComponent(value)}`
       );
       const data = await res.json();
       setFuels(data || []);
@@ -298,7 +308,7 @@ const ElitePlanner = () => {
     if (!carBrand || !carModel || !fuel) return;
     try {
       const res = await fetch(
-        `http://localhost:8000/mileage?brand=${encodeURIComponent(carBrand)}&model=${encodeURIComponent(carModel)}&fuel=${encodeURIComponent(fuel)}`
+        `${API_BASE_URL}/mileage?brand=${encodeURIComponent(carBrand)}&model=${encodeURIComponent(carModel)}&fuel=${encodeURIComponent(fuel)}`
       );
       const data = await res.json();
       const m = typeof data?.mileage === "number" ? data.mileage : null;
@@ -354,7 +364,7 @@ const ElitePlanner = () => {
         setHotelsLoading(true);
         setHotelsError(null);
         try {
-          const res = await fetch(`http://localhost:8000/get-hotels?destination=${encodeURIComponent(targetDestination)}`);
+          const res = await fetch(`${API_BASE_URL}/get-hotels?destination=${encodeURIComponent(targetDestination)}`);
           if (!res.ok) throw new Error("Failed to fetch real hotels for " + targetDestination);
           const data = await res.json();
           if (data.hotels && data.hotels.length > 0) {
@@ -640,7 +650,7 @@ const ElitePlanner = () => {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      const response = await axios.post("http://localhost:8000/api/build-itinerary", {
+      const response = await axios.post(`${API_BASE_URL}/api/build-itinerary`, {
         tripData: trip
       });
 
@@ -676,46 +686,83 @@ const ElitePlanner = () => {
   return (
     <div className="min-h-screen pt-16 bg-gt-offwhite font-sans text-emerald-800 flex flex-col">
       {/* Top Tracker */}
-      <div className="w-full bg-white shadow-sm border-b border-gray-100 py-4 px-6 md:px-12 z-10 sticky top-16">
-        <div className="max-w-6xl mx-auto flex justify-between items-center relative">
-          <div className="absolute left-0 top-1/2 w-full h-0.5 bg-gray-200 -z-10 -translate-y-1/2"></div>
-          <div
-            className={`absolute left-0 top-1/2 h-0.5 bg-emerald-500 -z-10 -translate-y-1/2 transition-all duration-500 ${trackerWidthClasses[currentStage] || "w-[12.5%]"}`}
-          ></div>
+      <div className="w-full bg-white shadow-sm border-b border-gray-100 py-3 sm:py-4 px-3 sm:px-6 md:px-12 z-10 sticky top-16">
+        <div className="max-w-6xl mx-auto">
+          {/* Mobile stage summary indicator */}
+          <div className="flex md:hidden items-center justify-between mb-2">
+            <span className="text-xs font-bold text-emerald-800 tracking-wide uppercase">
+              Step {currentStage + 1} of {stages.length}: <span className="text-emerald-950 font-black">{stages[currentStage]}</span>
+            </span>
+            <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+              {Math.round(((currentStage + 1) / stages.length) * 100)}% Completed
+            </span>
+          </div>
 
-          {stages.map((stage, index) => {
-            const isActive = index === currentStage;
-            const isCompleted = index < currentStage;
-            return (
-              <div key={stage} className="flex flex-col items-center gap-2 bg-white px-2">
+          {/* Desktop connecting line */}
+          <div className="hidden md:block relative w-full mb-0">
+            <div className="absolute left-0 top-1/2 w-full h-0.5 bg-gray-200 -z-10 -translate-y-1/2"></div>
+            <div
+              className={`absolute left-0 top-1/2 h-0.5 bg-emerald-500 -z-10 -translate-y-1/2 transition-all duration-500 ${trackerWidthClasses[currentStage] || "w-[12.5%]"}`}
+            ></div>
+          </div>
+
+          {/* Steps container (scrollable on mobile, evenly distributed on desktop) */}
+          <div className="flex items-center justify-start md:justify-between gap-2 sm:gap-4 overflow-x-auto no-scrollbar py-1 px-1 relative">
+            {stages.map((stage, index) => {
+              const isActive = index === currentStage;
+              const isCompleted = index < currentStage;
+              return (
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold transition-colors duration-300 ${isActive ? "bg-emerald-700 text-white ring-4 ring-emerald-200" :
-                    isCompleted ? "bg-emerald-500 text-white" : "bg-gray-100 text-gray-400"
-                    }`}
+                  key={stage}
+                  ref={(el) => (stepRefs.current[index] = el)}
+                  onClick={() => {
+                    if (index < currentStage) setCurrentStage(index);
+                  }}
+                  className={`flex flex-col items-center gap-1 sm:gap-2 shrink-0 px-1 sm:px-2 cursor-pointer transition-all ${
+                    index < currentStage ? "hover:opacity-80" : ""
+                  }`}
                 >
-                  {isCompleted ? <CheckCircle2 size={16} /> : index + 1}
+                  <div
+                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold transition-all duration-300 ${
+                      isActive
+                        ? "bg-emerald-700 text-white ring-4 ring-emerald-200 shadow-md scale-105"
+                        : isCompleted
+                          ? "bg-emerald-500 text-white shadow-xs"
+                          : "bg-gray-100 text-gray-400 border border-gray-200"
+                    }`}
+                  >
+                    {isCompleted ? <CheckCircle2 size={16} /> : index + 1}
+                  </div>
+                  <span
+                    className={`text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-colors ${
+                      isActive
+                        ? "text-emerald-900 font-bold block"
+                        : isCompleted
+                          ? "text-emerald-700 hidden sm:block"
+                          : "text-gray-400 hidden md:block"
+                    }`}
+                  >
+                    {stage}
+                  </span>
                 </div>
-                <span className={`text-xs hidden md:block font-medium ${isActive ? "text-emerald-800" : "text-gray-400"}`}>
-                  {stage}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 max-w-5xl mx-auto w-full p-6 md:p-12 flex flex-col justify-center">
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden min-h-[500px] flex flex-col">
+      <div className="flex-1 max-w-5xl mx-auto w-full px-3 py-4 sm:p-6 md:p-10 flex flex-col justify-center">
+        <div className="bg-white rounded-2xl shadow-xl overflow-hidden min-h-[480px] flex flex-col border border-gray-100">
 
-          <div className="p-8 md:p-12 flex-1">
+          <div className="p-4 sm:p-6 md:p-10 flex-1">
             {/* Stage 1: Profile */}
             {currentStage === 0 && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className="text-4xl font-serif font-semibold text-emerald-800 mb-4">Who is traveling?</h2>
-                <p className="text-gray-500 mb-8 font-sans">Select your travel identity to tailor the experience.</p>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-semibold text-emerald-800 mb-2 sm:mb-4">Who is traveling?</h2>
+                <p className="text-sm sm:text-base text-gray-500 mb-6 sm:mb-8 font-sans">Select your travel identity to tailor the experience.</p>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                   {[
                     { id: "solo", title: "Solo Explorer", icon: User, desc: "A journey of self-discovery", size: 1 },
                     { id: "family", title: "Family Getaway", icon: Users, desc: "Memories for a lifetime", size: 4 },
@@ -727,32 +774,32 @@ const ElitePlanner = () => {
                         updateTrip("tripType", profile.id as any);
                         updateTrip("numberOfMembers", profile.id === "solo" ? 1 : profile.size);
                       }}
-                      className={`cursor-pointer rounded-xl border-2 p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-1 ${trip.tripType === profile.id ? "border-emerald-500 bg-emerald-50 shadow-md" : "border-gray-100 hover:border-gray-300"
+                      className={`cursor-pointer rounded-xl border-2 p-5 sm:p-6 flex flex-col items-center text-center transition-all duration-300 hover:-translate-y-1 ${trip.tripType === profile.id ? "border-emerald-500 bg-emerald-50 shadow-md" : "border-gray-100 hover:border-gray-300"
                         }`}
                     >
-                      <div className={`p-4 rounded-full mb-4 ${trip.tripType === profile.id ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-500"}`}>
-                        <profile.icon size={32} />
+                      <div className={`p-3.5 sm:p-4 rounded-full mb-3 sm:mb-4 ${trip.tripType === profile.id ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-500"}`}>
+                        <profile.icon size={30} />
                       </div>
-                      <h3 className="font-serif font-medium text-xl mb-2">{profile.title}</h3>
-                      <p className="text-sm text-gray-500">{profile.desc}</p>
+                      <h3 className="font-serif font-medium text-lg sm:text-xl mb-1.5">{profile.title}</h3>
+                      <p className="text-xs sm:text-sm text-gray-500">{profile.desc}</p>
                     </div>
                   ))}
                 </div>
 
                 {!isSoloTrip && (
-                  <div className="mt-8 max-w-md mx-auto bg-gray-50 border border-gray-100 rounded-xl p-6 flex items-center justify-between shadow-inner">
-                    <span className="text-base font-semibold text-emerald-800 font-sans">Refine exact traveler count:</span>
-                    <div className="flex items-center gap-4">
+                  <div className="mt-6 sm:mt-8 max-w-md mx-auto bg-gray-50 border border-gray-100 rounded-xl p-4 sm:p-6 flex items-center justify-between shadow-inner">
+                    <span className="text-sm sm:text-base font-semibold text-emerald-800 font-sans">Refine exact traveler count:</span>
+                    <div className="flex items-center gap-3 sm:gap-4">
                       <button
                         onClick={() => updateTrip("numberOfMembers", Math.max(2, trip.numberOfMembers - 1))}
-                        className="w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center font-bold text-emerald-800 hover:bg-emerald-700 hover:text-white transition-all shadow-sm"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center font-bold text-emerald-800 hover:bg-emerald-700 hover:text-white transition-all shadow-sm"
                       >
                         -
                       </button>
-                      <span className="text-xl font-bold text-emerald-800 w-6 text-center">{trip.numberOfMembers}</span>
+                      <span className="text-lg sm:text-xl font-bold text-emerald-800 w-6 text-center">{trip.numberOfMembers}</span>
                       <button
                         onClick={() => updateTrip("numberOfMembers", Math.min(20, trip.numberOfMembers + 1))}
-                        className="w-10 h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center font-bold text-emerald-800 hover:bg-emerald-700 hover:text-white transition-all shadow-sm"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-gray-200 bg-white flex items-center justify-center font-bold text-emerald-800 hover:bg-emerald-700 hover:text-white transition-all shadow-sm"
                       >
                         +
                       </button>
@@ -765,14 +812,14 @@ const ElitePlanner = () => {
             {/* Stage 2: Route & Travel Dates */}
             {currentStage === 1 && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className="text-4xl font-serif font-semibold text-emerald-800 mb-4">Chart Your Course & Travel Dates</h2>
-                <p className="text-gray-500 mb-8 font-sans">Define your starting point, dream destination, and travel timeline.</p>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-semibold text-emerald-800 mb-2 sm:mb-4">Chart Your Course & Travel Dates</h2>
+                <p className="text-sm sm:text-base text-gray-500 mb-6 sm:mb-8 font-sans">Define your starting point, dream destination, and travel timeline.</p>
 
-                <div className="space-y-6 max-w-2xl mx-auto mt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-5 sm:space-y-6 max-w-2xl mx-auto mt-4 sm:mt-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     <div className="relative">
                       <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm font-semibold text-emerald-800">Starting Location</label>
+                        <label className="block text-xs sm:text-sm font-semibold text-emerald-800">Starting Location</label>
                         <button
                           type="button"
                           onClick={() => detectLiveLocation(false)}
@@ -785,12 +832,12 @@ const ElitePlanner = () => {
                         </button>
                       </div>
                       <div className="relative">
-                        <Navigation className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                        <Navigation className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <Input
                           value={trip.startLocation}
                           onChange={(e) => updateTrip("startLocation", e.target.value)}
                           placeholder={isDetectingLocation ? "Fetching live GPS location..." : "e.g. Chennai, India"}
-                          className="pl-12 pr-24 h-14 text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20"
+                          className="pl-11 pr-24 h-12 sm:h-14 text-base sm:text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20"
                         />
                         {locationDetected && trip.startLocation && !isDetectingLocation && (
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
@@ -801,22 +848,22 @@ const ElitePlanner = () => {
                     </div>
 
                     <div className="relative">
-                      <label className="block text-sm font-semibold text-emerald-800 mb-2">Destination</label>
+                      <label className="block text-xs sm:text-sm font-semibold text-emerald-800 mb-2">Destination</label>
                       <div className="relative">
-                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600" size={20} />
+                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600" size={18} />
                         <Input
                           value={trip.destinations[0] || ""}
                           onChange={(e) => updateTrip("destinations", [e.target.value])}
                           placeholder="e.g. Ooty, Tamil Nadu"
-                          className="pl-12 h-14 text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20"
+                          className="pl-11 h-12 sm:h-14 text-base sm:text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-gray-100">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pt-4 border-t border-gray-100">
                     <div className="relative">
-                      <label className="block text-sm font-semibold text-emerald-800 mb-2">Start Date</label>
+                      <label className="block text-xs sm:text-sm font-semibold text-emerald-800 mb-2">Start Date</label>
                       <div className="relative">
                         <Input
                           type="date"
@@ -830,13 +877,13 @@ const ElitePlanner = () => {
                               console.error("Error opening date picker: ", err);
                             }
                           }}
-                          className="h-14 text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20 focus:ring-2 cursor-pointer"
+                          className="h-12 sm:h-14 text-base sm:text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20 focus:ring-2 cursor-pointer"
                         />
                       </div>
                     </div>
 
                     <div className="relative">
-                      <label className="block text-sm font-semibold text-emerald-800 mb-2">End Date</label>
+                      <label className="block text-xs sm:text-sm font-semibold text-emerald-800 mb-2">End Date</label>
                       <div className="relative">
                         <Input
                           type="date"
@@ -850,16 +897,16 @@ const ElitePlanner = () => {
                               console.error("Error opening date picker: ", err);
                             }
                           }}
-                          className="h-14 text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20 focus:ring-2 cursor-pointer"
+                          className="h-12 sm:h-14 text-base sm:text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20 focus:ring-2 cursor-pointer"
                         />
                       </div>
                     </div>
                   </div>
 
                   {trip.startDate && trip.endDate && (
-                    <div className="mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center justify-between text-emerald-800">
-                      <span className="font-semibold">Calculated Trip Duration:</span>
-                      <span className="px-4 py-1.5 bg-emerald-600 text-white font-bold rounded-full text-sm">
+                    <div className="mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 sm:p-4 flex items-center justify-between text-emerald-800">
+                      <span className="text-xs sm:text-sm font-semibold">Calculated Trip Duration:</span>
+                      <span className="px-3.5 py-1 bg-emerald-600 text-white font-bold rounded-full text-xs sm:text-sm">
                         {(() => {
                           const startD = new Date(trip.startDate);
                           const endD = new Date(trip.endDate);
@@ -877,10 +924,10 @@ const ElitePlanner = () => {
             {/* Stage 3: Fleet */}
             {currentStage === 2 && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className="text-4xl font-serif font-semibold text-emerald-800 mb-4">Fleet Specification</h2>
-                <p className="text-gray-500 mb-8 font-sans">Select your vehicle for accurate routing and pricing.</p>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-semibold text-emerald-800 mb-2 sm:mb-4">Fleet Specification</h2>
+                <p className="text-sm sm:text-base text-gray-500 mb-6 sm:mb-8 font-sans">Select your vehicle for accurate routing and pricing.</p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 mb-6 sm:mb-8">
                   {(
                     isSoloTrip
                       ? [
@@ -898,25 +945,25 @@ const ElitePlanner = () => {
                           updateTrip("mileage", 38);
                         }
                       }}
-                      className={`cursor-pointer rounded-xl border-2 p-6 flex items-center gap-4 transition-all hover:shadow-md ${trip.vehicleType === v.id ? "border-emerald-500 bg-emerald-50 shadow-md animate-pulse-subtle" : "border-gray-100"
+                      className={`cursor-pointer rounded-xl border-2 p-5 sm:p-6 flex items-center gap-4 transition-all hover:shadow-md ${trip.vehicleType === v.id ? "border-emerald-500 bg-emerald-50 shadow-md animate-pulse-subtle" : "border-gray-100"
                         }`}
                     >
                       <div className={`p-3 rounded-lg ${trip.vehicleType === v.id ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-500"}`}>
-                        <v.icon size={28} />
+                        <v.icon size={26} />
                       </div>
-                      <h3 className="font-serif font-medium text-xl text-emerald-800">{v.title}</h3>
+                      <h3 className="font-serif font-medium text-lg sm:text-xl text-emerald-800">{v.title}</h3>
                     </div>
                   ))}
                 </div>
 
-                {/* Vehicle Selection based on FuelEstimator.tsx layout */}
+                {/* Vehicle Selection */}
                 {trip.vehicleType === "car" ? (
-                  <div className="mb-8 animate-in fade-in duration-300">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                  <div className="mb-6 sm:mb-8 animate-in fade-in duration-300">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-4 sm:mb-6">
                       <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-emerald-800">Brand</label>
+                        <label className="block text-xs sm:text-sm font-semibold text-emerald-800">Brand</label>
                         <Select value={carBrand} onValueChange={onBrandChange}>
-                          <SelectTrigger className="h-12 bg-white border-gray-200">
+                          <SelectTrigger className="h-11 sm:h-12 bg-white border-gray-200">
                             <SelectValue placeholder="Select brand" />
                           </SelectTrigger>
                           <SelectContent>
@@ -930,9 +977,9 @@ const ElitePlanner = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-emerald-800">Model</label>
+                        <label className="block text-xs sm:text-sm font-semibold text-emerald-800">Model</label>
                         <Select value={carModel} onValueChange={onModelChange} disabled={!carBrand || models.length === 0}>
-                          <SelectTrigger className="h-12 bg-white border-gray-200">
+                          <SelectTrigger className="h-11 sm:h-12 bg-white border-gray-200">
                             <SelectValue placeholder="Select model" />
                           </SelectTrigger>
                           <SelectContent>
@@ -946,9 +993,9 @@ const ElitePlanner = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="block text-sm font-semibold text-emerald-800">Fuel Type</label>
+                        <label className="block text-xs sm:text-sm font-semibold text-emerald-800">Fuel Type</label>
                         <Select value={trip.fuelType || ""} onValueChange={onFuelChange} disabled={!carModel || fuels.length === 0}>
-                          <SelectTrigger className="h-12 bg-white border-gray-200 capitalize">
+                          <SelectTrigger className="h-11 sm:h-12 bg-white border-gray-200 capitalize">
                             <SelectValue placeholder="Select fuel" />
                           </SelectTrigger>
                           <SelectContent>
@@ -964,14 +1011,14 @@ const ElitePlanner = () => {
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4 items-start">
                       <div>
-                        <label className="block text-sm font-semibold text-emerald-800 mb-2">Expected Mileage (km/L)</label>
+                        <label className="block text-xs sm:text-sm font-semibold text-emerald-800 mb-2">Expected Mileage (km/L)</label>
                         <div className="relative">
-                          <Fuel className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                          <Fuel className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                           <Input
                             type="number"
                             value={trip.mileage}
                             onChange={(e) => updateTrip("mileage", Number(e.target.value))}
-                            className="pl-12 h-12 text-lg bg-gray-50 focus:border-emerald-600 focus:ring-emerald-600/20"
+                            className="pl-11 h-11 sm:h-12 text-base sm:text-lg bg-gray-50 focus:border-emerald-600 focus:ring-emerald-600/20"
                           />
                         </div>
                       </div>
@@ -984,14 +1031,14 @@ const ElitePlanner = () => {
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4 items-start">
                     <div>
-                      <label className="block text-sm font-semibold text-emerald-800 mb-2">Fuel Type</label>
+                      <label className="block text-xs sm:text-sm font-semibold text-emerald-800 mb-2">Fuel Type</label>
                       <div className="flex gap-4">
                         {["Petrol"].map((f) => (
                           <button
                             key={f}
                             type="button"
                             onClick={() => updateTrip("fuelType", f.toLowerCase() as any)}
-                            className={`px-6 py-3 rounded-lg border font-medium transition-colors ${trip.fuelType === f.toLowerCase() ? "bg-emerald-700 text-white border-emerald-700" : "bg-white text-gray-600 border-gray-200 hover:border-emerald-600/50"
+                            className={`px-5 sm:px-6 py-2.5 sm:py-3 rounded-lg border font-medium transition-colors ${trip.fuelType === f.toLowerCase() ? "bg-emerald-700 text-white border-emerald-700" : "bg-white text-gray-600 border-gray-200 hover:border-emerald-600/50"
                               }`}
                           >
                             {f}
@@ -1000,14 +1047,14 @@ const ElitePlanner = () => {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-emerald-800 mb-2">Expected Mileage (km/L)</label>
+                      <label className="block text-xs sm:text-sm font-semibold text-emerald-800 mb-2">Expected Mileage (km/L)</label>
                       <div className="relative">
-                        <Fuel className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                        <Fuel className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                         <Input
                           type="number"
                           value={trip.mileage}
                           onChange={(e) => updateTrip("mileage", Number(e.target.value))}
-                          className="pl-12 h-12 text-lg bg-gray-50 focus:border-emerald-600 focus:ring-emerald-600/20"
+                          className="pl-11 h-11 sm:h-12 text-base sm:text-lg bg-gray-50 focus:border-emerald-600 focus:ring-emerald-600/20"
                         />
                       </div>
                     </div>
@@ -1023,10 +1070,10 @@ const ElitePlanner = () => {
             {/* Stage 4: Vibe/Mood */}
             {currentStage === 3 && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className="text-4xl font-serif font-semibold text-emerald-800 mb-4">The Cultured Vibe</h2>
-                <p className="text-gray-500 mb-8 font-sans">Curate the essence of your journey.</p>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-semibold text-emerald-800 mb-2 sm:mb-4">The Cultured Vibe</h2>
+                <p className="text-sm sm:text-base text-gray-500 mb-6 sm:mb-8 font-sans">Curate the essence of your journey.</p>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                   {[
                     { id: "Heritage", icon: Castle, bg: "bg-emerald-50" },
                     { id: "Wilderness", icon: Tent, bg: "bg-emerald-50" },
@@ -1043,11 +1090,11 @@ const ElitePlanner = () => {
                             : [...trip.moods, mood.id];
                           updateTrip("moods", newMoods as any);
                         }}
-                        className={`cursor-pointer rounded-2xl p-6 aspect-square flex flex-col items-center justify-center text-center transition-all duration-300 ${isSelected ? "bg-emerald-600 text-white shadow-lg scale-105" : `${mood.bg} text-gray-700 hover:shadow-md`
+                        className={`cursor-pointer rounded-2xl p-4 sm:p-6 aspect-square flex flex-col items-center justify-center text-center transition-all duration-300 ${isSelected ? "bg-emerald-600 text-white shadow-lg scale-105" : `${mood.bg} text-gray-700 hover:shadow-md`
                           }`}
                       >
-                        <mood.icon size={40} className="mb-4 opacity-80" />
-                        <h3 className="font-serif font-medium text-lg">{mood.id}</h3>
+                        <mood.icon size={36} className="mb-3 sm:mb-4 opacity-80" />
+                        <h3 className="font-serif font-medium text-base sm:text-lg">{mood.id}</h3>
                       </div>
                     );
                   })}
@@ -1058,11 +1105,11 @@ const ElitePlanner = () => {
             {/* Stage 5: Budget */}
             {currentStage === 4 && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className="text-4xl font-serif font-semibold text-emerald-800 mb-4">Financial Blueprint</h2>
-                <p className="text-gray-500 mb-12 font-sans">Set your budget limit for a personalized experience.</p>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-semibold text-emerald-800 mb-2 sm:mb-4">Financial Blueprint</h2>
+                <p className="text-sm sm:text-base text-gray-500 mb-6 sm:mb-12 font-sans">Set your budget limit for a personalized experience.</p>
 
                 <div className="max-w-2xl mx-auto text-center">
-                  <div className="text-6xl font-serif font-bold text-emerald-800 mb-8">
+                  <div className="text-4xl sm:text-5xl md:text-6xl font-serif font-bold text-emerald-800 mb-6 sm:mb-8">
                     ₹{trip.budgetCap.toLocaleString()}
                   </div>
 
@@ -1072,10 +1119,10 @@ const ElitePlanner = () => {
                     max={500000}
                     step={5000}
                     onValueChange={(vals) => updateTrip("budgetCap", vals[0])}
-                    className="mb-8"
+                    className="mb-6 sm:mb-8"
                   />
 
-                  <div className="flex justify-between text-gray-400 font-medium text-sm">
+                  <div className="flex justify-between text-gray-400 font-medium text-xs sm:text-sm">
                     <span>Economy (₹10K)</span>
                     <span>Premium (₹2.5L)</span>
                     <span>Ultra-Luxury (₹5L+)</span>
@@ -1087,10 +1134,10 @@ const ElitePlanner = () => {
             {/* Stage 6: Priority */}
             {currentStage === 5 && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <h2 className="text-4xl font-serif font-semibold text-emerald-800 mb-4">Multi-Factor Priority</h2>
-                <p className="text-gray-500 mb-8 font-sans">Optimize your route logic.</p>
+                <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-semibold text-emerald-800 mb-2 sm:mb-4">Multi-Factor Priority</h2>
+                <p className="text-sm sm:text-base text-gray-500 mb-6 sm:mb-8 font-sans">Optimize your route logic.</p>
 
-                <div className="space-y-4 max-w-2xl mx-auto">
+                <div className="space-y-3 sm:space-y-4 max-w-2xl mx-auto">
                   {[
                     { id: "eco-friendly", title: "Eco-friendly / Fuel Efficient", icon: Leaf, desc: "Minimizes CO2 emissions and saves fuel." },
                     { id: "toll-free", title: "Avoid Tolls", icon: Wallet, desc: "Cost-effective routing via state highways." },
@@ -1099,19 +1146,19 @@ const ElitePlanner = () => {
                     <div
                       key={p.id}
                       onClick={() => updateTrip("routePriority", p.id as any)}
-                      className={`cursor-pointer rounded-xl border-2 p-5 flex items-center gap-5 transition-all ${trip.routePriority === p.id ? "border-emerald-600 bg-emerald-50 shadow-sm" : "border-gray-100 hover:border-gray-200"
+                      className={`cursor-pointer rounded-xl border-2 p-4 sm:p-5 flex items-center gap-3.5 sm:gap-5 transition-all ${trip.routePriority === p.id ? "border-emerald-600 bg-emerald-50 shadow-sm" : "border-gray-100 hover:border-gray-200"
                         }`}
                     >
-                      <div className={`p-3 rounded-full ${trip.routePriority === p.id ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-500"}`}>
-                        <p.icon size={24} />
+                      <div className={`p-2.5 sm:p-3 rounded-full shrink-0 ${trip.routePriority === p.id ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-500"}`}>
+                        <p.icon size={22} />
                       </div>
                       <div className="flex-1">
-                        <h3 className="font-semibold text-lg text-emerald-800">{p.title}</h3>
-                        <p className="text-sm text-gray-500">{p.desc}</p>
+                        <h3 className="font-semibold text-base sm:text-lg text-emerald-800">{p.title}</h3>
+                        <p className="text-xs sm:text-sm text-gray-500">{p.desc}</p>
                       </div>
-                      <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${trip.routePriority === p.id ? "border-emerald-600 bg-emerald-600" : "border-gray-300"
+                      <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 flex items-center justify-center shrink-0 ${trip.routePriority === p.id ? "border-emerald-600 bg-emerald-600" : "border-gray-300"
                         }`}>
-                        {trip.routePriority === p.id && <div className="w-2.5 h-2.5 rounded-full bg-white" />}
+                        {trip.routePriority === p.id && <div className="w-2 sm:w-2.5 h-2 sm:h-2.5 rounded-full bg-white" />}
                       </div>
                     </div>
                   ))}
@@ -1121,21 +1168,21 @@ const ElitePlanner = () => {
 
             {/* Stage 7: Lodging */}
             {currentStage === 6 && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-8">
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6 sm:space-y-8">
                 <div>
-                  <div className="flex items-center justify-between flex-wrap gap-4 mb-2">
-                    <h2 className="text-4xl font-serif font-semibold text-emerald-800">Accommodation & Real Stays</h2>
-                    <span className="px-3.5 py-1.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-xs flex items-center gap-1.5">
-                      <MapPin size={14} /> Destination: {targetDestination}
+                  <div className="flex items-center justify-between flex-wrap gap-2 sm:gap-4 mb-2">
+                    <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-semibold text-emerald-800">Accommodation & Real Stays</h2>
+                    <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-xs flex items-center gap-1.5">
+                      <MapPin size={13} /> {targetDestination}
                     </span>
                   </div>
-                  <p className="text-gray-500 font-sans">
+                  <p className="text-xs sm:text-sm text-gray-500 font-sans">
                     Filter and choose real hotels & lodges in {targetDestination}. Selected stay will be automatically added to your trip budget calculation.
                   </p>
                 </div>
 
                 {/* 3 Lodging Style Options */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6">
                   {[
                     { id: "Boutique", title: "Boutique Stays", icon: Home, desc: "Intimate, unique & heritage stays." },
                     { id: "Luxury", title: "Luxury Resorts", icon: Star, desc: "5-star amenities & premium villas." },
@@ -1152,13 +1199,13 @@ const ElitePlanner = () => {
                             : [...current, l.id];
                           updateTrip("lodgingType", newTypes);
                         }}
-                        className={`cursor-pointer rounded-2xl border-2 p-6 flex flex-col items-center text-center transition-all ${isSelected ? "border-emerald-600 bg-emerald-50 shadow-md scale-102" : "border-gray-100 hover:border-gray-200"
+                        className={`cursor-pointer rounded-2xl border-2 p-4 sm:p-6 flex flex-col items-center text-center transition-all ${isSelected ? "border-emerald-600 bg-emerald-50 shadow-md scale-102" : "border-gray-100 hover:border-gray-200"
                           }`}
                       >
-                        <div className={`p-4 rounded-full mb-3 ${isSelected ? "bg-emerald-600 text-white" : "bg-gray-50 text-gray-400"}`}>
-                          <l.icon size={28} />
+                        <div className={`p-3 sm:p-4 rounded-full mb-2 sm:mb-3 ${isSelected ? "bg-emerald-600 text-white" : "bg-gray-50 text-gray-400"}`}>
+                          <l.icon size={24} />
                         </div>
-                        <h3 className="font-serif font-medium text-lg text-emerald-800">{l.title}</h3>
+                        <h3 className="font-serif font-medium text-base sm:text-lg text-emerald-800">{l.title}</h3>
                         <p className="text-xs text-gray-500 mt-1">{l.desc}</p>
                       </div>
                     );
@@ -1167,9 +1214,9 @@ const ElitePlanner = () => {
 
                 {/* Real Hotels for Destination */}
                 <div className="pt-4 border-t border-gray-100">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-serif font-semibold text-emerald-900 flex items-center gap-2">
-                      <Bed className="text-emerald-600" size={22} />
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <h3 className="text-lg sm:text-xl font-serif font-semibold text-emerald-900 flex items-center gap-2">
+                      <Bed className="text-emerald-600" size={20} />
                       Real Hotels & Lodges in {targetDestination}
                     </h3>
                     <span className="text-xs text-gray-500 font-medium">
@@ -1181,21 +1228,21 @@ const ElitePlanner = () => {
                   {hotelsLoading && (
                     <div className="py-12 text-center text-gray-500 space-y-3">
                       <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
-                      <p className="text-sm font-medium">Searching OpenStreetMap for real hotels in {targetDestination}...</p>
+                      <p className="text-xs sm:text-sm font-medium">Searching OpenStreetMap for real hotels in {targetDestination}...</p>
                     </div>
                   )}
 
                   {/* Error State */}
                   {!hotelsLoading && hotelsError && (
-                    <div className="py-8 text-center text-amber-700 bg-amber-50 rounded-xl p-4 border border-amber-200">
-                      <p className="font-semibold text-sm">{hotelsError}</p>
+                    <div className="py-6 sm:py-8 text-center text-amber-700 bg-amber-50 rounded-xl p-4 border border-amber-200">
+                      <p className="font-semibold text-xs sm:text-sm">{hotelsError}</p>
                       <p className="text-xs mt-1 text-amber-600">Select a stay category above to estimate lodging budget.</p>
                     </div>
                   )}
 
                   {/* Real Hotel List */}
                   {!hotelsLoading && filteredHotels.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-h-[480px] overflow-y-auto pr-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 max-h-[480px] overflow-y-auto pr-1 custom-scrollbar">
                       {filteredHotels.map((hotel) => {
                         const isChosen = trip.selectedHotelName === hotel.name;
                         const rooms = Math.max(1, Math.ceil(trip.numberOfMembers / 2));
@@ -1211,7 +1258,7 @@ const ElitePlanner = () => {
                               }`}
                           >
                             <div>
-                              <div className="relative h-40 w-full bg-gray-100 overflow-hidden">
+                              <div className="relative h-36 sm:h-40 w-full bg-gray-100 overflow-hidden">
                                 <img
                                   src={hotel.photoUrl}
                                   alt={hotel.name}
@@ -1220,7 +1267,7 @@ const ElitePlanner = () => {
                                     (e.target as HTMLElement).style.display = 'none';
                                   }}
                                 />
-                                <span className={`absolute top-3 left-3 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider backdrop-blur-md shadow-sm ${hotel.category === "Luxury"
+                                <span className={`absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider backdrop-blur-md shadow-sm ${hotel.category === "Luxury"
                                   ? "bg-amber-500/90 text-white"
                                   : hotel.category === "Eco"
                                     ? "bg-emerald-600/90 text-white"
@@ -1229,34 +1276,34 @@ const ElitePlanner = () => {
                                   {hotel.category}
                                 </span>
                                 {isChosen && (
-                                  <span className="absolute top-3 right-3 p-1.5 rounded-full bg-emerald-600 text-white shadow-md">
+                                  <span className="absolute top-2.5 right-2.5 p-1 rounded-full bg-emerald-600 text-white shadow-md">
                                     <CheckCircle2 size={16} />
                                   </span>
                                 )}
                               </div>
 
-                              <div className="p-4 space-y-2">
-                                <h4 className="font-serif font-bold text-base text-emerald-950 group-hover:text-emerald-700 transition-colors line-clamp-1">
+                              <div className="p-3.5 sm:p-4 space-y-1.5">
+                                <h4 className="font-serif font-bold text-sm sm:text-base text-emerald-950 group-hover:text-emerald-700 transition-colors line-clamp-1">
                                   {hotel.name}
                                 </h4>
                                 <p className="text-xs text-gray-500 flex items-center gap-1 line-clamp-1">
                                   <MapPin size={12} className="shrink-0 text-gray-400" />
                                   {hotel.address}
                                 </p>
-                                <div className="flex items-center gap-1 text-xs text-amber-600 font-semibold pt-1">
-                                  <Star size={14} className="fill-amber-400 text-amber-400" />
+                                <div className="flex items-center gap-1 text-xs text-amber-600 font-semibold pt-0.5">
+                                  <Star size={13} className="fill-amber-400 text-amber-400" />
                                   {hotel.rating}
                                   <span className="text-gray-400 font-normal">({hotel.user_ratings_total} reviews)</span>
                                 </div>
                               </div>
                             </div>
 
-                            <div className="p-4 pt-0 border-t border-gray-100 flex items-center justify-between mt-3">
+                            <div className="p-3.5 sm:p-4 pt-0 border-t border-gray-100 flex items-center justify-between mt-2">
                               <div>
-                                <span className="text-lg font-bold text-emerald-700">₹{hotel.estimatedPricePerNight.toLocaleString()}</span>
-                                <span className="text-[11px] text-gray-500"> / night</span>
+                                <span className="text-base sm:text-lg font-bold text-emerald-700">₹{hotel.estimatedPricePerNight.toLocaleString()}</span>
+                                <span className="text-[10px] sm:text-[11px] text-gray-500"> / night</span>
                                 <div className="text-[10px] text-emerald-600 font-medium">
-                                  Total: ₹{totalCostForStay.toLocaleString()} ({tripNights}N, {rooms} room{rooms > 1 ? "s" : ""})
+                                  Total: ₹{totalCostForStay.toLocaleString()} ({tripNights}N, {rooms} rm{rooms > 1 ? "s" : ""})
                                 </div>
                               </div>
 
@@ -1266,7 +1313,7 @@ const ElitePlanner = () => {
                                   e.stopPropagation();
                                   handleSelectHotel(hotel);
                                 }}
-                                className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${isChosen
+                                className={`px-3 sm:px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer ${isChosen
                                   ? "bg-emerald-600 text-white shadow-sm"
                                   : "bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white"
                                   }`}
@@ -1286,125 +1333,218 @@ const ElitePlanner = () => {
             {/* Stage 8: Review */}
             {currentStage === 7 && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 h-full flex flex-col">
-                <div className="text-center mb-8">
-                  <h2 className="text-4xl font-serif font-semibold text-emerald-800 mb-3">Your Bespoke Journey</h2>
-                  <p className="text-gray-500 font-sans">Review your elegant itinerary preferences before we craft your master plan.</p>
+                <div className="text-center mb-6 sm:mb-8">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold uppercase tracking-wider mb-2">
+                    <Sparkles size={14} className="text-emerald-600" /> Final Master Review
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-bold text-emerald-900 mb-2">
+                    Your Bespoke Journey
+                  </h2>
+                  <p className="text-xs sm:text-sm text-gray-500 font-sans max-w-lg mx-auto">
+                    Review your curated itinerary preferences before we generate your AI-optimized travel plan.
+                  </p>
                 </div>
 
-                <div className="bg-gray-50 rounded-2xl p-8 border border-gray-100 flex-1">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-4">
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Route</p>
-                      <p className="font-semibold text-emerald-800">{trip.startLocation || "Not set"} → {trip.destinations[0] || "Not set"}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Profile</p>
-                      <p className="font-semibold text-emerald-800 capitalize">{trip.tripType}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Fleet</p>
-                      <p className="font-semibold text-emerald-800 capitalize">
-                        {trip.vehicleType === "car" && carBrand && carModel
-                          ? `${carBrand} ${carModel} (${trip.fuelType})`
-                          : `${trip.vehicleType} (${trip.fuelType})`}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Budget Cap</p>
-                      <p className="font-semibold text-emerald-600">₹{trip.budgetCap.toLocaleString()}</p>
-                    </div>
-
-                    {/* Travel Dates */}
-                    <div className="col-span-2 md:col-span-4 bg-emerald-100/60 border border-emerald-200/80 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="p-2.5 rounded-lg bg-emerald-600 text-white shadow-sm">
-                          <Calendar size={22} />
-                        </div>
-                        <div>
-                          <p className="text-xs text-emerald-800 uppercase tracking-wider font-bold">Selected Travel Dates</p>
-                          <p className="font-bold text-emerald-950 text-base">
-                            {trip.startDate ? new Date(trip.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Start Date Not Set'}
-                            {' → '}
-                            {trip.endDate ? new Date(trip.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'End Date Not Set'}
-                          </p>
+                <div className="bg-gray-50/80 rounded-2xl p-3.5 sm:p-6 md:p-8 border border-gray-200/80 flex-1 space-y-4 sm:space-y-6">
+                  {/* Route & Dates Banner */}
+                  <div className="bg-white rounded-xl p-4 sm:p-5 border border-emerald-200 shadow-xs space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-gray-100">
+                      <div className="space-y-1">
+                        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Planned Route</p>
+                        <div className="flex items-start sm:items-center gap-2 flex-wrap">
+                          <span className="font-bold text-emerald-950 text-sm sm:text-base flex items-center gap-1">
+                            <Navigation size={14} className="text-emerald-600 shrink-0" />
+                            {trip.startLocation || "Origin Not Set"}
+                          </span>
+                          <span className="text-emerald-600 font-bold hidden sm:inline">→</span>
+                          <span className="font-bold text-emerald-800 text-sm sm:text-base flex items-center gap-1">
+                            <MapPin size={14} className="text-emerald-600 shrink-0" />
+                            {trip.destinations[0] || "Destination Not Set"}
+                          </span>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="px-3.5 py-1.5 bg-emerald-700 text-white font-bold rounded-full text-xs shadow-sm">
-                          {tripNights > 0 ? `${tripNights} Night${tripNights > 1 ? 's' : ''} / ${tripNights + 1} Days` : 'Duration Not Set'}
+                      <div className="shrink-0 self-start sm:self-center">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-700 text-white font-bold rounded-full text-xs shadow-xs">
+                          {tripNights > 0 ? `${tripNights} Night${tripNights > 1 ? "s" : ""} / ${tripNights + 1} Days` : "Duration Pending"}
                         </span>
                       </div>
                     </div>
 
-                    <div className="col-span-2">
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Vibe</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {trip.moods.map(m => (
-                          <span key={m} className="px-3 py-1 bg-white border rounded-full text-xs font-medium text-emerald-800">{m}</span>
-                        ))}
+                    <div className="flex items-center gap-3 pt-1">
+                      <div className="p-2 rounded-lg bg-emerald-50 text-emerald-700 shrink-0">
+                        <Calendar size={18} />
+                      </div>
+                      <div className="text-xs sm:text-sm font-semibold text-gray-700">
+                        <span className="text-gray-400 uppercase font-bold text-[10px] block">Travel Timeline</span>
+                        {trip.startDate ? new Date(trip.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Start Date Pending'}
+                        {' — '}
+                        {trip.endDate ? new Date(trip.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'End Date Pending'}
                       </div>
                     </div>
-                    <div className="col-span-2">
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Lodging Styles</p>
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {trip.lodgingType?.map(l => (
-                          <span key={l} className="px-3 py-1 bg-white border rounded-full text-xs font-medium text-emerald-800">{l}</span>
-                        ))}
+                  </div>
+
+                  {/* 4 Specification Cards Grid */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    {/* Profile */}
+                    <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-gray-100 shadow-xs flex flex-col justify-between">
+                      <div className="flex items-center gap-2 text-gray-400 mb-1.5">
+                        <Users size={15} className="text-emerald-600" />
+                        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Profile</span>
+                      </div>
+                      <div>
+                        <p className="font-bold text-emerald-950 text-sm sm:text-base capitalize">{trip.tripType || "Solo"}</p>
+                        <p className="text-[11px] text-gray-500 font-medium">
+                          {trip.numberOfMembers} Traveler{trip.numberOfMembers !== 1 ? "s" : ""}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="col-span-2 md:col-span-4 border-t border-gray-200 pt-4 mt-2">
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-2 font-bold">Selected Accommodation & Lodging Budget</p>
-                      {trip.selectedHotelName ? (
-                        <div className="flex items-center justify-between p-4 rounded-xl bg-white border border-emerald-200 shadow-sm">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2.5 rounded-lg bg-emerald-100 text-emerald-700">
-                              <Bed size={22} />
-                            </div>
-                            <div>
-                              <p className="font-bold text-emerald-900 text-sm">{trip.selectedHotelName}</p>
-                              <p className="text-xs text-gray-500">₹{(trip.selectedHotelPrice || 0).toLocaleString()} / night ({tripNights} Nights stay)</p>
-                            </div>
+                    {/* Fleet */}
+                    <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-gray-100 shadow-xs flex flex-col justify-between">
+                      <div className="flex items-center gap-2 text-gray-400 mb-1.5">
+                        <Car size={15} className="text-emerald-600" />
+                        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Fleet</span>
+                      </div>
+                      <div>
+                        <p className="font-bold text-emerald-950 text-sm sm:text-base capitalize line-clamp-1">
+                          {trip.vehicleType === "car" && carBrand && carModel
+                            ? `${carBrand} ${carModel}`
+                            : `${trip.vehicleType || "Car"}`}
+                        </p>
+                        <p className="text-[11px] text-gray-500 font-medium capitalize">
+                          {trip.fuelType || "Petrol"} • {trip.mileage || 15} km/L
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Budget Cap */}
+                    <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-gray-100 shadow-xs flex flex-col justify-between">
+                      <div className="flex items-center gap-2 text-gray-400 mb-1.5">
+                        <Wallet size={15} className="text-emerald-600" />
+                        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Budget Cap</span>
+                      </div>
+                      <div>
+                        <p className="font-black text-emerald-700 text-sm sm:text-base">
+                          ₹{trip.budgetCap.toLocaleString()}
+                        </p>
+                        <p className="text-[11px] text-gray-500 font-medium">Spending Limit</p>
+                      </div>
+                    </div>
+
+                    {/* Route Priority */}
+                    <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-gray-100 shadow-xs flex flex-col justify-between">
+                      <div className="flex items-center gap-2 text-gray-400 mb-1.5">
+                        <Leaf size={15} className="text-emerald-600" />
+                        <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider">Priority</span>
+                      </div>
+                      <div>
+                        <p className="font-bold text-emerald-950 text-sm sm:text-base capitalize">
+                          {trip.routePriority === "eco-friendly"
+                            ? "Eco Friendly"
+                            : trip.routePriority === "toll-free"
+                              ? "Avoid Tolls"
+                              : "Express Route"}
+                        </p>
+                        <p className="text-[11px] text-gray-500 font-medium">Optimal Route</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Vibe & Lodging Styles */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-gray-100 shadow-xs">
+                      <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Selected Vibes</p>
+                      <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                        {trip.moods && trip.moods.length > 0 ? (
+                          trip.moods.map((m) => (
+                            <span key={m} className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-xs font-semibold">
+                              {m}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">None selected</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-gray-100 shadow-xs">
+                      <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Lodging Styles</p>
+                      <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                        {trip.lodgingType && trip.lodgingType.length > 0 ? (
+                          trip.lodgingType.map((l) => (
+                            <span key={l} className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-full text-xs font-semibold">
+                              {l}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">None selected</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Selected Accommodation & Lodging Budget Card */}
+                  <div className="bg-white rounded-xl p-4 sm:p-5 border border-emerald-200 shadow-xs">
+                    <p className="text-[11px] font-bold text-emerald-800 uppercase tracking-wider mb-2.5">
+                      Selected Accommodation & Lodging Budget
+                    </p>
+                    {trip.selectedHotelName ? (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-emerald-50/60 border border-emerald-200">
+                        <div className="flex items-start sm:items-center gap-3">
+                          <div className="p-2.5 rounded-lg bg-emerald-600 text-white shrink-0 shadow-xs">
+                            <Bed size={20} />
                           </div>
-                          <div className="text-right">
-                            <p className="font-bold text-emerald-700 text-base">₹{(trip.costBreakdown?.hotel || 0).toLocaleString()}</p>
-                            <p className="text-[10px] text-gray-400">Added to Trip Budget</p>
+                          <div>
+                            <p className="font-bold text-emerald-950 text-sm sm:text-base leading-tight">
+                              {trip.selectedHotelName}
+                            </p>
+                            <p className="text-xs text-gray-600 font-medium mt-0.5">
+                              ₹{(trip.selectedHotelPrice || 0).toLocaleString()} / night ({tripNights} Nights • {Math.max(1, Math.ceil(trip.numberOfMembers / 2))} Room{Math.max(1, Math.ceil(trip.numberOfMembers / 2)) > 1 ? "s" : ""})
+                            </p>
                           </div>
                         </div>
-                      ) : (
-                        <p className="text-xs text-gray-500 italic">No specific hotel selected. Standard category lodging estimate included.</p>
-                      )}
-                    </div>
+                        <div className="sm:text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-emerald-200/60 shrink-0">
+                          <p className="font-black text-emerald-700 text-base sm:text-lg">
+                            ₹{(trip.costBreakdown?.hotel || (trip.selectedHotelPrice || 0) * tripNights * Math.max(1, Math.ceil(trip.numberOfMembers / 2))).toLocaleString()}
+                          </p>
+                          <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-wider">Added to Trip Budget</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-3.5 rounded-xl bg-gray-50 border border-gray-200 text-xs text-gray-500 italic">
+                        No specific hotel selected. Standard category lodging estimate included in the final plan.
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Footer Controls */}
-          <div className="p-6 md:px-12 bg-gray-50 border-t border-gray-100 flex justify-between items-center rounded-b-2xl">
+          {/* Footer Controls - Sticky and prominent */}
+          <div className="p-4 sm:p-6 md:px-12 bg-white/95 backdrop-blur-md border-t border-gray-100 flex justify-between items-center rounded-b-2xl sticky bottom-0 z-20 shadow-xs">
             <Button
               variant="outline"
               onClick={handlePrev}
               disabled={isSubmitting}
-              className="px-6 border border-emerald-300 text-emerald-700 bg-white hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all duration-200 font-medium shadow-sm"
+              className="px-4 sm:px-6 h-11 border border-emerald-300 text-emerald-700 bg-white hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all duration-200 font-medium shadow-sm"
             >
-              <ArrowLeft size={16} className="mr-2" /> Back
+              <ArrowLeft size={16} className="mr-1.5 sm:mr-2" /> Back
             </Button>
 
             {currentStage < stages.length - 1 ? (
               <Button
                 onClick={handleNext}
                 disabled={!isStageValid()}
-                className="px-8 bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50"
+                className="px-6 sm:px-8 h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-medium disabled:opacity-50 shadow-md shadow-emerald-600/20"
               >
-                Next <ArrowRight size={16} className="ml-2" />
+                Next <ArrowRight size={16} className="ml-1.5 sm:ml-2" />
               </Button>
             ) : (
               <Button
                 onClick={handleSubmit}
                 disabled={isSubmitting || !isStageValid()}
-                className="px-8 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-lg shadow-emerald-600/30 disabled:opacity-50"
+                className="px-6 sm:px-8 h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-lg shadow-emerald-600/30 disabled:opacity-50"
               >
                 {isSubmitting ? "Crafting..." : "Generate Bespoke Plan"}
               </Button>
@@ -1417,3 +1557,4 @@ const ElitePlanner = () => {
 };
 
 export default ElitePlanner;
+

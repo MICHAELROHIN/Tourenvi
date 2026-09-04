@@ -1,5 +1,6 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, setPersistence, browserSessionPersistence } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCh9nN8yktf1Igf6QB71w97amHwLP_v070",
@@ -12,12 +13,15 @@ const firebaseConfig = {
 };
 
 // Initialize secondary Firebase app specifically for independent Admin Authentication
-const secondaryApp = initializeApp(firebaseConfig, "AdminApp");
+const secondaryApp = getApps().find((app) => app.name === "AdminApp") || initializeApp(firebaseConfig, "AdminApp");
 
 export const adminAuth = getAuth(secondaryApp);
+export const adminDb = getFirestore(secondaryApp);
 
 // Configure adminAuth to use tab-isolated session persistence
-setPersistence(adminAuth, browserSessionPersistence)
-  .catch((error) => {
+if (typeof window !== "undefined") {
+  setPersistence(adminAuth, browserSessionPersistence).catch((error) => {
     console.error("Failed to set isolated session persistence for adminAuth:", error);
   });
+}
+

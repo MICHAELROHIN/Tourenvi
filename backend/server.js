@@ -2485,22 +2485,30 @@ app.get("/api/reverse-geocode", async (req, res) => {
   // Use Google Places API key (same key works for Geocoding API)
   const apiKey = process.env.GOOGLE_PLACES_API_KEY || process.env.GOOGLE_API_KEY;
 
+  const reqHeaders = {
+    "User-Agent": "Tourenvi/1.0",
+    "Referer": "http://localhost:8080/",
+    "Origin": "http://localhost:8080",
+    "Accept-Language": "en",
+  };
+
   if (!apiKey) {
     console.warn("[reverse-geocode] No Google API key found in environment. Falling back to OSM.");
     // Fallback to OSM Nominatim if no Google key
     try {
       const osmUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`;
       const osmRes = await axios.get(osmUrl, {
-        headers: { "User-Agent": "Tourenvi/1.0", "Accept-Language": "en" },
+        headers: reqHeaders,
         timeout: 8000,
       });
       const data = osmRes.data;
       const addr = data.address || {};
-      const parts = [
-        addr.suburb || addr.neighbourhood || addr.village || addr.hamlet || addr.town || addr.city_district,
-        addr.city || addr.county || addr.state_district,
-        addr.state,
-      ].filter((v) => typeof v === "string" && v.trim().length > 0);
+      const street = addr.road || addr.street || addr.amenity || addr.building;
+      const sub = addr.suburb || addr.neighbourhood || addr.quarter || addr.residential;
+      const city = addr.city || addr.town || addr.village || addr.county || addr.state_district;
+      const state = addr.state;
+
+      const parts = [street, sub, city, state].filter((v) => typeof v === "string" && v.trim().length > 0);
       const deduped = [...new Set(parts)];
       const placeName = deduped.length > 0 ? deduped.join(", ") : data.display_name || null;
       return res.json({ success: !!placeName, placeName, source: "osm" });
@@ -2512,40 +2520,27 @@ app.get("/api/reverse-geocode", async (req, res) => {
 
   try {
     // Use Google Geocoding API with result_type to get precise location
-    const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}&result_type=sublocality|locality|neighborhood|route&language=en`;
+    const googleUrl = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}&language=en`;
 
-    const googleRes = await axios.get(googleUrl, { timeout: 8000 });
+    const googleRes = await axios.get(googleUrl, { timeout: 8000, headers: reqHeaders });
     const data = googleRes.data;
 
     if (data.status === "OK" && data.results && data.results.length > 0) {
-      // Try to find the most precise result
-      // Priority: sublocality_level_1 > neighborhood > locality > route
-      let bestResult = null;
-
-      for (const result of data.results) {
-        const types = result.types || [];
-        if (types.includes("sublocality_level_1") || types.includes("sublocality")) {
-          bestResult = result;
-          break;
-        }
-        if (!bestResult && (types.includes("neighborhood") || types.includes("locality"))) {
-          bestResult = result;
-        }
-      }
-
-      if (!bestResult) {
-        bestResult = data.results[0];
-      }
-
-      // Extract a clean place name from address components
+      const bestResult = data.results[0];
       const components = bestResult.address_components || [];
       const parts = [];
+
+      // Get street / route
+      const street = components.find((c) => c.types.includes("route") || c.types.includes("street_address"));
+      if (street) parts.push(street.long_name);
 
       // Get neighborhood / sublocality
       const sublocality = components.find(
         (c) => c.types.includes("sublocality_level_1") || c.types.includes("sublocality") || c.types.includes("neighborhood")
       );
-      if (sublocality) parts.push(sublocality.long_name);
+      if (sublocality && (!street || sublocality.long_name !== street.long_name)) {
+        parts.push(sublocality.long_name);
+      }
 
       // Get locality (city)
       const locality = components.find((c) => c.types.includes("locality"));
@@ -2650,11 +2645,193 @@ app.get("/api/reverse-geocode", async (req, res) => {
   }
 });
 
+// --------------------------- JOURNEY SCHEDULE REBALANCER (8:00 PM HARD-STOP) ---------------------------
+app.post("/api/journey/rebalance-schedule", (req, res) => {
+  try {
+    const { items = [], currentTime = "14:30", targetEndTime = "20:00" } = req.body;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: "No itinerary items provided" });
+    }
+
+    // Helper: Convert "HH:MM" (24-hour) to total minutes from midnight
+    const timeToMinutes = (timeStr) => {
+      if (!timeStr) return 0;
+      const clean = timeStr.trim();
+      // Handle 12-hour format "02:30 PM"
+      const match12 = clean.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+      if (match12) {
+        let hours = parseInt(match12[1], 10);
+        const mins = parseInt(match12[2], 10);
+        const meridian = match12[3]?.toUpperCase();
+        if (meridian === "PM" && hours < 12) hours += 12;
+        if (meridian === "AM" && hours === 12) hours = 0;
+        return hours * 60 + mins;
+      }
+      const [h, m] = clean.split(":").map(Number);
+      return (h || 0) * 60 + (m || 0);
+    };
+
+    // Helper: Convert minutes from midnight to "HH:MM AM/PM"
+    const minutesToTime = (mins) => {
+      const normalized = Math.max(0, Math.min(24 * 60 - 1, Math.round(mins)));
+      const h24 = Math.floor(normalized / 60);
+      const m = normalized % 60;
+      const period = h24 >= 12 ? "PM" : "AM";
+      const h12 = h24 % 12 || 12;
+      return `${h12}:${m.toString().padStart(2, "0")} ${period}`;
+    };
+
+    const currentMins = timeToMinutes(currentTime);
+    const targetEndMins = timeToMinutes(targetEndTime); // 20:00 = 1200 mins
+
+    const availableMins = Math.max(30, targetEndMins - currentMins);
+
+    // Filter uncompleted items
+    const uncompletedItems = items.filter((item) => !item.completed);
+    const completedItems = items.filter((item) => item.completed);
+
+    if (uncompletedItems.length === 0) {
+      return res.json({
+        success: true,
+        rebalanced: false,
+        message: "All items completed for today.",
+        items,
+        guaranteedFinishTime: minutesToTime(currentMins),
+      });
+    }
+
+    // Default durations per type if not specified
+    const getDefaultDuration = (type) => {
+      switch (String(type).toLowerCase()) {
+        case "food":
+          return 45; // 45 mins for meal
+        case "lodging":
+          return 30; // 30 mins check-in / settle
+        case "sightseeing":
+          return 75; // 75 mins explore
+        default:
+          return 45;
+      }
+    };
+
+    // Total requested duration
+    const rawDurations = uncompletedItems.map((item) => item.durationMinutes || getDefaultDuration(item.type));
+    const transitBufferPerStop = 20; // 20 mins travel between spots
+    const totalTransitMins = (uncompletedItems.length - 1) * transitBufferPerStop;
+    const totalActivityMins = rawDurations.reduce((a, b) => a + b, 0);
+    const totalNeeded = totalActivityMins + totalTransitMins;
+
+    const isRunningLate = totalNeeded > availableMins;
+    const compressionFactor = isRunningLate ? Math.max(0.45, (availableMins - totalTransitMins) / totalActivityMins) : 1;
+
+    let cursorMins = currentMins;
+    const rebalancedUncompleted = uncompletedItems.map((item, idx) => {
+      const origDur = item.durationMinutes || getDefaultDuration(item.type);
+      // Food stays at least 35 mins; sightseeing can compress down to 30 mins
+      const minDuration = item.type === "food" ? 35 : 25;
+      const adjustedDuration = Math.max(minDuration, Math.round(origDur * compressionFactor));
+
+      const startTime = minutesToTime(cursorMins);
+      const endTime = minutesToTime(cursorMins + adjustedDuration);
+
+      cursorMins += adjustedDuration;
+      if (idx < uncompletedItems.length - 1) {
+        cursorMins += transitBufferPerStop;
+      }
+
+      return {
+        ...item,
+        time: `${startTime} - ${endTime}`,
+        startTime,
+        endTime,
+        durationMinutes: adjustedDuration,
+        isAdjusted: isRunningLate,
+        originalDuration: origDur,
+      };
+    });
+
+    const guaranteedFinishTime = minutesToTime(Math.min(targetEndMins, cursorMins));
+
+    return res.json({
+      success: true,
+      rebalanced: isRunningLate,
+      compressionFactor: Math.round(compressionFactor * 100) / 100,
+      availableMinutes: availableMins,
+      neededMinutes: totalNeeded,
+      guaranteedFinishTime,
+      targetEndTime: minutesToTime(targetEndMins),
+      items: [...completedItems, ...rebalancedUncompleted],
+      summaryMessage: isRunningLate
+        ? `⚡ Smart Rebalance Active: Schedule optimized to guarantee reaching your hotel before 8:00 PM (Projected: ${guaranteedFinishTime}).`
+        : `✅ On Schedule: Day's itinerary will comfortably finish by ${guaranteedFinishTime}.`,
+    });
+  } catch (error) {
+    console.error("[rebalance-schedule] Error:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// --------------------------- NEARBY FOOD & DINING RECOMMENDATIONS ---------------------------
+app.get("/api/journey/nearby-food-stops", (req, res) => {
+  const { mealType = "lunch", budget = "standard", city = "" } = req.query;
+
+  const sampleFoodStops = [
+    {
+      id: "food_1",
+      name: "Hotel Saravana Bhavan / Grand Veg",
+      cuisine: "Authentic South Indian & Thali Meals",
+      rating: 4.5,
+      avgCostPerPerson: budget === "luxury" ? 550 : budget === "budget" ? 120 : 250,
+      mealType: "lunch",
+      openHours: "11:30 AM - 04:00 PM",
+      highlight: "Clean express highway dining with ample parking",
+    },
+    {
+      id: "food_2",
+      name: "Highway Cafe & Filter Coffee Corner",
+      cuisine: "Snacks, Dosas, Fresh Juices & Tea",
+      rating: 4.4,
+      avgCostPerPerson: budget === "luxury" ? 250 : budget === "budget" ? 60 : 120,
+      mealType: "breakfast",
+      openHours: "07:00 AM - 11:30 AM",
+      highlight: "Fresh morning breakfast & energized filter coffee",
+    },
+    {
+      id: "food_3",
+      name: "Chettinad Heritage Kitchen & Grill",
+      cuisine: "Spicy Chettinad, Biryani & Traditional Meals",
+      rating: 4.7,
+      avgCostPerPerson: budget === "luxury" ? 850 : budget === "budget" ? 180 : 380,
+      mealType: "dinner",
+      openHours: "07:00 PM - 10:30 PM",
+      highlight: "Family-friendly dinner spot before reaching hotel",
+    },
+    {
+      id: "food_4",
+      name: "Greenleaf Eco Bistro",
+      cuisine: "Multi-Cuisine & Healthy Bowls",
+      rating: 4.6,
+      avgCostPerPerson: budget === "luxury" ? 600 : budget === "budget" ? 150 : 300,
+      mealType: "lunch",
+      openHours: "12:00 PM - 09:30 PM",
+      highlight: "Organic farm-to-table travel dining",
+    },
+  ];
+
+  const filtered = sampleFoodStops.filter((f) => !mealType || f.mealType === mealType.toLowerCase() || mealType === "all");
+  return res.json({ success: true, data: filtered.length > 0 ? filtered : sampleFoodStops });
+});
+
 // --------------------------- HEALTH CHECK (for Render) ---------------------------
 app.get("/", (req, res) => {
   res.json({ status: "ok", message: "Tourenvi Backend is running!" });
 });
 
 // --------------------------- SERVER START ---------------------------
-const PORT = process.env.PORT || 8000;
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}. Using OpenStreetMap (FREE) for hotel data.`));
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 8000;
+  app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}. Using OpenStreetMap (FREE) for hotel data.`));
+}
+
+export default app;
