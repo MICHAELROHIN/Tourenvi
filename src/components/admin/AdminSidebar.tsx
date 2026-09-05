@@ -12,7 +12,7 @@ import {
   Fuel,
   FileWarning,
   LogOut,
-  Compass,
+  Leaf,
   UserCheck,
   Headphones,
   DollarSign,
@@ -20,6 +20,7 @@ import {
   History,
   AlertTriangle,
   Megaphone,
+  X,
 } from "lucide-react";
 
 export type AdminTab =
@@ -38,14 +39,20 @@ export type AdminTab =
 interface AdminSidebarProps {
   activeTab: AdminTab;
   setActiveTab: (tab: AdminTab) => void;
+  mobileOpen?: boolean;
+  setMobileOpen?: (open: boolean) => void;
 }
 
-const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab }) => {
+const AdminSidebar: React.FC<AdminSidebarProps> = ({
+  activeTab,
+  setActiveTab,
+  mobileOpen = false,
+  setMobileOpen,
+}) => {
   const [adminUser, setAdminUser] = useState<User | null>(null);
   const [adminProfile, setAdminProfile] = useState<any>(null);
   const navigate = useNavigate();
 
-  // Monitor isolated admin authentication state and subscribe to Firestore updates
   useEffect(() => {
     let unsubscribeDoc: (() => void) | null = null;
 
@@ -62,7 +69,6 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab }) 
         return;
       }
 
-      // Setup a real-time listener on the isolated admin's profile document (check admins collection first)
       unsubscribeDoc = onSnapshot(
         doc(db, "admins", user.uid),
         (snap) => {
@@ -142,13 +148,6 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab }) 
       label: "Broadcast & Alerts",
       icon: Megaphone,
     },
-    /*
-    {
-      id: "revenue" as AdminTab,
-      label: "Revenue & Monetization",
-      icon: DollarSign,
-    },
-    */
     {
       id: "health" as AdminTab,
       label: "System Health",
@@ -161,86 +160,134 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({ activeTab, setActiveTab }) 
     },
   ];
 
-  return (
-    <aside className="w-80 h-[calc(100vh-2rem)] sticky top-4 left-4 flex flex-col justify-between rounded-2xl border border-white/10 bg-[#0B2B5C]/80 backdrop-blur-md shadow-[0_8px_32px_0_rgba(5,17,36,0.5)] p-6 z-30 transition-all duration-300">
-      {/* Header / Brand */}
-      <div className="space-y-8">
-        <div className="flex items-center gap-3 px-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#D4AF37] text-[#0B2B5C] shadow-[0_0_15px_rgba(212,175,55,0.4)]">
-            <Compass className="h-6 w-6 animate-spin-slow" />
+  const handleSelectTab = (tab: AdminTab) => {
+    setActiveTab(tab);
+    if (setMobileOpen) {
+      setMobileOpen(false);
+    }
+  };
+
+  const sidebarContent = (
+    <div className="flex flex-col h-full justify-between">
+      {/* Brand Header */}
+      <div className="flex-shrink-0">
+        <div className="flex items-center justify-between px-2 pt-1 pb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#2ecc71] to-[#27ae60] text-white shadow-[0_4px_12px_rgba(46,204,113,0.3)]">
+              <Leaf className="h-5 w-5" strokeWidth={2.5} />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-[#1e3b34]">
+                Tourenvi<span className="text-[#2ecc71] ml-1">Admin</span>
+              </h1>
+              <p className="text-[10px] tracking-widest text-[#2ecc71] uppercase font-extrabold">
+                Operations Center
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight text-white">
-              Tourenvi<span className="text-[#D4AF37] ml-1">Admin</span>
-            </h1>
-            <p className="text-[10px] tracking-widest text-[#D4AF37] uppercase font-bold">
-              Operations Center
-            </p>
-          </div>
+
+          {/* Close button for mobile */}
+          {setMobileOpen && (
+            <button
+              onClick={() => setMobileOpen(false)}
+              className="lg:hidden p-2 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+              aria-label="Close menu"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
-
-        {/* Navigation Tabs */}
-        <nav className="space-y-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-semibold tracking-wide transition-all duration-300 relative group cursor-pointer ${isActive
-                    ? "text-[#D4AF37] bg-[#F8F9FA]/5 border-l-4 border-[#D4AF37] shadow-[inset_4px_0_15px_rgba(212,175,55,0.05)]"
-                    : "text-gray-300 hover:text-white hover:bg-white/5 hover:translate-x-1"
-                  }`}
-              >
-                <Icon
-                  className={`h-5 w-5 transition-transform duration-300 group-hover:scale-110 ${isActive ? "text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.5)]" : "text-gray-400 group-hover:text-white"
-                    }`}
-                />
-                <span>{item.label}</span>
-
-                {/* Animated active/hover glow element */}
-                {isActive && (
-                  <span className="absolute right-3 w-1.5 h-1.5 rounded-full bg-[#D4AF37] shadow-[0_0_8px_rgba(212,175,55,0.8)]" />
-                )}
-              </button>
-            );
-          })}
-        </nav>
       </div>
 
-      {/* Footer Profile & Logout */}
-      <div className="space-y-4 pt-6 border-t border-white/10">
-        <div className="flex items-center gap-3 px-2 py-1">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full border border-[#D4AF37]/30 bg-[#051124] text-[#D4AF37]">
-            {adminProfile?.name ? (
-              <span className="font-bold text-sm uppercase">
-                {adminProfile.name.substring(0, 2)}
-              </span>
-            ) : (
-              <UserCheck className="h-5 w-5" />
-            )}
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <h4 className="text-sm font-bold text-white truncate">
-              {adminProfile?.name || "System Admin"}
-            </h4>
-            <p className="text-xs text-gray-400 truncate">
-              {adminProfile?.email || adminUser?.email || "admin@tourenvi.com"}
-            </p>
+      {/* Navigation list with smooth scroll container */}
+      <nav className="flex-1 overflow-y-auto pr-1 py-2 space-y-1 custom-scrollbar">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+
+          return (
+            <button
+              key={item.id}
+              onClick={() => handleSelectTab(item.id)}
+              className={`w-full flex items-center gap-3.5 px-3.5 py-2.5 rounded-xl text-sm font-semibold tracking-wide transition-all duration-200 relative group cursor-pointer ${
+                isActive
+                  ? "text-[#2ecc71] bg-[#2ecc71]/10 shadow-[inset_3px_0_0_#2ecc71]"
+                  : "text-slate-600 hover:text-[#1e3b34] hover:bg-slate-50 hover:translate-x-1"
+              }`}
+            >
+              <Icon
+                className={`h-4.5 w-4.5 transition-transform duration-200 group-hover:scale-110 shrink-0 ${
+                  isActive ? "text-[#2ecc71]" : "text-slate-400 group-hover:text-[#1e3b34]"
+                }`}
+              />
+              <span className="truncate">{item.label}</span>
+
+              {isActive && (
+                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#2ecc71] shadow-[0_0_6px_rgba(46,204,113,0.8)] shrink-0" />
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Footer Profile & Logout - Always Pinned & Visible */}
+      <div className="flex-shrink-0 pt-4 mt-2 border-t border-slate-100 space-y-3">
+        <div className="flex items-center justify-between gap-3 px-2 py-1">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-[#2ecc71] border border-emerald-200 shrink-0 font-bold text-xs uppercase">
+              {adminProfile?.name ? (
+                adminProfile.name.substring(0, 2)
+              ) : (
+                <UserCheck className="h-4 w-4" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-xs font-bold text-[#1e3b34] truncate">
+                {adminProfile?.name || "System Admin"}
+              </h4>
+              <p className="text-[11px] text-slate-400 truncate">
+                {adminProfile?.email || adminUser?.email || "admin@tourenvi.com"}
+              </p>
+            </div>
           </div>
         </div>
 
+        {/* Dedicated Prominent Logout Button */}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-500/20 bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 text-sm font-semibold tracking-wide transition-all duration-300 active:scale-95 cursor-pointer shadow-[0_2px_10px_rgba(239,68,68,0.05)]"
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-xs font-bold tracking-wide transition-all duration-200 active:scale-95 cursor-pointer shadow-xs"
         >
           <LogOut className="h-4 w-4" />
-          <span>Exit Dashboard</span>
+          <span>Log Out</span>
         </button>
       </div>
-    </aside>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Desktop Sticky Sidebar */}
+      <aside className="hidden lg:flex w-72 xl:w-80 h-[calc(100vh-2rem)] sticky top-4 left-4 flex-col rounded-3xl border border-slate-200/80 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-5 z-30 flex-shrink-0">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile Drawer Overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 lg:hidden animate-fade-in"
+          onClick={() => setMobileOpen?.(false)}
+        />
+      )}
+
+      {/* Mobile Slide-in Drawer */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-white p-5 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden flex flex-col ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {sidebarContent}
+      </div>
+    </>
   );
 };
 

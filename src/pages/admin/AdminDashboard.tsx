@@ -67,12 +67,19 @@ import {
   Megaphone,
   Download,
   Send,
+  Menu,
+  BarChart2,
+  PieChart as PieIcon,
+  Layers,
+  Leaf,
 } from "lucide-react";
 import { exportToCSV } from "@/utils/csvExporter";
 import {
   ResponsiveContainer,
   AreaChart,
   Area,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   Tooltip,
@@ -85,24 +92,27 @@ import {
 import AdminSidebar, { AdminTab } from "@/components/admin/AdminSidebar";
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from "@react-google-maps/api";
 
-const COLORS_MOOD = ["#D4AF37", "#0B2B5C", "#10B981", "#EF4444"];
+const COLORS_MOOD = ["#10B981", "#F59E0B", "#06B6D4", "#8B5CF6"];
 const COLORS_VEHICLE = ["#10B981", "#3B82F6", "#F59E0B"];
 
 const TRIP_TRENDS_DATA = [
-  { month: "Jan", trips: 140 },
-  { month: "Feb", trips: 210 },
-  { month: "Mar", trips: 185 },
-  { month: "Apr", trips: 310 },
-  { month: "May", trips: 450 },
-  { month: "Jun", trips: 590 },
-  { month: "Jul", trips: 720 },
+  { month: "Jan", trips: 420, lastYear: 280 },
+  { month: "Feb", trips: 380, lastYear: 310 },
+  { month: "Mar", trips: 510, lastYear: 350 },
+  { month: "Apr", trips: 290, lastYear: 210 },
+  { month: "May", trips: 620, lastYear: 430 },
+  { month: "Jun", trips: 540, lastYear: 390 },
+  { month: "Jul", trips: 720, lastYear: 480 },
 ];
 
 const MOODS_DATA = [
-  { name: "Nature", value: 45 },
-  { name: "Adventure", value: 30 },
-  { name: "Spiritual", value: 25 },
+  { name: "Nature", value: 45, color: "#10B981", percent: "39%" },
+  { name: "Adventure", value: 30, color: "#F59E0B", percent: "26%" },
+  { name: "Spiritual", value: 25, color: "#06B6D4", percent: "22%" },
+  { name: "Culture", value: 15, color: "#8B5CF6", percent: "13%" },
 ];
+
+const TOTAL_VIBE_COUNT = MOODS_DATA.reduce((acc, curr) => acc + curr.value, 0);
 
 const VEHICLES_DATA = [
   { name: "EV", value: 60 },
@@ -115,6 +125,9 @@ const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [systemHealth, setSystemHealth] = useState("Excellent");
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [chartViewMode, setChartViewMode] = useState<"bar" | "area">("bar");
+  const [activePieIndex, setActivePieIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(adminAuth, async (user) => {
@@ -762,40 +775,55 @@ const AdminDashboard: React.FC = () => {
       user.providerData?.[0]?.providerId === "google.com";
 
     return isGoogle ? (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-[0_0_10px_rgba(59,130,246,0.1)]">
-        <svg className="h-3 w-3 fill-current text-blue-400" viewBox="0 0 24 24">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-blue-50 text-blue-600 border border-blue-200">
+        <svg className="h-3 w-3 fill-current text-blue-500" viewBox="0 0 24 24">
           <path d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 15.96 0 12.48 0 5.8 0 0 5.8 0 12.48s5.8 12.48 12.48 12.48c3.6 0 6.64-1.187 8.88-3.52 2.32-2.32 3.013-5.573 3.013-8.213 0-.573-.053-1.147-.133-1.64H12.48z" />
         </svg>
         Google Account
       </span>
     ) : (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-        <Mail className="h-3 w-3 text-amber-400" />
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-600 border border-amber-200">
+        <Mail className="h-3 w-3 text-amber-500" />
         Email & Password
       </span>
     );
   };
 
   return (
-    <div className="min-h-screen bg-[#051124] text-white flex p-4 gap-6 font-sans relative overflow-x-hidden">
-      <div className="fixed -top-40 -left-40 w-96 h-96 bg-[#0B2B5C]/40 rounded-full blur-3xl pointer-events-none" />
-      <div className="fixed top-1/2 -right-40 w-96 h-96 bg-[#D4AF37]/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 flex flex-col lg:flex-row p-3 sm:p-5 lg:p-6 gap-4 lg:gap-6 font-['Poppins',sans-serif] relative overflow-x-hidden">
+      <div className="fixed -top-40 -left-40 w-96 h-96 bg-[#2ecc71]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="fixed top-1/2 -right-40 w-96 h-96 bg-[#2ecc71]/5 rounded-full blur-3xl pointer-events-none" />
 
-      <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <AdminSidebar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        mobileOpen={isMobileMenuOpen}
+        setMobileOpen={setIsMobileMenuOpen}
+      />
 
-      <main className="flex-1 space-y-6 max-w-7xl mx-auto pb-12 z-10">
-        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-              Welcome back, <span className="text-[#D4AF37]">{adminName}</span>
-            </h2>
-            <p className="text-xs text-gray-400 mt-1">
-              Tourenvi Operational Intelligence Dashboard • Central Real-time Telemetry
-            </p>
+      <main className="flex-1 space-y-6 max-w-7xl mx-auto pb-12 z-10 w-full min-w-0">
+        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs">
+          <div className="flex items-center gap-3">
+            {/* Mobile Menu Hamburger Button */}
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="lg:hidden p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-[#1e3b34] transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
+              aria-label="Open sidebar menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1e3b34] flex items-center gap-2">
+                Welcome back, <span className="text-[#2ecc71]">{adminName}</span>
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Tourenvi Operational Intelligence Dashboard • Central Real-time Telemetry
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="px-3.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 flex items-center gap-2 text-xs font-semibold text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.2)]">
+          <div className="flex items-center gap-3 self-end sm:self-center">
+            <div className="px-3.5 py-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 flex items-center gap-2 text-xs font-semibold text-emerald-700">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -811,143 +839,298 @@ const AdminDashboard: React.FC = () => {
                   toast.success("Telemetry and user tables synchronized.");
                 }, 800);
               }}
-              className="p-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white transition-all cursor-pointer active:scale-95 shadow-sm"
+              className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-[#1e3b34] transition-all cursor-pointer active:scale-95 shadow-xs"
               title="Sync Telemetry Data"
             >
-              <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin text-[#D4AF37]" : ""}`} />
+              <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin text-[#2ecc71]" : ""}`} />
             </button>
           </div>
         </header>
 
         {activeTab === "overview" && (
           <div className="space-y-6 animate-fade-in">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+            {/* 4 Stat Cards with Image 3 Soft Pastel Aesthetic & White Icon Badges */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+              {/* Total Users - Soft Purple / Lavender */}
+              <div className="p-5 rounded-2xl border border-purple-200/80 bg-gradient-to-br from-[#f8f5ff] via-[#fbf9ff] to-[#f3ebff] shadow-[0_4px_20px_-4px_rgba(168,85,247,0.12)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Users</p>
-                    <h3 className="text-2xl font-black text-white mt-1 group-hover:text-[#D4AF37] transition-colors">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Users</p>
+                    <h3 className="text-2xl sm:text-3xl font-semibold font-black text-slate-900 mt-1 group-hover:text-purple-700 transition-colors">
                       {users.length}
                     </h3>
                   </div>
-                  <div className="p-3 rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37]">
+                  <div className="p-3 rounded-2xl bg-white text-purple-600 border border-purple-100/80 shadow-xs group-hover:scale-105 transition-transform">
                     <UsersIcon className="h-5 w-5" />
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold">
                   <TrendingUp className="h-3.5 w-3.5" /> +12.4% this month
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+              {/* Trips Planned - Soft Blue */}
+              <div className="p-5 rounded-2xl border border-blue-200/80 bg-gradient-to-br from-[#f0f7ff] via-[#f8faff] to-[#e4f1ff] shadow-[0_4px_20px_-4px_rgba(59,130,246,0.12)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Trips Planned</p>
-                    <h3 className="text-2xl font-black text-white mt-1 group-hover:text-[#D4AF37] transition-colors">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Trips Planned</p>
+                    <h3 className="text-2xl sm:text-3xl font-semibold font-black text-slate-900 mt-1 group-hover:text-blue-700 transition-colors">
                       2,480
                     </h3>
                   </div>
-                  <div className="p-3 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400">
+                  <div className="p-3 rounded-2xl bg-white text-blue-600 border border-blue-100/80 shadow-xs group-hover:scale-105 transition-transform">
                     <Compass className="h-5 w-5" />
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold">
                   <TrendingUp className="h-3.5 w-3.5" /> +18.2% from route builder
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+              {/* Active Navigations - Soft Mint / Emerald */}
+              <div className="p-5 rounded-2xl border border-emerald-200/80 bg-gradient-to-br from-[#f0fdf4] via-[#f9fefb] to-[#def7ec] shadow-[0_4px_20px_-4px_rgba(16,185,129,0.12)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Active Navigations</p>
-                    <h3 className="text-2xl font-black text-white mt-1 group-hover:text-[#D4AF37] transition-colors">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Active Navigations</p>
+                    <h3 className="text-2xl sm:text-3xl font-semibold font-black text-slate-900 mt-1 group-hover:text-emerald-700 transition-colors">
                       {fleet.length}
                     </h3>
                   </div>
-                  <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                  <div className="p-3 rounded-2xl bg-white text-emerald-600 border border-emerald-100/80 shadow-xs group-hover:scale-105 transition-transform">
                     <Navigation className="h-5 w-5" />
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold">
                   <Activity className="h-3.5 w-3.5 animate-pulse" /> Live telemetry tracking
                 </div>
               </div>
 
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg hover:-translate-y-1 transition-all duration-300 group">
+              {/* CO2 Saved - Soft Warm Amber / Cream */}
+              <div className="p-5 rounded-2xl border border-amber-200/80 bg-gradient-to-br from-[#fffbeb] via-[#fffdf5] to-[#fef3c7] shadow-[0_4px_20px_-4px_rgba(245,158,11,0.12)] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">CO₂ Saved</p>
-                    <h3 className="text-2xl font-black text-white mt-1 group-hover:text-[#D4AF37] transition-colors">
-                      4,820 <span className="text-sm font-semibold text-gray-400">kg</span>
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">CO₂ Saved</p>
+                    <h3 className="text-2xl sm:text-3xl font-semibold font-black text-slate-900 mt-1 group-hover:text-amber-700 transition-colors">
+                      4,820 <span className="text-sm font-semibold text-slate-400">kg</span>
                     </h3>
                   </div>
-                  <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
+                  <div className="p-3 rounded-2xl bg-white text-amber-600 border border-amber-100/80 shadow-xs group-hover:scale-105 transition-transform">
                     <DollarSign className="h-5 w-5" />
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold">
+                <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold">
                   <TrendingUp className="h-3.5 w-3.5" /> Eco-friendly routes chosen
                 </div>
               </div>
             </div>
 
+            {/* Graphs Grid: Left = Image 2 Style Comparison Bar/Wave Chart, Right = Image 3 Financial Breakdown Donut */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg">
-                <div className="flex items-center justify-between mb-6">
+              {/* Monthly Activity Trends - Styled like Image 2 "Overview Income" */}
+              <div className="lg:col-span-2 p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
                   <div>
-                    <h3 className="text-base font-bold text-white uppercase tracking-wider">Monthly Trip Activity Trends</h3>
-                    <p className="text-xs text-gray-400 mt-0.5">Aggregated trip planning frequency per month</p>
+                    <h3 className="text-base font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                      <BarChart2 className="h-4.5 w-4.5 text-purple-600" /> Monthly Trip Activity Trends
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Comparative monthly trip telemetry & frequency</p>
+                  </div>
+
+                  {/* Chart controls matching Image 2 */}
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="flex items-center gap-3 text-xs font-semibold">
+                      <span className="flex items-center gap-1.5 text-slate-700">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-purple-600"></span> This year
+                      </span>
+                      <span className="flex items-center gap-1.5 text-slate-400">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-slate-200"></span> Last year
+                      </span>
+                    </div>
+
+                    <div className="flex items-center p-0.5 bg-slate-100 rounded-xl text-xs font-semibold">
+                      <button
+                        onClick={() => setChartViewMode("bar")}
+                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                          chartViewMode === "bar"
+                            ? "bg-white text-purple-700 shadow-xs font-bold"
+                            : "text-slate-500 hover:text-slate-800"
+                        }`}
+                      >
+                        Bars
+                      </button>
+                      <button
+                        onClick={() => setChartViewMode("area")}
+                        className={`px-3 py-1 rounded-lg transition-all cursor-pointer ${
+                          chartViewMode === "area"
+                            ? "bg-white text-purple-700 shadow-xs font-bold"
+                            : "text-slate-500 hover:text-slate-800"
+                        }`}
+                      >
+                        Wave
+                      </button>
+                    </div>
                   </div>
                 </div>
-                <div className="h-72 w-full">
+
+                <div className="h-72 w-full pt-2">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={TRIP_TRENDS_DATA}>
-                      <defs>
-                        <linearGradient id="colorTrips" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.4} />
-                          <stop offset="95%" stopColor="#D4AF37" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                      <XAxis dataKey="month" stroke="#9CA3AF" fontSize={12} />
-                      <YAxis stroke="#9CA3AF" fontSize={12} />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: "#051124",
-                          border: "1px solid rgba(255, 255, 255, 0.15)",
-                          borderRadius: "12px",
-                          color: "#FFF",
-                        }}
-                      />
-                      <Area type="monotone" dataKey="trips" stroke="#D4AF37" strokeWidth={2} fillOpacity={1} fill="url(#colorTrips)" />
-                    </AreaChart>
+                    {chartViewMode === "bar" ? (
+                      <BarChart data={TRIP_TRENDS_DATA} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                        <XAxis dataKey="month" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={{ stroke: "#E2E8F0" }} />
+                        <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={{ stroke: "#E2E8F0" }} />
+                        <Tooltip
+                          content={({ active, payload, label }) => {
+                            if (active && payload && payload.length) {
+                              return (
+                                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xl text-xs">
+                                  <p className="font-bold text-slate-800 mb-1">{label} Telemetry</p>
+                                  <p className="text-purple-600 font-semibold flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+                                    This year: <span className="font-black">{payload[0]?.value}</span> trips
+                                  </p>
+                                  {payload[1] && (
+                                    <p className="text-slate-400 font-semibold flex items-center gap-1.5 mt-0.5">
+                                      <span className="w-2 h-2 rounded-full bg-slate-300"></span>
+                                      Last year: <span className="font-black">{payload[1]?.value}</span> trips
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            }
+                            return null;
+                          }}
+                        />
+                        <Bar dataKey="trips" fill="#7C3AED" radius={[6, 6, 0, 0]} barSize={14} name="This year" />
+                        <Bar dataKey="lastYear" fill="#E2E8F0" radius={[6, 6, 0, 0]} barSize={14} name="Last year" />
+                      </BarChart>
+                    ) : (
+                      <AreaChart data={TRIP_TRENDS_DATA} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorTripsVibrant" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.35} />
+                            <stop offset="95%" stopColor="#7C3AED" stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                        <XAxis dataKey="month" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={{ stroke: "#E2E8F0" }} />
+                        <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={{ stroke: "#E2E8F0" }} />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: "#FFFFFF",
+                            border: "1px solid #E2E8F0",
+                            borderRadius: "12px",
+                            boxShadow: "0 10px 25px -5px rgba(0,0,0,0.1)",
+                            color: "#0F172A",
+                            fontSize: "12px",
+                          }}
+                        />
+                        <Area type="monotone" dataKey="trips" stroke="#7C3AED" strokeWidth={3} fillOpacity={1} fill="url(#colorTripsVibrant)" name="Trips Planned" />
+                      </AreaChart>
+                    )}
                   </ResponsiveContainer>
                 </div>
               </div>
 
-              <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-6">
+              {/* Trip Vibe Distribution - Exact Image 3 Layout (3D Center Badge + 2x2 Callout Cards) */}
+              <div className="p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4">
                 <div>
-                  <h3 className="text-base font-bold text-white uppercase tracking-wider">Trip Vibe Distribution</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">User preferred trip atmospheres</p>
-                  <div className="h-44 w-full mt-2">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={MOODS_DATA} innerRadius={40} outerRadius={65} paddingAngle={4} dataKey="value">
-                          {MOODS_DATA.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS_MOOD[index % COLORS_MOOD.length]} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "#ffffffff",
-                            border: "1px solid rgba(255, 255, 255, 0.15)",
-                            borderRadius: "12px",
-                          }}
-                        />
-                        <Legend />
-                      </PieChart>
-                    </ResponsiveContainer>
+                  <h3 className="text-base font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <Sparkles className="h-4.5 w-4.5 text-emerald-600" /> Trip Vibe Distribution
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">User preferred trip atmospheres</p>
+                </div>
+
+                {/* 3D-effect Circular Donut with Center Leaf Badge */}
+                <div className="relative h-56 flex items-center justify-center">
+                  <div className="absolute w-32 h-32 rounded-full bg-gradient-to-br from-white to-slate-50 shadow-[inset_0_2px_4px_rgba(255,255,255,0.9),0_10px_20px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.04)] border border-slate-200/60 flex flex-col items-center justify-center text-center pointer-events-none z-10 p-3 transition-all duration-300">
+                    <Leaf className="text-emerald-600 mb-0.5" size={20} />
+                    {activePieIndex !== null ? (
+                      <>
+                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">
+                          {MOODS_DATA[activePieIndex].name}
+                        </span>
+                        <span
+                          className="text-lg font-black transition-all duration-300 mt-1 leading-none"
+                          style={{ color: MOODS_DATA[activePieIndex].color }}
+                        >
+                          {MOODS_DATA[activePieIndex].value}%
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">
+                          Total Vibes
+                        </span>
+                        <span className="text-lg font-black text-slate-800 mt-1 leading-none">
+                          100%
+                        </span>
+                      </>
+                    )}
                   </div>
+
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={MOODS_DATA}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={65}
+                        outerRadius={88}
+                        paddingAngle={4}
+                        cornerRadius={6}
+                        dataKey="value"
+                        onMouseEnter={(_, index) => setActivePieIndex(index)}
+                        onMouseLeave={() => setActivePieIndex(null)}
+                      >
+                        {MOODS_DATA.map((entry, index) => {
+                          const isActive = activePieIndex === index;
+                          return (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={entry.color}
+                              stroke="#FFFFFF"
+                              strokeWidth={isActive ? 3.5 : 2}
+                              style={{ outline: "none", cursor: "pointer", transition: "all 0.2s ease" }}
+                            />
+                          );
+                        })}
+                      </Pie>
+                      <Tooltip content={() => null} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* 2x2 Callout Cards Grid - Exact Image 3 Layout */}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  {MOODS_DATA.map((item, index) => {
+                    const isActive = activePieIndex === index;
+                    return (
+                      <div
+                        key={item.name}
+                        onMouseEnter={() => setActivePieIndex(index)}
+                        onMouseLeave={() => setActivePieIndex(null)}
+                        className={`p-3 rounded-2xl border transition-all duration-300 text-left cursor-pointer ${
+                          isActive
+                            ? "bg-slate-50 border-slate-300 shadow-md translate-y-[-2px]"
+                            : "bg-slate-50/50 border-slate-100 hover:border-slate-200"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span
+                            className="px-2.5 py-0.5 rounded-full text-[9px] font-bold text-white tracking-wider uppercase"
+                            style={{ backgroundColor: item.color }}
+                          >
+                            {item.name}
+                          </span>
+                          <span className="text-[10px] font-extrabold text-slate-400">{item.percent}</span>
+                        </div>
+                        <div className="text-sm font-black text-slate-800">
+                          {item.value} <span className="text-xs font-semibold text-slate-400">trips</span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -955,19 +1138,19 @@ const AdminDashboard: React.FC = () => {
         )}
 
         {activeTab === "users" && (
-          <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4 animate-fade-in">
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-b border-white/5 pb-3">
+          <div className="p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4 animate-fade-in">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <UsersIcon className="h-5 w-5 text-[#D4AF37]" /> User Accounts Management
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <UsersIcon className="h-5 w-5 text-[#2ecc71]" /> User Accounts Management
                 </h3>
-                <p className="text-xs text-gray-400">
-                  Showing non-admin user accounts. Click any account to view planned trips and profile details.
+                <p className="text-xs text-slate-500">
+                  Showing registered traveler accounts. Click any account to view planned trips and profile details.
                 </p>
               </div>
               <div className="flex items-center gap-3 w-full sm:max-w-md">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
                   <input
                     type="text"
                     placeholder="Search by name, email or phone..."
@@ -976,12 +1159,12 @@ const AdminDashboard: React.FC = () => {
                       setUserSearch(e.target.value);
                       setUserPage(1);
                     }}
-                    className="w-full pl-11 pr-4 py-2 rounded-xl border border-white/10 bg-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2ecc71] focus:bg-white transition-all"
                   />
                 </div>
                 <button
                   onClick={() => exportToCSV("Tourenvi_Users_Report", regularUsers)}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#D4AF37] text-[#0B2B5C] font-bold text-xs hover:bg-[#c49f27] transition-all shrink-0 cursor-pointer shadow-md"
+                  className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#2ecc71] text-white font-bold text-xs hover:bg-[#27ae60] transition-all shrink-0 cursor-pointer shadow-xs"
                   title="Export User Accounts CSV Report"
                 >
                   <Download className="h-4 w-4" /> Export CSV
@@ -989,10 +1172,10 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+            <div className="overflow-x-auto border border-slate-200/80 rounded-xl bg-white shadow-2xs">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/5 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold text-slate-600 uppercase tracking-wider">
                     <th className="px-6 py-4">Full Name</th>
                     <th className="px-6 py-4">Contact Details</th>
                     <th className="px-6 py-4">Login Method</th>
@@ -1001,43 +1184,45 @@ const AdminDashboard: React.FC = () => {
                     <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 text-sm">
+                <tbody className="divide-y divide-slate-100 text-sm">
                   {paginatedUsers.length > 0 ? (
                     paginatedUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-white/5 transition-colors duration-200">
+                      <tr key={user.id} className="hover:bg-slate-50/70 transition-colors duration-150">
                         <td className="px-6 py-4">
                           <button
                             onClick={() => handleOpenUserModal(user)}
-                            className="text-left font-semibold text-white hover:text-[#D4AF37] transition-colors group flex items-center gap-1.5 cursor-pointer"
+                            className="text-left font-semibold text-slate-900 hover:text-[#2ecc71] transition-colors group flex items-center gap-1.5 cursor-pointer"
                           >
                             <span>{user.name || "Anonymous User"}</span>
-                            <Eye className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 text-[#D4AF37] transition-opacity" />
+                            <Eye className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 text-[#2ecc71] transition-opacity" />
                           </button>
-                          <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">
+                          <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">
                             UID: {user.uid?.substr(0, 8) || user.id?.substr(0, 8)}...
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-white font-medium">{user.email}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">{user.phone || "No phone registered"}</div>
+                          <div className="text-slate-800 font-medium">{user.email}</div>
+                          <div className="text-xs text-slate-400 mt-0.5">{user.phone || "No phone registered"}</div>
                         </td>
                         <td className="px-6 py-4">{renderAuthProviderBadge(user)}</td>
                         <td className="px-6 py-4">
                           <span
-                            className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${user.role === "guide"
-                                ? "bg-cyan-500/15 text-cyan-400 border border-cyan-500/30"
+                            className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                              user.role === "guide"
+                                ? "bg-cyan-50 text-cyan-700 border border-cyan-200"
                                 : user.role === "support"
-                                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                                  : "bg-blue-500/15 text-blue-400 border border-blue-500/30"
-                              }`}
+                                ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                : "bg-blue-50 text-blue-700 border border-blue-200"
+                            }`}
                           >
                             {user.role || "user"}
                           </span>
                         </td>
                         <td className="px-6 py-4">
                           <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${user.status === "suspended" ? "text-red-400" : "text-emerald-400"
-                              }`}
+                            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                              user.status === "suspended" ? "text-red-600" : "text-emerald-600"
+                            }`}
                           >
                             {user.status === "suspended" ? (
                               <>
@@ -1054,24 +1239,25 @@ const AdminDashboard: React.FC = () => {
                           <div className="flex justify-end gap-2">
                             <button
                               onClick={() => handleOpenUserModal(user)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-500/20 hover:border-blue-500 bg-white/5 hover:bg-blue-500/15 text-blue-400 text-xs font-bold transition-all cursor-pointer active:scale-95"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
                               title="Inspect User Details & Trip Plans"
                             >
                               <Eye className="h-3.5 w-3.5" /> View Trips
                             </button>
                             <button
                               onClick={() => handlePromoteAdmin(user.id)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#D4AF37]/20 hover:border-[#D4AF37] bg-white/5 hover:bg-[#D4AF37]/15 text-[#D4AF37] text-xs font-bold transition-all cursor-pointer active:scale-95"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
                               title="Promote to Administrator"
                             >
                               <Shield className="h-3.5 w-3.5" /> Promote
                             </button>
                             <button
                               onClick={() => handleToggleSuspension(user.id, user.status)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer active:scale-95 ${user.status === "suspended"
-                                  ? "border-emerald-500/20 hover:border-emerald-500 bg-white/5 hover:bg-emerald-500/15 text-emerald-400"
-                                  : "border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400"
-                                }`}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs ${
+                                user.status === "suspended"
+                                  ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
+                                  : "border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700"
+                              }`}
                               title={user.status === "suspended" ? "Unsuspend account" : "Suspend account"}
                             >
                               <UserX className="h-3.5 w-3.5" />
@@ -1079,7 +1265,7 @@ const AdminDashboard: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleDeleteUser(user.id)}
-                              className="p-1.5 rounded-lg border border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400 transition-all cursor-pointer active:scale-95"
+                              className="p-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
                               title="Delete Account permanently"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -1090,7 +1276,7 @@ const AdminDashboard: React.FC = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-gray-500 font-semibold">
+                      <td colSpan={6} className="text-center py-8 text-slate-500 font-semibold">
                         No non-admin accounts match your filter.
                       </td>
                     </tr>
@@ -1100,21 +1286,21 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {totalUserPages > 1 && (
-              <div className="flex items-center justify-between pt-4 border-t border-white/5">
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                 <button
                   disabled={userPage === 1}
                   onClick={() => setUserPage((p) => Math.max(1, p - 1))}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
                 >
                   <ChevronLeft className="h-4 w-4" /> Previous
                 </button>
-                <span className="text-xs text-gray-400">
-                  Page <span className="font-semibold text-white">{userPage}</span> of {totalUserPages}
+                <span className="text-xs text-slate-500">
+                  Page <span className="font-semibold text-slate-800">{userPage}</span> of {totalUserPages}
                 </span>
                 <button
                   disabled={userPage === totalUserPages}
                   onClick={() => setUserPage((p) => Math.min(totalUserPages, p + 1))}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
                 >
                   Next <ChevronRight className="h-4 w-4" />
                 </button>
@@ -1124,18 +1310,18 @@ const AdminDashboard: React.FC = () => {
         )}
 
         {activeTab === "admins" && (
-          <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4 animate-fade-in">
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-b border-white/5 pb-3">
+          <div className="p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4 animate-fade-in">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-[#D4AF37]" /> Admin Accounts Management
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-[#2ecc71]" /> Admin Accounts Management
                 </h3>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-slate-500">
                   Administrators with full operational access. Demoting an account automatically moves it to User Management.
                 </p>
               </div>
               <div className="relative w-full sm:max-w-md">
-                <Search className="absolute left-3.5 top-3 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Search administrators by name, email or phone..."
@@ -1144,15 +1330,15 @@ const AdminDashboard: React.FC = () => {
                     setAdminSearch(e.target.value);
                     setAdminPage(1);
                   }}
-                  className="w-full pl-11 pr-4 py-2 rounded-xl border border-white/10 bg-white/5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                  className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2ecc71] focus:bg-white transition-all"
                 />
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+            <div className="overflow-x-auto border border-slate-200/80 rounded-xl bg-white shadow-2xs">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/5 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold text-slate-600 uppercase tracking-wider">
                     <th className="px-6 py-4">Administrator Name</th>
                     <th className="px-6 py-4">Contact Info</th>
                     <th className="px-6 py-4">Login Method</th>
@@ -1161,30 +1347,31 @@ const AdminDashboard: React.FC = () => {
                     <th className="px-6 py-4 text-right">Demote / Manage Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 text-sm">
+                <tbody className="divide-y divide-slate-100 text-sm">
                   {paginatedAdmins.length > 0 ? (
                     paginatedAdmins.map((user) => (
-                      <tr key={user.id} className="hover:bg-white/5 transition-colors duration-200">
+                      <tr key={user.id} className="hover:bg-slate-50/70 transition-colors duration-150">
                         <td className="px-6 py-4">
-                          <div className="font-semibold text-white">{user.name || "Administrator"}</div>
-                          <div className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">
+                          <div className="font-semibold text-slate-900">{user.name || "Administrator"}</div>
+                          <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">
                             UID: {user.uid?.substr(0, 8) || user.id?.substr(0, 8)}...
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-white font-medium">{user.email}</div>
-                          <div className="text-xs text-gray-400 mt-0.5">{user.phone || "No phone registered"}</div>
+                          <div className="text-slate-800 font-medium">{user.email}</div>
+                          <div className="text-xs text-slate-400 mt-0.5">{user.phone || "No phone registered"}</div>
                         </td>
                         <td className="px-6 py-4">{renderAuthProviderBadge(user)}</td>
                         <td className="px-6 py-4">
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-[#D4AF37]/15 text-[#D4AF37] border border-[#D4AF37]/30">
+                          <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
                             admin
                           </span>
                         </td>
                         <td className="px-6 py-4">
                           <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${user.status === "suspended" ? "text-red-400" : "text-emerald-400"
-                              }`}
+                            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                              user.status === "suspended" ? "text-red-600" : "text-emerald-600"
+                            }`}
                           >
                             {user.status === "suspended" ? (
                               <>
@@ -1201,17 +1388,18 @@ const AdminDashboard: React.FC = () => {
                           <div className="flex justify-end gap-2">
                             <button
                               onClick={() => handleDemoteAdmin(user.id)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400 text-xs font-bold transition-all cursor-pointer active:scale-95"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
                               title="Demote Admin back to Regular User"
                             >
                               <ShieldAlert className="h-3.5 w-3.5" /> Demote to User
                             </button>
                             <button
                               onClick={() => handleToggleSuspension(user.id, user.status)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer active:scale-95 ${user.status === "suspended"
-                                  ? "border-emerald-500/20 hover:border-emerald-500 bg-white/5 hover:bg-emerald-500/15 text-emerald-400"
-                                  : "border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400"
-                                }`}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs ${
+                                user.status === "suspended"
+                                  ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
+                                  : "border-red-200 bg-red-50 hover:bg-red-100 text-red-600"
+                              }`}
                               title={user.status === "suspended" ? "Unsuspend account" : "Suspend account"}
                             >
                               <UserX className="h-3.5 w-3.5" />
@@ -1219,7 +1407,7 @@ const AdminDashboard: React.FC = () => {
                             </button>
                             <button
                               onClick={() => handleDeleteUser(user.id)}
-                              className="p-1.5 rounded-lg border border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400 transition-all cursor-pointer active:scale-95"
+                              className="p-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
                               title="Delete Account permanently"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
@@ -1230,7 +1418,7 @@ const AdminDashboard: React.FC = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-gray-500 font-semibold">
+                      <td colSpan={6} className="text-center py-8 text-slate-500 font-semibold">
                         No administrator accounts found.
                       </td>
                     </tr>
@@ -1240,21 +1428,21 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {totalAdminPages > 1 && (
-              <div className="flex items-center justify-between pt-4 border-t border-white/5">
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                 <button
                   disabled={adminPage === 1}
                   onClick={() => setAdminPage((p) => Math.max(1, p - 1))}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
                 >
                   <ChevronLeft className="h-4 w-4" /> Previous
                 </button>
-                <span className="text-xs text-gray-400">
-                  Page <span className="font-semibold text-white">{adminPage}</span> of {totalAdminPages}
+                <span className="text-xs text-slate-500">
+                  Page <span className="font-semibold text-slate-800">{adminPage}</span> of {totalAdminPages}
                 </span>
                 <button
                   disabled={adminPage === totalAdminPages}
                   onClick={() => setAdminPage((p) => Math.min(totalAdminPages, p + 1))}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-bold cursor-pointer"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
                 >
                   Next <ChevronRight className="h-4 w-4" />
                 </button>
@@ -1265,10 +1453,10 @@ const AdminDashboard: React.FC = () => {
 
         {activeTab === "fleet" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-            <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg p-4 h-[550px] relative overflow-hidden flex flex-col justify-between">
-              <div className="absolute top-6 left-6 z-10 bg-[#051124]/90 border border-white/10 p-3.5 rounded-xl shadow-lg max-w-xs pointer-events-none">
-                <h4 className="text-xs font-bold text-[#D4AF37] uppercase tracking-widest">Active Operations Map</h4>
-                <p className="text-[10px] text-gray-300 mt-1 leading-relaxed">
+            <div className="lg:col-span-2 rounded-2xl border border-slate-200/80 bg-white shadow-xs p-4 h-[550px] relative overflow-hidden flex flex-col justify-between">
+              <div className="absolute top-6 left-6 z-10 bg-white/95 backdrop-blur-xs border border-slate-200/80 p-3.5 rounded-xl shadow-md max-w-xs pointer-events-none">
+                <h4 className="text-xs font-bold text-[#2ecc71] uppercase tracking-widest">Active Operations Map</h4>
+                <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
                   Real-time telemetry showing live transits. Click a fleet vehicle to target telemetry tracker.
                 </p>
               </div>
@@ -1281,15 +1469,15 @@ const AdminDashboard: React.FC = () => {
                     zoom={mapZoom}
                     options={{
                       styles: [
-                        { elementType: "geometry", stylers: [{ color: "#051124" }] },
-                        { elementType: "labels.text.stroke", stylers: [{ color: "#051124" }] },
-                        { elementType: "labels.text.fill", stylers: [{ color: "#8a9ba8" }] },
-                        { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#d4af37" }] },
-                        { featureType: "road", elementType: "geometry", stylers: [{ color: "#0b2b5c" }] },
-                        { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#1d3f72" }] },
-                        { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#8a9ba8" }] },
-                        { featureType: "water", elementType: "geometry", stylers: [{ color: "#030a16" }] },
-                        { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#030a16" }] },
+                        { elementType: "geometry", stylers: [{ color: "#F8FAFC" }] },
+                        { elementType: "labels.text.stroke", stylers: [{ color: "#FFFFFF" }] },
+                        { elementType: "labels.text.fill", stylers: [{ color: "#475569" }] },
+                        { featureType: "administrative.locality", elementType: "labels.text.fill", stylers: [{ color: "#2ecc71" }] },
+                        { featureType: "road", elementType: "geometry", stylers: [{ color: "#E2E8F0" }] },
+                        { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#CBD5E1" }] },
+                        { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#64748B" }] },
+                        { featureType: "water", elementType: "geometry", stylers: [{ color: "#E0F2FE" }] },
+                        { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#0284C7" }] },
                       ],
                     }}
                   >
@@ -1305,7 +1493,7 @@ const AdminDashboard: React.FC = () => {
                         icon={{
                           path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
                           scale: 6,
-                          fillColor: v.model?.includes("EV") ? "#10B981" : "#D4AF37",
+                          fillColor: v.model?.includes("EV") ? "#10B981" : "#2ecc71",
                           fillOpacity: 0.9,
                           strokeWeight: 2,
                           strokeColor: "#FFF",
@@ -1318,7 +1506,7 @@ const AdminDashboard: React.FC = () => {
                         onCloseClick={() => setSelectedVehicle(null)}
                       >
                         <div className="text-slate-900 p-2 text-xs leading-relaxed max-w-[180px]">
-                          <div className="font-bold border-b pb-1 text-[#0B2B5C]">{selectedVehicle.regNo}</div>
+                          <div className="font-bold border-b pb-1 text-[#1e3b34]">{selectedVehicle.regNo}</div>
                           <div>Model: {selectedVehicle.model}</div>
                           <div>Driver: {selectedVehicle.driver}</div>
                           <div>Route: {selectedVehicle.route}</div>
@@ -1329,19 +1517,19 @@ const AdminDashboard: React.FC = () => {
                   </GoogleMap>
                 </div>
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center rounded-xl bg-[#051124] border border-white/5 p-4 text-center mt-4">
-                  <div className="text-gray-400 space-y-3 max-w-sm">
-                    <MapPin className="h-10 w-10 mx-auto text-[#D4AF37] animate-bounce" />
-                    <h5 className="font-bold text-white">Interactive Geographic Console</h5>
-                    <p className="text-xs text-gray-500">
+                <div className="w-full h-full flex flex-col items-center justify-center rounded-xl bg-slate-50 border border-slate-200 p-4 text-center mt-4">
+                  <div className="text-slate-500 space-y-3 max-w-sm">
+                    <MapPin className="h-10 w-10 mx-auto text-[#2ecc71] animate-bounce" />
+                    <h5 className="font-bold text-slate-800">Interactive Geographic Console</h5>
+                    <p className="text-xs text-slate-500">
                       Standard maps api not currently loaded. Displaying telemetry route simulation matrix:
                     </p>
-                    <div className="p-3 border border-[#D4AF37]/20 rounded-xl bg-[#0B2B5C]/15 flex flex-col gap-2.5 text-left text-[11px]">
+                    <div className="p-3 border border-slate-200 rounded-xl bg-white flex flex-col gap-2.5 text-left text-[11px] shadow-2xs">
                       {fleet.map((v, idx) => (
-                        <div key={idx} className="flex justify-between items-center border-b border-white/5 pb-1">
-                          <span className="font-bold text-[#D4AF37]">{v.regNo}</span>
-                          <span className="text-gray-400">{v.route}</span>
-                          <span className="text-emerald-400 font-semibold">{v.progress}%</span>
+                        <div key={idx} className="flex justify-between items-center border-b border-slate-100 pb-1">
+                          <span className="font-bold text-[#1e3b34]">{v.regNo}</span>
+                          <span className="text-slate-500">{v.route}</span>
+                          <span className="text-emerald-600 font-semibold">{v.progress}%</span>
                         </div>
                       ))}
                     </div>
@@ -1350,10 +1538,10 @@ const AdminDashboard: React.FC = () => {
               )}
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg p-5 flex flex-col h-[550px]">
+            <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs p-5 flex flex-col h-[550px]">
               <div className="flex items-center gap-2 mb-4">
-                <Car className="h-5 w-5 text-[#D4AF37]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Active Fleet Telemetry</h4>
+                <Car className="h-5 w-5 text-[#2ecc71]" />
+                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Active Fleet Telemetry</h4>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-3 pr-1">
@@ -1365,49 +1553,51 @@ const AdminDashboard: React.FC = () => {
                       setMapZoom(11);
                       setSelectedVehicle(v);
                     }}
-                    className={`p-4 rounded-xl border transition-all duration-300 cursor-pointer flex flex-col gap-2.5 group ${selectedVehicle?.regNo === v.regNo
-                        ? "border-[#D4AF37] bg-[#D4AF37]/5 shadow-[0_0_15px_rgba(212,175,55,0.1)]"
-                        : "border-white/10 bg-white/5 hover:border-white/20"
-                      }`}
+                    className={`p-4 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col gap-2.5 group ${
+                      selectedVehicle?.regNo === v.regNo
+                        ? "border-[#2ecc71] bg-emerald-50/40 shadow-xs"
+                        : "border-slate-200/80 bg-slate-50/50 hover:bg-slate-50 hover:border-slate-300"
+                    }`}
                   >
                     <div className="flex justify-between items-start">
                       <div>
-                        <span className="font-bold text-white text-sm group-hover:text-[#D4AF37] transition-colors">
+                        <span className="font-bold text-slate-900 text-sm group-hover:text-[#2ecc71] transition-colors">
                           {v.regNo}
                         </span>
-                        <div className="text-[10px] text-gray-400 uppercase tracking-wider mt-0.5">{v.model}</div>
+                        <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">{v.model}</div>
                       </div>
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${v.status === "In Transit"
-                            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider ${
+                          v.status === "In Transit"
+                            ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                             : v.status === "Delayed"
-                              ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                          }`}
+                            ? "bg-red-50 text-red-600 border border-red-200"
+                            : "bg-amber-50 text-amber-700 border border-amber-200"
+                        }`}
                       >
                         {v.status}
                       </span>
                     </div>
 
-                    <div className="text-xs text-gray-300">
+                    <div className="text-xs text-slate-600">
                       <div className="flex justify-between">
                         <span>Route:</span>
-                        <span className="font-medium text-white">{v.route}</span>
+                        <span className="font-semibold text-slate-800">{v.route}</span>
                       </div>
                       <div className="flex justify-between mt-1">
                         <span>Operator:</span>
-                        <span className="font-medium text-white">{v.driver}</span>
+                        <span className="font-semibold text-slate-800">{v.driver}</span>
                       </div>
                     </div>
 
                     <div className="space-y-1 mt-1">
-                      <div className="flex justify-between text-[10px] font-semibold text-gray-400">
+                      <div className="flex justify-between text-[10px] font-semibold text-slate-500">
                         <span>Transit Progress</span>
-                        <span className="text-[#D4AF37]">{v.progress}%</span>
+                        <span className="text-[#2ecc71] font-bold">{v.progress}%</span>
                       </div>
-                      <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-[#0B2B5C] to-[#D4AF37] rounded-full transition-all duration-1000"
+                          className="h-full bg-gradient-to-r from-emerald-500 to-[#2ecc71] rounded-full transition-all duration-700"
                           style={{ width: `${v.progress}%` }}
                         />
                       </div>
@@ -1421,16 +1611,16 @@ const AdminDashboard: React.FC = () => {
 
         {activeTab === "fuel" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-            <div className="lg:col-span-2 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
-              <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-                <Fuel className="h-5 w-5 text-[#D4AF37]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Active Fuel & Routing Overrides</h4>
+            <div className="lg:col-span-2 p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4">
+              <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Fuel className="h-5 w-5 text-[#2ecc71]" />
+                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Active Fuel & Routing Overrides</h4>
               </div>
 
-              <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+              <div className="overflow-x-auto border border-slate-200/80 rounded-xl bg-white shadow-2xs">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-white/10 bg-white/5 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                    <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold text-slate-600 uppercase tracking-wider">
                       <th className="px-6 py-4">City</th>
                       <th className="px-6 py-4">Petrol Rate (₹/L)</th>
                       <th className="px-6 py-4">Diesel Rate (₹/L)</th>
@@ -1438,17 +1628,17 @@ const AdminDashboard: React.FC = () => {
                       <th className="px-6 py-4 text-right">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 text-sm">
+                  <tbody className="divide-y divide-slate-100 text-sm">
                     {fuelOverrides.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4 font-bold text-white">{item.city}</td>
-                        <td className="px-6 py-4 font-mono text-[#D4AF37]">₹{item.petrol.toFixed(2)}</td>
-                        <td className="px-6 py-4 font-mono text-gray-300">₹{item.diesel.toFixed(2)}</td>
-                        <td className="px-6 py-4 font-mono text-gray-300">₹{item.tollRate.toFixed(2)}</td>
+                      <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-6 py-4 font-bold text-slate-900">{item.city}</td>
+                        <td className="px-6 py-4 font-mono font-bold text-emerald-600">₹{item.petrol.toFixed(2)}</td>
+                        <td className="px-6 py-4 font-mono text-slate-700">₹{item.diesel.toFixed(2)}</td>
+                        <td className="px-6 py-4 font-mono text-slate-700">₹{item.tollRate.toFixed(2)}</td>
                         <td className="px-6 py-4 text-right">
                           <button
                             onClick={() => handleDeleteFuelOverride(item.city)}
-                            className="p-1.5 rounded-lg border border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400 transition-all cursor-pointer active:scale-95"
+                            className="p-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
                             title="Reset rates to Default"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -1461,13 +1651,13 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg h-fit space-y-4">
+            <div className="p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs h-fit space-y-4">
               <div className="flex items-center gap-2">
-                <Plus className="h-5 w-5 text-[#D4AF37]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Create/Update Override</h4>
+                <Plus className="h-5 w-5 text-[#2ecc71]" />
+                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Create/Update Override</h4>
               </div>
 
-              <form onSubmit={handleSaveFuelOverride} className="space-y-4 text-xs font-semibold uppercase tracking-wider text-gray-300">
+              <form onSubmit={handleSaveFuelOverride} className="space-y-4 text-xs font-bold uppercase tracking-wider text-slate-600">
                 <div className="space-y-1">
                   <label>City Region</label>
                   <input
@@ -1476,7 +1666,7 @@ const AdminDashboard: React.FC = () => {
                     placeholder="e.g. Mumbai, Goa"
                     value={overrideCity}
                     onChange={(e) => setOverrideCity(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 focus:outline-none focus:border-[#2ecc71] focus:bg-white transition-all font-normal"
                   />
                 </div>
 
@@ -1489,7 +1679,7 @@ const AdminDashboard: React.FC = () => {
                     placeholder="104.21"
                     value={overridePetrol}
                     onChange={(e) => setOverridePetrol(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 focus:outline-none focus:border-[#2ecc71] focus:bg-white transition-all font-normal"
                   />
                 </div>
 
@@ -1502,7 +1692,7 @@ const AdminDashboard: React.FC = () => {
                     placeholder="92.15"
                     value={overrideDiesel}
                     onChange={(e) => setOverrideDiesel(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 focus:outline-none focus:border-[#2ecc71] focus:bg-white transition-all font-normal"
                   />
                 </div>
 
@@ -1515,13 +1705,13 @@ const AdminDashboard: React.FC = () => {
                     placeholder="120"
                     value={overrideToll}
                     onChange={(e) => setOverrideToll(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 text-sm text-white focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37] transition-all"
+                    className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 focus:outline-none focus:border-[#2ecc71] focus:bg-white transition-all font-normal"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="w-full flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl text-sm font-bold uppercase tracking-wider text-[#0B2B5C] bg-[#D4AF37] hover:bg-[#D4AF37]/90 transition-all cursor-pointer active:scale-95"
+                  className="w-full flex items-center justify-center gap-1.5 py-3 px-4 rounded-xl text-sm font-bold uppercase tracking-wider text-white bg-[#2ecc71] hover:bg-[#27ae60] transition-all cursor-pointer active:scale-95 shadow-xs"
                 >
                   <Plus className="h-4 w-4" /> Save Rates Override
                 </button>
@@ -1531,34 +1721,34 @@ const AdminDashboard: React.FC = () => {
         )}
 
         {activeTab === "logs" && (
-          <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4 animate-fade-in">
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-b border-white/5 pb-3">
+          <div className="p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4 animate-fade-in">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
-                <FileWarning className="h-5 w-5 text-[#D4AF37]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Failed Budget Estimator Telemetry Logs</h4>
+                <FileWarning className="h-5 w-5 text-amber-500" />
+                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Failed Budget Estimator Telemetry Logs</h4>
               </div>
 
               <div className="flex gap-2">
                 <button
                   onClick={handleSimulateException}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#D4AF37]/20 hover:border-[#D4AF37] bg-white/5 hover:bg-[#D4AF37]/15 text-[#D4AF37] text-xs font-bold transition-all cursor-pointer active:scale-95"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
                 >
                   <Plus className="h-3.5 w-3.5" /> Simulate Exception
                 </button>
                 <button
                   onClick={handleClearLogs}
                   disabled={budgetLogs.length === 0}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-500/20 hover:border-red-500 bg-white/5 hover:bg-red-500/15 text-red-400 text-xs font-bold transition-all cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-bold transition-all cursor-pointer active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
                 >
                   <Trash2 className="h-3.5 w-3.5" /> Clear All Logs
                 </button>
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+            <div className="overflow-x-auto border border-slate-200/80 rounded-xl bg-white shadow-2xs">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/5 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold text-slate-600 uppercase tracking-wider">
                     <th className="px-6 py-4">Timestamp</th>
                     <th className="px-6 py-4">Route Info</th>
                     <th className="px-6 py-4">User Allocation (Budget)</th>
@@ -1567,32 +1757,32 @@ const AdminDashboard: React.FC = () => {
                     <th className="px-6 py-4">User Email</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 text-xs font-mono">
+                <tbody className="divide-y divide-slate-100 text-xs font-mono">
                   {budgetLogs.length > 0 ? (
                     budgetLogs.map((log) => (
-                      <tr key={log.id} className="hover:bg-white/5 transition-colors">
-                        <td className="px-6 py-4 text-gray-400 text-[10px]">
+                      <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-6 py-4 text-slate-400 text-[10px]">
                           {log.timestamp?.seconds
                             ? new Date(log.timestamp.seconds * 1000).toLocaleString()
                             : new Date().toLocaleString()}
                         </td>
-                        <td className="px-6 py-4 text-white font-sans font-bold">
+                        <td className="px-6 py-4 text-slate-900 font-sans font-bold">
                           {log.origin} ➔ {log.destination}
                         </td>
-                        <td className="px-6 py-4 text-amber-400 font-bold">₹{log.budget?.toLocaleString()}</td>
-                        <td className="px-6 py-4 text-red-400 font-bold">₹{log.estimatedCost?.toLocaleString()}</td>
-                        <td className="px-6 py-4 font-sans text-gray-300">
+                        <td className="px-6 py-4 text-amber-600 font-bold">₹{log.budget?.toLocaleString()}</td>
+                        <td className="px-6 py-4 text-red-600 font-bold">₹{log.estimatedCost?.toLocaleString()}</td>
+                        <td className="px-6 py-4 font-sans text-slate-600">
                           <span className="inline-flex items-center gap-1.5">
-                            <AlertOctagon className="h-3.5 w-3.5 text-red-400 shrink-0" />
+                            <AlertOctagon className="h-3.5 w-3.5 text-red-500 shrink-0" />
                             {log.errorReason}
                           </span>
                         </td>
-                        <td className="px-6 py-4 font-sans text-gray-400">{log.userEmail}</td>
+                        <td className="px-6 py-4 font-sans text-slate-400">{log.userEmail}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-gray-500 font-semibold font-sans">
+                      <td colSpan={6} className="text-center py-8 text-slate-500 font-semibold font-sans">
                         No budget exceptions logged.
                       </td>
                     </tr>
@@ -1608,70 +1798,71 @@ const AdminDashboard: React.FC = () => {
           <div className="space-y-6 animate-fade-in">
             {/* Header & Status Summary Badges */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-              <div className="p-4 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl flex items-center justify-between">
+              <div className="p-4 rounded-2xl border border-slate-200/80 bg-white shadow-xs flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-gray-400 uppercase">Total Tickets</p>
-                  <h3 className="text-2xl font-black text-white mt-1">{inquiries.length}</h3>
+                  <p className="text-xs font-bold text-slate-500 uppercase">Total Tickets</p>
+                  <h3 className="text-2xl font-black text-slate-900 mt-1">{inquiries.length}</h3>
                 </div>
-                <div className="p-3 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400">
+                <div className="p-3 rounded-xl bg-blue-50 text-blue-600 border border-blue-100">
                   <Headphones className="h-5 w-5" />
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl border border-red-500/20 bg-red-500/10 backdrop-blur-xl flex items-center justify-between">
+              <div className="p-4 rounded-2xl border border-red-200 bg-red-50/60 shadow-xs flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-red-300 uppercase">Open (Pending)</p>
-                  <h3 className="text-2xl font-black text-red-400 mt-1">
+                  <p className="text-xs font-bold text-red-700 uppercase">Open (Pending)</p>
+                  <h3 className="text-2xl font-black text-red-600 mt-1">
                     {inquiries.filter((i) => i.status === "Open").length}
                   </h3>
                 </div>
-                <div className="p-3 rounded-xl border border-red-500/30 bg-red-500/20 text-red-400">
+                <div className="p-3 rounded-xl bg-red-100 text-red-600 border border-red-200">
                   <AlertOctagon className="h-5 w-5" />
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 backdrop-blur-xl flex items-center justify-between">
+              <div className="p-4 rounded-2xl border border-amber-200 bg-amber-50/60 shadow-xs flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-amber-300 uppercase">In Progress</p>
-                  <h3 className="text-2xl font-black text-amber-400 mt-1">
+                  <p className="text-xs font-bold text-amber-700 uppercase">In Progress</p>
+                  <h3 className="text-2xl font-black text-amber-600 mt-1">
                     {inquiries.filter((i) => i.status === "In Progress").length}
                   </h3>
                 </div>
-                <div className="p-3 rounded-xl border border-amber-500/30 bg-amber-500/20 text-amber-400">
+                <div className="p-3 rounded-xl bg-amber-100 text-amber-600 border border-amber-200">
                   <Clock className="h-5 w-5" />
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 backdrop-blur-xl flex items-center justify-between">
+              <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/60 shadow-xs flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold text-emerald-300 uppercase">Resolved</p>
-                  <h3 className="text-2xl font-black text-emerald-400 mt-1">
+                  <p className="text-xs font-bold text-emerald-700 uppercase">Resolved</p>
+                  <h3 className="text-2xl font-black text-emerald-600 mt-1">
                     {inquiries.filter((i) => i.status === "Resolved").length}
                   </h3>
                 </div>
-                <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/20 text-emerald-400">
+                <div className="p-3 rounded-xl bg-emerald-100 text-emerald-600 border border-emerald-200">
                   <CheckCircle2 className="h-5 w-5" />
                 </div>
               </div>
             </div>
 
             {/* Filter Tabs */}
-            <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-white/5 pb-4">
+            <div className="p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
                 <div className="flex items-center gap-2">
-                  <Headphones className="h-5 w-5 text-[#D4AF37]" />
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">User Support Inquiries & Tickets</h4>
+                  <Headphones className="h-5 w-5 text-[#2ecc71]" />
+                  <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">User Support Inquiries & Tickets</h4>
                 </div>
 
-                <div className="flex items-center gap-1.5 bg-[#051124]/60 p-1 rounded-xl border border-white/10 text-xs">
+                <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
                   {(["All", "Open", "In Progress", "Resolved"] as const).map((filter) => (
                     <button
                       key={filter}
                       onClick={() => setSupportFilter(filter)}
-                      className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${supportFilter === filter
-                          ? "bg-[#D4AF37] text-[#0B2B5C] shadow-md"
-                          : "text-gray-400 hover:text-white"
-                        }`}
+                      className={`px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer ${
+                        supportFilter === filter
+                          ? "bg-white text-slate-900 shadow-xs"
+                          : "text-slate-500 hover:text-slate-900"
+                      }`}
                     >
                       {filter}
                     </button>
@@ -1680,10 +1871,10 @@ const AdminDashboard: React.FC = () => {
               </div>
 
               {/* Tickets Table */}
-              <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+              <div className="overflow-x-auto border border-slate-200/80 rounded-xl bg-white shadow-2xs">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-white/10 bg-white/5 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                    <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold text-slate-600 uppercase tracking-wider">
                       <th className="px-6 py-4">Ticket ID</th>
                       <th className="px-6 py-4">User Details</th>
                       <th className="px-6 py-4">Category</th>
@@ -1693,53 +1884,55 @@ const AdminDashboard: React.FC = () => {
                       <th className="px-6 py-4 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5 text-xs">
+                  <tbody className="divide-y divide-slate-100 text-xs">
                     {inquiries.filter((inq) => supportFilter === "All" || inq.status === supportFilter).length > 0 ? (
                       inquiries
                         .filter((inq) => supportFilter === "All" || inq.status === supportFilter)
                         .map((inq) => (
-                          <tr key={inq.id} className="hover:bg-white/5 transition-colors">
-                            <td className="px-6 py-4 font-mono text-[#D4AF37] font-bold">
+                          <tr key={inq.id} className="hover:bg-slate-50/70 transition-colors">
+                            <td className="px-6 py-4 font-mono text-[#2ecc71] font-bold">
                               #{inq.id.substring(0, 6)}
                             </td>
                             <td className="px-6 py-4">
-                              <div className="font-bold text-white">{inq.name || "Anonymous"}</div>
-                              <div className="text-gray-400 text-[11px]">{inq.email}</div>
+                              <div className="font-bold text-slate-900">{inq.name || "Anonymous"}</div>
+                              <div className="text-slate-400 text-[11px]">{inq.email}</div>
                             </td>
                             <td className="px-6 py-4">
-                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/5 border border-white/10 text-gray-300">
-                                <Tag className="h-3 w-3 text-[#D4AF37]" />
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 border border-slate-200 text-slate-700">
+                                <Tag className="h-3 w-3 text-[#2ecc71]" />
                                 {inq.category}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-gray-400 font-mono text-[11px]">
+                            <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">
                               {inq.createdAt?.seconds
                                 ? new Date(inq.createdAt.seconds * 1000).toLocaleDateString()
                                 : new Date().toLocaleDateString()}
                             </td>
-                            <td className="px-6 py-4 text-gray-300">
+                            <td className="px-6 py-4 text-slate-600">
                               {inq.assignedTo ? (
-                                <span className="font-semibold text-blue-400">{inq.assignedTo}</span>
+                                <span className="font-semibold text-blue-600">{inq.assignedTo}</span>
                               ) : (
-                                <span className="text-gray-500 italic">Unassigned</span>
+                                <span className="text-slate-400 italic">Unassigned</span>
                               )}
                             </td>
                             <td className="px-6 py-4">
                               <span
-                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${inq.status === "Open"
-                                    ? "bg-red-500/10 text-red-400 border border-red-500/20 shadow-[0_0_10px_rgba(239,68,68,0.2)]"
+                                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${
+                                  inq.status === "Open"
+                                    ? "bg-red-50 text-red-600 border border-red-200"
                                     : inq.status === "In Progress"
-                                      ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                                      : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                  }`}
+                                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                    : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                }`}
                               >
                                 <span
-                                  className={`h-1.5 w-1.5 rounded-full ${inq.status === "Open"
-                                      ? "bg-red-400 animate-pulse"
+                                  className={`h-1.5 w-1.5 rounded-full ${
+                                    inq.status === "Open"
+                                      ? "bg-red-500 animate-pulse"
                                       : inq.status === "In Progress"
-                                        ? "bg-amber-400"
-                                        : "bg-emerald-400"
-                                    }`}
+                                      ? "bg-amber-500"
+                                      : "bg-emerald-500"
+                                  }`}
                                 />
                                 {inq.status}
                               </span>
@@ -1747,7 +1940,7 @@ const AdminDashboard: React.FC = () => {
                             <td className="px-6 py-4 text-right">
                               <button
                                 onClick={() => setSelectedTicket(inq)}
-                                className="px-3 py-1.5 rounded-lg border border-[#D4AF37]/30 bg-[#D4AF37]/10 hover:bg-[#D4AF37]/20 text-[#D4AF37] font-bold text-xs transition-all active:scale-95 cursor-pointer"
+                                className="px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-2xs"
                               >
                                 View Ticket
                               </button>
@@ -1756,7 +1949,7 @@ const AdminDashboard: React.FC = () => {
                         ))
                     ) : (
                       <tr>
-                        <td colSpan={7} className="text-center py-8 text-gray-500 font-semibold">
+                        <td colSpan={7} className="text-center py-8 text-slate-500 font-semibold">
                           No support tickets found for filter "{supportFilter}".
                         </td>
                       </tr>
@@ -1963,20 +2156,20 @@ const AdminDashboard: React.FC = () => {
         {activeTab === "health" && (
           <div className="space-y-6 animate-fade-in">
             {/* Action Bar */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs">
               <div>
-                <h4 className="text-base font-bold text-white flex items-center gap-2">
-                  <Activity className="h-5 w-5 text-emerald-400 animate-pulse" />
+                <h4 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-emerald-600 animate-pulse" />
                   Live Third-Party API Health & Telemetry Monitor
                 </h4>
-                <p className="text-xs text-gray-400 mt-1">
-                  Real-time latency metrics (ms) and manual fallback trigger switches for failover safety.
+                <p className="text-xs text-slate-500 mt-1">
+                  Real-time latency metrics (ms) and operational status across all external integrations.
                 </p>
               </div>
 
               <button
                 onClick={handlePingServices}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#D4AF37] text-[#0B2B5C] font-bold text-xs hover:bg-[#c49f27] active:scale-95 transition-all cursor-pointer shadow-lg shadow-[#D4AF37]/20"
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2ecc71] text-white font-bold text-xs hover:bg-[#27ae60] active:scale-95 transition-all cursor-pointer shadow-xs"
               >
                 <RefreshCw className="h-4 w-4 animate-spin-slow" /> Ping Services Now
               </button>
@@ -1985,161 +2178,81 @@ const AdminDashboard: React.FC = () => {
             {/* Service Status Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
               {/* Google Maps API */}
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl space-y-3">
+              <div className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-400 uppercase">Google Maps API</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="text-xs font-bold text-slate-500 uppercase">Google Maps API</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Operational
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <h3 className="text-3xl font-black text-white font-mono">{latencies.googleMaps} <span className="text-sm font-semibold text-gray-400">ms</span></h3>
-                  <Server className="h-5 w-5 text-gray-400" />
+                  <h3 className="text-3xl font-black text-slate-900 font-mono">
+                    {latencies.googleMaps} <span className="text-sm font-semibold text-slate-400">ms</span>
+                  </h3>
+                  <Server className="h-5 w-5 text-slate-400" />
                 </div>
-                <div className="text-[11px] text-gray-400">
+                <div className="text-[11px] text-slate-400">
                   Routing, Geocoding & Distance Matrix
                 </div>
               </div>
 
               {/* Live Fuel Rate API */}
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl space-y-3">
+              <div className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-400 uppercase">Live Fuel Rate API</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="text-xs font-bold text-slate-500 uppercase">Live Fuel Rate API</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Operational
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <h3 className="text-3xl font-black text-white font-mono">{latencies.liveFuel} <span className="text-sm font-semibold text-gray-400">ms</span></h3>
-                  <Fuel className="h-5 w-5 text-gray-400" />
+                  <h3 className="text-3xl font-black text-slate-900 font-mono">
+                    {latencies.liveFuel} <span className="text-sm font-semibold text-slate-400">ms</span>
+                  </h3>
+                  <Fuel className="h-5 w-5 text-slate-400" />
                 </div>
-                <div className="text-[11px] text-gray-400">
+                <div className="text-[11px] text-slate-400">
                   State Petrol & Diesel Feeds
                 </div>
               </div>
 
               {/* Firebase Firestore */}
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl space-y-3">
+              <div className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-400 uppercase">Firebase Firestore</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="text-xs font-bold text-slate-500 uppercase">Firebase Firestore</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Operational
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <h3 className="text-3xl font-black text-white font-mono">{latencies.firebase} <span className="text-sm font-semibold text-gray-400">ms</span></h3>
-                  <Zap className="h-5 w-5 text-gray-400" />
+                  <h3 className="text-3xl font-black text-slate-900 font-mono">
+                    {latencies.firebase} <span className="text-sm font-semibold text-slate-400">ms</span>
+                  </h3>
+                  <Zap className="h-5 w-5 text-slate-400" />
                 </div>
-                <div className="text-[11px] text-gray-400">
+                <div className="text-[11px] text-slate-400">
                   Database & Auth Telemetry
                 </div>
               </div>
 
               {/* Weather API */}
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl space-y-3">
+              <div className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-gray-400 uppercase">Live Weather API</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="text-xs font-bold text-slate-500 uppercase">Live Weather API</span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                     Operational
                   </span>
                 </div>
                 <div className="flex items-baseline justify-between">
-                  <h3 className="text-3xl font-black text-white font-mono">{latencies.weather} <span className="text-sm font-semibold text-gray-400">ms</span></h3>
-                  <Globe className="h-5 w-5 text-gray-400" />
+                  <h3 className="text-3xl font-black text-slate-900 font-mono">
+                    {latencies.weather} <span className="text-sm font-semibold text-slate-400">ms</span>
+                  </h3>
+                  <Globe className="h-5 w-5 text-slate-400" />
                 </div>
-                <div className="text-[11px] text-gray-400">
+                <div className="text-[11px] text-slate-400">
                   Highway Climate & Terrain Warnings
                 </div>
               </div>
             </div>
-
-            {/* Manual Fallback Trigger Switches (COMMENTED OUT - UNCOMMENT WHEN NEEDED) */}
-            {/*
-            <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
-              <div className="flex items-center gap-2 border-b border-white/5 pb-3">
-                <Sliders className="h-5 w-5 text-[#D4AF37]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">Manual Emergency Fallback Controls</h4>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 rounded-xl border border-white/10 bg-[#051124]/40 flex items-center justify-between">
-                  <div>
-                    <h5 className="font-bold text-white text-sm">Static Fuel Price Cache Fallback</h5>
-                    <p className="text-xs text-gray-400 mt-0.5">Bypasses external Fuel API during rate limits or outages</p>
-                  </div>
-                  <button
-                    onClick={() => handleToggleFallback("fuel", "Fuel Price Cache")}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                      fallbackModes.fuel ? "bg-amber-500" : "bg-gray-700"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        fallbackModes.fuel ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="p-4 rounded-xl border border-white/10 bg-[#051124]/40 flex items-center justify-between">
-                  <div>
-                    <h5 className="font-bold text-white text-sm">Offline Map Tile Fallback</h5>
-                    <p className="text-xs text-gray-400 mt-0.5">Switches to vector tile cache if Google Maps API throttles</p>
-                  </div>
-                  <button
-                    onClick={() => handleToggleFallback("maps", "Offline Map Tile")}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                      fallbackModes.maps ? "bg-amber-500" : "bg-gray-700"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        fallbackModes.maps ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="p-4 rounded-xl border border-white/10 bg-[#051124]/40 flex items-center justify-between">
-                  <div>
-                    <h5 className="font-bold text-white text-sm">Seasonal Weather Climatology Cache</h5>
-                    <p className="text-xs text-gray-400 mt-0.5">Uses offline monthly averages if weather API fails</p>
-                  </div>
-                  <button
-                    onClick={() => handleToggleFallback("weather", "Weather Climatology")}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                      fallbackModes.weather ? "bg-amber-500" : "bg-gray-700"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        fallbackModes.weather ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-
-                <div className="p-4 rounded-xl border border-white/10 bg-[#051124]/40 flex items-center justify-between">
-                  <div>
-                    <h5 className="font-bold text-white text-sm">Firebase Local Cache Sync</h5>
-                    <p className="text-xs text-gray-400 mt-0.5">Enforces persistent offline cache read mode</p>
-                  </div>
-                  <button
-                    onClick={() => handleToggleFallback("firebase", "Firebase Local Sync")}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
-                      fallbackModes.firebase ? "bg-amber-500" : "bg-gray-700"
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                        fallbackModes.firebase ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </button>
-                </div>
-              </div>
-            </div>
-            */}
           </div>
         )}
 
@@ -2147,77 +2260,77 @@ const AdminDashboard: React.FC = () => {
         {activeTab === "broadcast" && (
           <div className="space-y-6 animate-fade-in">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg">
+              <div className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-xs">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Active Broadcasts</p>
-                    <h3 className="text-2xl font-black text-white mt-1 text-emerald-400 font-mono">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Active Broadcasts</p>
+                    <h3 className="text-2xl font-black text-emerald-600 mt-1 font-mono">
                       {announcements.filter((a) => a.isActive).length} Live
                     </h3>
                   </div>
-                  <div className="p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
+                  <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100">
                     <Megaphone className="h-5 w-5" />
                   </div>
                 </div>
-                <p className="text-[11px] text-gray-400 mt-2">Active on user route banners</p>
+                <p className="text-[11px] text-slate-400 mt-2">Active on user route banners</p>
               </div>
 
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg">
+              <div className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-xs">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Total Sent Broadcasts</p>
-                    <h3 className="text-2xl font-black text-white mt-1 text-[#D4AF37] font-mono">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Sent Broadcasts</p>
+                    <h3 className="text-2xl font-black text-[#1e3b34] mt-1 font-mono">
                       {announcements.length} Published
                     </h3>
                   </div>
-                  <div className="p-3 rounded-xl border border-[#D4AF37]/30 bg-[#D4AF37]/10 text-[#D4AF37]">
+                  <div className="p-3 rounded-2xl bg-blue-50 text-blue-600 border border-blue-100">
                     <Send className="h-5 w-5" />
                   </div>
                 </div>
-                <p className="text-[11px] text-gray-400 mt-2">Pushed across all traveler channels</p>
+                <p className="text-[11px] text-slate-400 mt-2">Pushed across all traveler channels</p>
               </div>
 
-              <div className="p-5 rounded-2xl border border-white/10 bg-[#0B2B5C]/20 backdrop-blur-xl shadow-lg">
+              <div className="p-5 rounded-2xl border border-slate-200/80 bg-white shadow-xs">
                 <div className="flex justify-between items-start">
                   <div>
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Estimated Audience Reach</p>
-                    <h3 className="text-2xl font-black text-white mt-1 text-blue-400 font-mono">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Estimated Audience Reach</p>
+                    <h3 className="text-2xl font-black text-purple-600 mt-1 font-mono">
                       14,890 Travelers
                     </h3>
                   </div>
-                  <div className="p-3 rounded-xl border border-blue-500/30 bg-blue-500/10 text-blue-400">
+                  <div className="p-3 rounded-2xl bg-purple-50 text-purple-600 border border-purple-100">
                     <UsersIcon className="h-5 w-5" />
                   </div>
                 </div>
-                <p className="text-[11px] text-gray-400 mt-2">Active GPS highway subscribers</p>
+                <p className="text-[11px] text-slate-400 mt-2">Active GPS highway subscribers</p>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-1 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                  <Megaphone className="h-4 w-4 text-[#D4AF37]" /> Publish New Broadcast
+              <div className="lg:col-span-1 p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4">
+                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                  <Megaphone className="h-4 w-4 text-[#2ecc71]" /> Publish New Broadcast
                 </h4>
 
                 <form onSubmit={handlePublishBroadcast} className="space-y-3.5">
                   <div>
-                    <label className="text-[11px] font-bold text-gray-300 uppercase">Announcement Title</label>
+                    <label className="text-[11px] font-bold text-slate-600 uppercase">Announcement Title</label>
                     <input
                       type="text"
                       placeholder="e.g. Heavy Rainfall Advisory on Highway 48"
                       value={newBroadcastTitle}
                       onChange={(e) => setNewBroadcastTitle(e.target.value)}
-                      className="w-full mt-1 px-3.5 py-2.5 rounded-xl bg-[#051124] border border-white/15 text-white placeholder-gray-400 text-xs focus:outline-none focus:border-[#D4AF37]"
+                      className="w-full mt-1 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 text-xs focus:outline-none focus:border-[#2ecc71] focus:bg-white"
                     />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[11px] font-bold text-gray-300 uppercase">Category</label>
+                      <label className="text-[11px] font-bold text-slate-600 uppercase">Category</label>
                       <select
                         value={newBroadcastCategory}
                         onChange={(e) => setNewBroadcastCategory(e.target.value as any)}
-                        className="w-full mt-1 px-3 py-2 rounded-xl bg-[#051124] border border-white/15 text-white text-xs focus:outline-none focus:border-[#D4AF37]"
+                        className="w-full mt-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs focus:outline-none focus:border-[#2ecc71] focus:bg-white"
                       >
                         <option value="Route Alert">Route Alert</option>
                         <option value="Weather Warning">Weather Warning</option>
@@ -2227,11 +2340,11 @@ const AdminDashboard: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="text-[11px] font-bold text-gray-300 uppercase">Audience</label>
+                      <label className="text-[11px] font-bold text-slate-600 uppercase">Audience</label>
                       <select
                         value={newBroadcastTarget}
                         onChange={(e) => setNewBroadcastTarget(e.target.value as any)}
-                        className="w-full mt-1 px-3 py-2 rounded-xl bg-[#051124] border border-white/15 text-white text-xs focus:outline-none focus:border-[#D4AF37]"
+                        className="w-full mt-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs focus:outline-none focus:border-[#2ecc71] focus:bg-white"
                       >
                         <option value="All Travelers">All Travelers</option>
                         <option value="EV Drivers">EV Drivers</option>
@@ -2241,11 +2354,11 @@ const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-bold text-gray-300 uppercase">Severity Level</label>
+                    <label className="text-[11px] font-bold text-slate-600 uppercase">Severity Level</label>
                     <select
                       value={newBroadcastSeverity}
                       onChange={(e) => setNewBroadcastSeverity(e.target.value as any)}
-                      className="w-full mt-1 px-3 py-2 rounded-xl bg-[#051124] border border-white/15 text-white text-xs focus:outline-none focus:border-[#D4AF37]"
+                      className="w-full mt-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs focus:outline-none focus:border-[#2ecc71] focus:bg-white"
                     >
                       <option value="Normal">Normal Advisory</option>
                       <option value="High">High Priority Warning</option>
@@ -2254,42 +2367,42 @@ const AdminDashboard: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="text-[11px] font-bold text-gray-300 uppercase">Message Body</label>
+                    <label className="text-[11px] font-bold text-slate-600 uppercase">Message Body</label>
                     <textarea
                       rows={3}
                       placeholder="Enter detailed broadcast instructions or safety advisories..."
                       value={newBroadcastMsg}
                       onChange={(e) => setNewBroadcastMsg(e.target.value)}
-                      className="w-full mt-1 px-3.5 py-2.5 rounded-xl bg-[#051124] border border-white/15 text-white placeholder-gray-400 text-xs focus:outline-none focus:border-[#D4AF37]"
+                      className="w-full mt-1 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 placeholder-slate-400 text-xs focus:outline-none focus:border-[#2ecc71] focus:bg-white"
                     />
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full py-3 rounded-xl bg-[#D4AF37] hover:bg-[#c49f27] text-[#0B2B5C] font-bold text-xs transition-all cursor-pointer shadow-lg flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-xl bg-[#2ecc71] hover:bg-[#27ae60] text-white font-bold text-xs transition-all cursor-pointer shadow-xs flex items-center justify-center gap-2 active:scale-95"
                   >
                     <Send className="h-4 w-4" /> Publish Broadcast Now
                   </button>
                 </form>
               </div>
 
-              <div className="lg:col-span-2 p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4">
+              <div className="lg:col-span-2 p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">
+                  <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
                     Published Broadcast Announcements ({announcements.length})
                   </h4>
                   <button
                     onClick={() => exportToCSV("Tourenvi_Announcements_Report", announcements)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#D4AF37] text-[#0B2B5C] font-bold text-xs hover:bg-[#c49f27] transition-all cursor-pointer shadow-md"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2ecc71] text-white font-bold text-xs hover:bg-[#27ae60] transition-all cursor-pointer shadow-xs"
                   >
                     <Download className="h-3.5 w-3.5" /> Export CSV
                   </button>
                 </div>
 
-                <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+                <div className="overflow-x-auto border border-slate-200/80 rounded-xl bg-white shadow-2xs">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
-                      <tr className="border-b border-white/10 bg-white/5 text-gray-400 uppercase tracking-wider text-[10px]">
+                      <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 uppercase tracking-wider text-[10px] font-bold">
                         <th className="p-3">Title & Message</th>
                         <th className="p-3">Category</th>
                         <th className="p-3">Audience</th>
@@ -2298,30 +2411,31 @@ const AdminDashboard: React.FC = () => {
                         <th className="p-3 text-right">Actions</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-white/5 text-gray-300">
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
                       {announcements.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="p-6 text-center text-gray-400">
+                          <td colSpan={6} className="p-6 text-center text-slate-400">
                             No broadcasts published yet.
                           </td>
                         </tr>
                       ) : (
                         announcements.map((ann) => (
-                          <tr key={ann.id} className="hover:bg-white/5 transition-all">
+                          <tr key={ann.id} className="hover:bg-slate-50/70 transition-all">
                             <td className="p-3">
-                              <div className="font-bold text-white text-xs">{ann.title}</div>
-                              <div className="text-[10px] text-gray-400 line-clamp-1">{ann.message}</div>
+                              <div className="font-bold text-slate-900 text-xs">{ann.title}</div>
+                              <div className="text-[10px] text-slate-400 line-clamp-1">{ann.message}</div>
                             </td>
-                            <td className="p-3 font-semibold text-gray-300">{ann.category}</td>
-                            <td className="p-3 text-blue-400 font-medium">{ann.targetAudience}</td>
+                            <td className="p-3 font-semibold text-slate-700">{ann.category}</td>
+                            <td className="p-3 text-blue-600 font-medium">{ann.targetAudience}</td>
                             <td className="p-3">
                               <span
-                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${ann.severity === "Urgent"
-                                    ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  ann.severity === "Urgent"
+                                    ? "bg-red-50 text-red-600 border border-red-200"
                                     : ann.severity === "High"
-                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                                      : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
-                                  }`}
+                                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                                }`}
                               >
                                 {ann.severity}
                               </span>
@@ -2329,10 +2443,11 @@ const AdminDashboard: React.FC = () => {
                             <td className="p-3">
                               <button
                                 onClick={() => handleToggleBroadcastStatus(ann.id, ann.isActive)}
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-all ${ann.isActive
-                                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                                    : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
-                                  }`}
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold cursor-pointer transition-all ${
+                                  ann.isActive
+                                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    : "bg-slate-100 text-slate-500 border border-slate-200"
+                                }`}
                               >
                                 {ann.isActive ? "Live / Active" : "Inactive"}
                               </button>
@@ -2340,7 +2455,7 @@ const AdminDashboard: React.FC = () => {
                             <td className="p-3 text-right">
                               <button
                                 onClick={() => handleDeleteBroadcast(ann.id)}
-                                className="p-1.5 rounded-lg text-red-400 hover:bg-red-500/20 transition-all cursor-pointer"
+                                className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 transition-all cursor-pointer"
                               >
                                 <Trash2 className="h-4 w-4" />
                               </button>
@@ -2358,27 +2473,27 @@ const AdminDashboard: React.FC = () => {
 
         {/* --- 4. SYSTEM AUDIT & ACTIVITY LOGS TAB --- */}
         {activeTab === "audit" && (
-          <div className="p-6 rounded-2xl border border-white/10 bg-[#0B2B5C]/15 backdrop-blur-xl shadow-lg space-y-4 animate-fade-in">
-            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between border-b border-white/5 pb-3">
+          <div className="p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4 animate-fade-in">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
-                <History className="h-5 w-5 text-[#D4AF37]" />
-                <h4 className="text-sm font-bold text-white uppercase tracking-wider">System Audit & Administrative Activity Logs</h4>
+                <History className="h-5 w-5 text-[#2ecc71]" />
+                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">System Audit & Administrative Activity Logs</h4>
               </div>
 
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <div className="relative w-full sm:w-64">
-                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
                   <input
                     type="text"
                     placeholder="Filter by admin or action..."
                     value={auditSearch}
                     onChange={(e) => setAuditSearch(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 rounded-xl border border-white/10 bg-white/5 text-xs text-white placeholder-gray-400 focus:outline-none focus:border-[#D4AF37]"
+                    className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2ecc71] focus:bg-white"
                   />
                 </div>
                 <button
                   onClick={() => exportToCSV("Tourenvi_Audit_Logs_Report", auditLogs)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#D4AF37] text-[#0B2B5C] font-bold text-xs hover:bg-[#c49f27] transition-all shrink-0 cursor-pointer shadow-md"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#2ecc71] text-white font-bold text-xs hover:bg-[#27ae60] transition-all shrink-0 cursor-pointer shadow-xs"
                   title="Export Audit Logs CSV Report"
                 >
                   <Download className="h-4 w-4" /> Export CSV
@@ -2386,10 +2501,10 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            <div className="overflow-x-auto border border-white/10 rounded-xl bg-[#051124]/30">
+            <div className="overflow-x-auto border border-slate-200/80 rounded-xl bg-white shadow-2xs">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-white/10 bg-white/5 text-xs font-semibold text-gray-300 uppercase tracking-wider">
+                  <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold text-slate-600 uppercase tracking-wider">
                     <th className="px-6 py-4">Timestamp</th>
                     <th className="px-6 py-4">Admin Officer</th>
                     <th className="px-6 py-4">Action Performed</th>
@@ -2397,7 +2512,7 @@ const AdminDashboard: React.FC = () => {
                     <th className="px-6 py-4">Details / Context</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5 text-xs">
+                <tbody className="divide-y divide-slate-100 text-xs">
                   {auditLogs.filter(
                     (a) =>
                       a.adminName?.toLowerCase().includes(auditSearch.toLowerCase()) ||
@@ -2412,28 +2527,28 @@ const AdminDashboard: React.FC = () => {
                           a.target?.toLowerCase().includes(auditSearch.toLowerCase())
                       )
                       .map((log) => (
-                        <tr key={log.id} className="hover:bg-white/5 transition-colors">
-                          <td className="px-6 py-4 text-gray-400 font-mono text-[11px]">
+                        <tr key={log.id} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">
                             {log.timestamp?.seconds
                               ? new Date(log.timestamp.seconds * 1000).toLocaleString()
                               : new Date().toLocaleString()}
                           </td>
                           <td className="px-6 py-4">
-                            <div className="font-bold text-white">{log.adminName || "System Admin"}</div>
-                            <div className="text-gray-400 text-[10px]">{log.adminEmail || "admin@tourenvi.com"}</div>
+                            <div className="font-bold text-slate-900">{log.adminName || "System Admin"}</div>
+                            <div className="text-slate-400 text-[10px]">{log.adminEmail || "admin@tourenvi.com"}</div>
                           </td>
                           <td className="px-6 py-4">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               {log.action}
                             </span>
                           </td>
-                          <td className="px-6 py-4 font-mono text-gray-300 font-semibold">{log.target}</td>
-                          <td className="px-6 py-4 text-gray-300">{log.details || "-"}</td>
+                          <td className="px-6 py-4 font-mono text-slate-700 font-semibold">{log.target}</td>
+                          <td className="px-6 py-4 text-slate-600">{log.details || "-"}</td>
                         </tr>
                       ))
                   ) : (
                     <tr>
-                      <td colSpan={5} className="text-center py-8 text-gray-500 font-semibold">
+                      <td colSpan={5} className="text-center py-8 text-slate-500 font-semibold">
                         No audit log entries matching query.
                       </td>
                     </tr>
@@ -2446,24 +2561,24 @@ const AdminDashboard: React.FC = () => {
       </main>
 
       {selectedUserModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0B2B5C] text-white shadow-2xl p-6 space-y-6">
-            <div className="flex items-start justify-between border-b border-white/10 pb-4">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#D4AF37]/40 bg-[#051124] text-[#D4AF37] text-lg font-black uppercase">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
+          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-2xl p-4 sm:p-6 space-y-6">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 border border-emerald-200/80 text-emerald-600 text-lg font-black uppercase shadow-xs">
                   {selectedUserModal.name ? selectedUserModal.name.substring(0, 2) : "US"}
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-800 flex items-center gap-2">
                     {selectedUserModal.name || "Anonymous User"}
                   </h3>
-                  <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
-                    <span className="flex items-center gap-1 text-gray-300">
-                      <Mail className="h-3.5 w-3.5 text-[#D4AF37]" /> {selectedUserModal.email}
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-500 mt-1">
+                    <span className="flex items-center gap-1 text-slate-600">
+                      <Mail className="h-3.5 w-3.5 text-emerald-600" /> {selectedUserModal.email}
                     </span>
                     <span>•</span>
-                    <span className="flex items-center gap-1 text-gray-300">
-                      <Phone className="h-3.5 w-3.5 text-[#D4AF37]" /> {selectedUserModal.phone || "No phone added"}
+                    <span className="flex items-center gap-1 text-slate-600">
+                      <Phone className="h-3.5 w-3.5 text-emerald-600" /> {selectedUserModal.phone || "No phone added"}
                     </span>
                   </div>
                 </div>
@@ -2471,52 +2586,52 @@ const AdminDashboard: React.FC = () => {
 
               <button
                 onClick={() => setSelectedUserModal(null)}
-                className="p-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/15 text-gray-400 hover:text-white transition-all cursor-pointer"
+                className="p-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-all cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-              <div className="p-3.5 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
-                <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Account Role</span>
-                <div className="font-bold text-white uppercase text-xs">{selectedUserModal.role || "user"}</div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Account Role</span>
+                <div className="font-bold text-slate-800 uppercase text-xs">{selectedUserModal.role || "user"}</div>
               </div>
 
-              <div className="p-3.5 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
-                <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Login Method</span>
+              <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Login Method</span>
                 <div>{renderAuthProviderBadge(selectedUserModal)}</div>
               </div>
 
-              <div className="p-3.5 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
-                <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">Account Status</span>
-                <div className={selectedUserModal.status === "suspended" ? "text-red-400 font-bold" : "text-emerald-400 font-bold"}>
+              <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Account Status</span>
+                <div className={selectedUserModal.status === "suspended" ? "text-red-500 font-bold" : "text-emerald-600 font-bold"}>
                   {selectedUserModal.status === "suspended" ? "Suspended" : "Active & Verified"}
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
-                <span className="text-gray-400 text-[10px] font-bold uppercase tracking-wider">User ID</span>
-                <div className="font-mono text-gray-300 text-[11px] truncate">{selectedUserModal.uid || selectedUserModal.id}</div>
+              <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">User ID</span>
+                <div className="font-mono text-slate-600 text-[11px] truncate">{selectedUserModal.uid || selectedUserModal.id}</div>
               </div>
             </div>
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-bold uppercase tracking-wider text-[#D4AF37] flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" /> User Planned Itineraries & Budget History
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-emerald-500" /> User Planned Itineraries & Budget History
                 </h4>
-                <span className="text-xs text-gray-400 font-semibold">
+                <span className="text-xs text-slate-500 font-semibold">
                   {userTripsModal.length} Planned Trip(s)
                 </span>
               </div>
 
               {loadingTripsModal ? (
-                <div className="p-8 text-center text-sm text-gray-400 flex items-center justify-center gap-2">
-                  <RefreshCw className="h-4 w-4 animate-spin text-[#D4AF37]" /> Fetching planned trip itineraries...
+                <div className="p-8 text-center text-sm text-slate-400 flex items-center justify-center gap-2">
+                  <RefreshCw className="h-4 w-4 animate-spin text-emerald-500" /> Fetching planned trip itineraries...
                 </div>
               ) : userTripsModal.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {userTripsModal.map((trip, idx) => {
                     const startLoc = trip.startLocation || trip.routeDetails?.startLocation || trip.tripData?.startLocation || "Origin";
                     const destList = Array.isArray(trip.destinations) && trip.destinations.length
@@ -2551,70 +2666,70 @@ const AdminDashboard: React.FC = () => {
                     return (
                       <div
                         key={idx}
-                        className="p-5 rounded-xl border border-white/10 bg-[#051124]/50 space-y-3 relative overflow-hidden group hover:border-[#D4AF37]/50 transition-all"
+                        className="p-4 sm:p-5 rounded-xl border border-slate-200/80 bg-slate-50/50 space-y-3 relative overflow-hidden group hover:border-emerald-300 hover:bg-slate-50/80 transition-all shadow-xs"
                       >
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-white/5 pb-3">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-200/60 pb-3">
                           <div>
-                            <h5 className="font-bold text-white text-base group-hover:text-[#D4AF37] transition-colors">
+                            <h5 className="font-bold text-slate-800 text-base group-hover:text-emerald-700 transition-colors">
                               {title}
                             </h5>
-                            <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-2">
-                              <MapPin className="h-3.5 w-3.5 text-[#D4AF37]" />
-                              <span>Route: <strong className="text-white">{startLoc}</strong> ➔ {destStr}</span>
+                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
+                              <MapPin className="h-3.5 w-3.5 text-emerald-500" />
+                              <span>Route: <strong className="text-slate-700">{startLoc}</strong> ➔ {destStr}</span>
                             </p>
                           </div>
-                          <div className="text-right">
-                            <div className="text-sm font-bold text-emerald-400 font-mono">
+                          <div className="sm:text-right">
+                            <div className="text-sm font-bold text-emerald-600 font-mono">
                               Total Estimate: ₹{totalCostVal.toLocaleString()}
                             </div>
-                            <span className="text-[10px] text-gray-400 uppercase tracking-wider">
+                            <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
                               Level: {budgetVal}
                             </span>
                           </div>
                         </div>
 
                         <div className="flex flex-wrap gap-2 text-xs">
-                          <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-300">
+                          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium">
                             ⏱️ Duration: <strong>{daysVal} Days</strong>
                           </span>
-                          <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-300">
+                          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium">
                             👥 Travelers: <strong>{membersVal} Persons</strong>
                           </span>
-                          <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-gray-300">
+                          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium">
                             🚗 Vehicle: <strong>{vehicleVal}</strong> ({fuelVal})
                           </span>
                         </div>
 
                         {breakdown && (
-                          <div className="p-3 rounded-lg border border-white/5 bg-white/5 text-xs grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
+                          <div className="p-3 rounded-lg border border-slate-200/70 bg-white text-xs grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
                             <div>
-                              <div className="text-[10px] text-gray-400 uppercase font-semibold">Fuel</div>
-                              <div className="font-mono text-white font-bold">₹{breakdown.fuel?.toLocaleString()}</div>
+                              <div className="text-[10px] text-slate-400 uppercase font-semibold">Fuel</div>
+                              <div className="font-mono text-slate-800 font-bold">₹{breakdown.fuel?.toLocaleString()}</div>
                             </div>
                             <div>
-                              <div className="text-[10px] text-gray-400 uppercase font-semibold">Tolls</div>
-                              <div className="font-mono text-white font-bold">₹{breakdown.toll?.toLocaleString()}</div>
+                              <div className="text-[10px] text-slate-400 uppercase font-semibold">Tolls</div>
+                              <div className="font-mono text-slate-800 font-bold">₹{breakdown.toll?.toLocaleString()}</div>
                             </div>
                             <div>
-                              <div className="text-[10px] text-gray-400 uppercase font-semibold">Hotel</div>
-                              <div className="font-mono text-white font-bold">₹{breakdown.hotel?.toLocaleString()}</div>
+                              <div className="text-[10px] text-slate-400 uppercase font-semibold">Hotel</div>
+                              <div className="font-mono text-slate-800 font-bold">₹{breakdown.hotel?.toLocaleString()}</div>
                             </div>
                             <div>
-                              <div className="text-[10px] text-gray-400 uppercase font-semibold">Food</div>
-                              <div className="font-mono text-white font-bold">₹{breakdown.food?.toLocaleString()}</div>
+                              <div className="text-[10px] text-slate-400 uppercase font-semibold">Food</div>
+                              <div className="font-mono text-slate-800 font-bold">₹{breakdown.food?.toLocaleString()}</div>
                             </div>
                             <div>
-                              <div className="text-[10px] text-gray-400 uppercase font-semibold">Places</div>
-                              <div className="font-mono text-white font-bold">₹{breakdown.places?.toLocaleString()}</div>
+                              <div className="text-[10px] text-slate-400 uppercase font-semibold">Places</div>
+                              <div className="font-mono text-slate-800 font-bold">₹{breakdown.places?.toLocaleString()}</div>
                             </div>
                           </div>
                         )}
 
                         {moodsList.length > 0 && (
-                          <div className="flex items-center gap-1.5 text-xs pt-1">
-                            <span className="text-[10px] text-gray-400 uppercase font-bold">Vibes:</span>
+                          <div className="flex items-center gap-1.5 text-xs pt-1 flex-wrap">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold">Vibes:</span>
                             {moodsList.map((m: string, mIdx: number) => (
-                              <span key={mIdx} className="px-2 py-0.5 rounded-md bg-[#D4AF37]/10 text-[#D4AF37] border border-[#D4AF37]/20 text-[10px] font-semibold">
+                              <span key={mIdx} className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
                                 {m}
                               </span>
                             ))}
@@ -2625,23 +2740,23 @@ const AdminDashboard: React.FC = () => {
                   })}
                 </div>
               ) : (
-                <div className="p-8 text-center rounded-xl border border-white/10 bg-[#051124]/40 text-gray-400 text-xs space-y-2">
-                  <Info className="h-6 w-6 mx-auto text-gray-500" />
-                  <p className="font-bold text-white text-sm">No Planned Trips Recorded Yet</p>
+                <div className="p-8 text-center rounded-xl border border-slate-200/80 bg-slate-50/50 text-slate-500 text-xs space-y-2">
+                  <Info className="h-6 w-6 mx-auto text-slate-400" />
+                  <p className="font-bold text-slate-700 text-sm">No Planned Trips Recorded Yet</p>
                   <p>This user has not saved any trip itineraries with the trip calculator builder.</p>
                 </div>
               )}
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10">
-              <div className="text-xs text-gray-400">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
+              <div className="text-xs text-slate-400">
                 Use contact information above to run targeted marketing campaigns.
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 {selectedUserModal.phone && (
                   <a
                     href={`tel:${selectedUserModal.phone}`}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-600 transition-all active:scale-95 cursor-pointer shadow-lg shadow-emerald-500/20"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-600 transition-all active:scale-95 cursor-pointer shadow-xs"
                   >
                     <Phone className="h-3.5 w-3.5" /> Call User
                   </a>
@@ -2649,14 +2764,14 @@ const AdminDashboard: React.FC = () => {
                 {selectedUserModal.email && (
                   <a
                     href={`mailto:${selectedUserModal.email}?subject=Exclusive Tourenvi Travel Promo`}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#D4AF37] text-[#0B2B5C] font-bold text-xs hover:bg-[#D4AF37]/90 transition-all active:scale-95 cursor-pointer shadow-lg shadow-[#D4AF37]/20"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all active:scale-95 cursor-pointer shadow-xs"
                   >
                     <Mail className="h-3.5 w-3.5" /> Send Campaign Email
                   </a>
                 )}
                 <button
                   onClick={() => setSelectedUserModal(null)}
-                  className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs transition-all cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs transition-all cursor-pointer"
                 >
                   Close
                 </button>
@@ -2668,39 +2783,39 @@ const AdminDashboard: React.FC = () => {
 
       {/* --- SUPPORT TICKET DETAIL MODAL / DRAWER --- */}
       {selectedTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-white/10 bg-[#0B2B5C] text-white shadow-2xl p-6 space-y-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
+          <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-2xl p-4 sm:p-6 space-y-5">
             {/* Modal Header */}
-            <div className="flex items-start justify-between border-b border-white/10 pb-4">
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#D4AF37]/20 border border-[#D4AF37]/30 text-[#D4AF37]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 border border-emerald-200/80 text-emerald-600 shadow-xs">
                   <Headphones className="h-6 w-6" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-white">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-800">
                       Support Ticket #{selectedTicket.id?.substring(0, 6)}
                     </h3>
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${selectedTicket.status === "Open"
-                          ? "bg-red-500/10 text-red-400 border border-red-500/20"
+                          ? "bg-red-50 text-red-600 border border-red-200"
                           : selectedTicket.status === "In Progress"
-                            ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                            : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                            ? "bg-amber-50 text-amber-600 border border-amber-200"
+                            : "bg-emerald-50 text-emerald-600 border border-emerald-200"
                         }`}
                     >
                       {selectedTicket.status}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Category: <strong className="text-white">{selectedTicket.category}</strong>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Category: <strong className="text-slate-700">{selectedTicket.category}</strong>
                   </p>
                 </div>
               </div>
 
               <button
                 onClick={() => setSelectedTicket(null)}
-                className="p-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/15 text-gray-400 hover:text-white transition-all cursor-pointer"
+                className="p-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-all cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -2708,26 +2823,26 @@ const AdminDashboard: React.FC = () => {
 
             {/* Submitter User Details Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-              <div className="p-3 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
-                <span className="text-gray-400 text-[10px] font-bold uppercase">Submitted By</span>
-                <div className="font-bold text-white">{selectedTicket.name || "Anonymous"}</div>
-                <div className="text-gray-400 text-[10px] truncate">{selectedTicket.email}</div>
+              <div className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
+                <span className="text-slate-400 text-[10px] font-bold uppercase">Submitted By</span>
+                <div className="font-bold text-slate-800">{selectedTicket.name || "Anonymous"}</div>
+                <div className="text-slate-500 text-[10px] truncate">{selectedTicket.email}</div>
               </div>
 
-              <div className="p-3 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
-                <span className="text-gray-400 text-[10px] font-bold uppercase">Account Status</span>
-                <div className="font-bold text-blue-400">{selectedTicket.userRole || "Registered User"}</div>
-                <div className="text-gray-400 text-[10px] truncate">
+              <div className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
+                <span className="text-slate-400 text-[10px] font-bold uppercase">Account Status</span>
+                <div className="font-bold text-blue-600">{selectedTicket.userRole || "Registered User"}</div>
+                <div className="text-slate-500 text-[10px] truncate">
                   UID: {selectedTicket.userId ? selectedTicket.userId.substring(0, 8) : "N/A (Guest)"}
                 </div>
               </div>
 
-              <div className="p-3 rounded-xl border border-white/10 bg-[#051124]/40 space-y-1">
-                <span className="text-gray-400 text-[10px] font-bold uppercase">Assigned Staff</span>
-                <div className="font-bold text-[#D4AF37]">
+              <div className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
+                <span className="text-slate-400 text-[10px] font-bold uppercase">Assigned Staff</span>
+                <div className="font-bold text-slate-800">
                   {selectedTicket.assignedTo || "Unassigned"}
                 </div>
-                <div className="text-gray-400 text-[10px]">
+                <div className="text-slate-500 text-[10px]">
                   {selectedTicket.createdAt?.seconds
                     ? new Date(selectedTicket.createdAt.seconds * 1000).toLocaleString()
                     : "Recent"}
@@ -2737,21 +2852,21 @@ const AdminDashboard: React.FC = () => {
 
             {/* Message Body */}
             <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                <MessageSquare className="h-4 w-4 text-[#D4AF37]" /> User Message Content
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                <MessageSquare className="h-4 w-4 text-emerald-500" /> User Message Content
               </label>
-              <div className="p-4 rounded-xl border border-white/10 bg-[#051124]/60 text-sm text-gray-200 leading-relaxed font-sans whitespace-pre-wrap">
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-700 leading-relaxed font-sans whitespace-pre-wrap">
                 {selectedTicket.message}
               </div>
             </div>
 
             {/* Actions Footer */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-white/10">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
+              <div className="flex flex-wrap items-center gap-2">
                 {selectedTicket.status !== "In Progress" && (
                   <button
                     onClick={() => handleUpdateTicketStatus(selectedTicket.id, "In Progress")}
-                    className="px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer active:scale-95"
+                    className="px-3 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs font-bold transition-all cursor-pointer active:scale-95"
                   >
                     Mark as In Progress
                   </button>
@@ -2759,35 +2874,35 @@ const AdminDashboard: React.FC = () => {
                 {selectedTicket.status !== "Resolved" && (
                   <button
                     onClick={() => handleUpdateTicketStatus(selectedTicket.id, "Resolved")}
-                    className="px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all cursor-pointer active:scale-95 flex items-center gap-1.5"
+                    className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-bold transition-all cursor-pointer active:scale-95 flex items-center gap-1.5"
                   >
-                    <CheckCircle2 className="h-4 w-4" /> Mark as Resolved
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" /> Mark as Resolved
                   </button>
                 )}
                 {!selectedTicket.assignedTo && (
                   <button
                     onClick={() => handleAssignTicket(selectedTicket.id, adminName)}
-                    className="px-3 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 text-xs font-bold transition-all cursor-pointer active:scale-95"
+                    className="px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition-all cursor-pointer active:scale-95"
                   >
                     Assign to Me
                   </button>
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 <a
                   href={`mailto:${selectedTicket.email}?subject=Tourenvi Support Ticket [${selectedTicket.id?.substring(
                     0,
                     6
                   )}] - Response&body=Hi ${selectedTicket.name || "Traveler"},\n\nThank you for reaching out to Tourenvi Support regarding your inquiry (${selectedTicket.category}).\n\n`}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#D4AF37] text-[#0B2B5C] text-xs font-bold hover:bg-[#c49f27] transition-all cursor-pointer shadow-lg shadow-[#D4AF37]/20 active:scale-95"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-all cursor-pointer shadow-xs active:scale-95"
                 >
                   <Mail className="h-3.5 w-3.5" /> Reply via Email
                 </a>
 
                 <button
                   onClick={() => setSelectedTicket(null)}
-                  className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs transition-all cursor-pointer"
+                  className="px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs transition-all cursor-pointer"
                 >
                   Close
                 </button>
