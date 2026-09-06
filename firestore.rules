@@ -1,85 +1,108 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuth() { return request.auth != null; }
-    function role() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    function isAuth() {
+      return request.auth != null;
     }
 
+    function isAdmin() {
+      return isAuth() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isGuide() {
+      return isAuth() && (
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'guide'
+      );
+    }
+
+    function isSupport() {
+      return isAuth() && (
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'support'
+      );
+    }
+
+
     match /users/{uid} {
-      allow read: if isAuth() && (request.auth.uid == uid || role() == 'admin');
-      allow create, update: if isAuth() && request.auth.uid == uid;
+      allow read: if isAuth() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if isAuth() && (request.auth.uid == uid || isAdmin());
+      allow delete: if isAdmin();
 
       match /{subcollection=**} {
-        allow read, write: if isAuth() && (request.auth.uid == uid || role() == 'admin');
+        allow read, write: if isAuth() && (request.auth.uid == uid || isAdmin());
       }
     }
 
     match /admins/{uid} {
-      allow read: if isAuth() && (request.auth.uid == uid || role() == 'admin');
-      allow write: if isAuth() && (request.auth.uid == uid || role() == 'admin');
+      allow read, write: if isAuth() && (request.auth.uid == uid || isAdmin());
+      allow delete: if isAdmin();
     }
 
     match /announcements/{id} {
       allow read: if true;
-      allow write: if isAuth() && role() == 'admin';
+      allow write, delete: if isAdmin();
     }
 
     match /inquiries/{id} {
       allow create: if true;
-      allow read, update, delete: if isAuth() && (role() == 'admin' || role() == 'support');
+      allow read, update, delete: if isAdmin() || isSupport();
     }
 
     match /audit_logs/{id} {
-      allow read, write: if isAuth() && role() == 'admin';
+      allow read, write, delete: if isAdmin();
     }
 
     match /budget_logs/{id} {
-      allow read, write: if isAuth() && role() == 'admin';
+      allow read, write, delete: if isAdmin();
     }
 
     match /active_fleet/{id} {
-      allow read, write: if isAuth() && role() == 'admin';
+      allow read, write, delete: if isAdmin();
     }
 
     match /fuel_overrides/{id} {
-      allow read, write: if isAuth() && role() == 'admin';
+      allow read, write, delete: if isAdmin();
     }
 
     match /tripEvents/{id} {
-      allow read, write: if isAuth();
+      allow read: if isAuth();
     }
 
     match /trips/{tripId} {
       allow read: if isAuth() &&
-        (resource.data.userId == request.auth.uid || resource.data.memberIds.hasAny([request.auth.uid]));
+        (isAdmin() || resource.data.userId == request.auth.uid || (resource.data.memberIds != null && resource.data.memberIds.hasAny([request.auth.uid])));
       allow create: if isAuth();
-      allow update, delete: if isAuth() && resource.data.userId == request.auth.uid;
+      allow update, delete: if isAuth() && (isAdmin() || resource.data.userId == request.auth.uid);
     }
 
     match /attractions/{id} {
       allow read: if true;
       allow create: if isAuth();
-      allow update: if isAuth() && (role() == 'admin' || role() == 'guide');
-      allow delete: if role() == 'admin';
+      allow update: if isAdmin() || isGuide();
+      allow delete: if isAdmin();
     }
 
     match /dangerZones/{id} {
       allow read: if true;
-      allow write: if role() == 'admin';
+      allow write: if isAdmin();
     }
 
     match /reports/{id} {
-      allow read: if role() == 'admin' || role() == 'support';
+      allow read: if isAdmin() || isSupport();
       allow create: if isAuth();
-      allow update: if role() == 'admin' || role() == 'support';
+      allow update, delete: if isAdmin() || isSupport();
     }
 
     match /guideContent/{id} {
       allow read: if true;
-      allow create: if role() == 'guide';
-      allow update: if isAuth() &&
-        (resource.data.guideId == request.auth.uid || role() == 'admin');
+      allow create: if isGuide() || isAdmin();
+      allow update, delete: if isAuth() &&
+        (resource.data.guideId == request.auth.uid || isAdmin());
     }
   }
 }

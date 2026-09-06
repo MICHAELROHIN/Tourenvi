@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { adminAuth } from "@/lib/firebaseAdminAuth";
+import { adminAuth, adminDb } from "@/lib/firebaseAdminAuth";
 import { onAuthStateChanged } from "firebase/auth";
 import { db } from "@/firebase";
 import {
@@ -125,27 +125,11 @@ const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
   const [systemHealth, setSystemHealth] = useState("Excellent");
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isUsersLoading, setIsUsersLoading] = useState(true);
+  const [isAdminsLoading, setIsAdminsLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [chartViewMode, setChartViewMode] = useState<"bar" | "area">("bar");
   const [activePieIndex, setActivePieIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(adminAuth, async (user) => {
-      if (user) {
-        try {
-          const userDocSnap = await getDoc(doc(db, "users", user.uid));
-          if (userDocSnap.exists()) {
-            setAdminName(userDocSnap.data().name || "Officer");
-          }
-        } catch (error) {
-          console.error("Error fetching admin name in dashboard:", error);
-        }
-      } else {
-        setAdminName("Officer");
-      }
-    });
-    return () => unsubscribe();
-  }, []);
 
   const [users, setUsers] = useState<any[]>([]);
   const [adminsList, setAdminsList] = useState<any[]>([]);
@@ -186,6 +170,8 @@ const AdminDashboard: React.FC = () => {
   });
 
   const [userSearch, setUserSearch] = useState("");
+  const [userRoleFilter, setUserRoleFilter] = useState<"all" | "user" | "guide" | "support">("all");
+  const [userStatusFilter, setUserStatusFilter] = useState<"all" | "active" | "suspended">("all");
   const [userPage, setUserPage] = useState(1);
 
   const [adminSearch, setAdminSearch] = useState("");
@@ -214,7 +200,7 @@ const AdminDashboard: React.FC = () => {
   // Centralized Audit Logging Helper
   const logAdminAction = async (action: string, target: string, details?: string) => {
     try {
-      await addDoc(collection(db, "audit_logs"), {
+      await addDoc(collection(adminDb, "audit_logs"), {
         adminName: adminName || "Admin Officer",
         adminEmail: adminAuth.currentUser?.email || "admin@tourenvi.com",
         action,
@@ -229,7 +215,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleUpdateTicketStatus = async (ticketId: string, newStatus: string) => {
     try {
-      await updateDoc(doc(db, "inquiries", ticketId), {
+      await updateDoc(doc(adminDb, "inquiries", ticketId), {
         status: newStatus,
         assignedTo: adminName,
         updatedAt: serverTimestamp(),
@@ -247,7 +233,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleAssignTicket = async (ticketId: string, assignedAdmin: string) => {
     try {
-      await updateDoc(doc(db, "inquiries", ticketId), {
+      await updateDoc(doc(adminDb, "inquiries", ticketId), {
         assignedTo: assignedAdmin,
         updatedAt: serverTimestamp(),
       });
@@ -287,195 +273,273 @@ const AdminDashboard: React.FC = () => {
     await logAdminAction("Toggled API Fallback Mode", name, nextVal ? "Fallback Active" : "Operational");
   };
 
+  // Master Auth & Realtime Firestore Listeners Lifecycle
   useEffect(() => {
-    const unsubUsers = onSnapshot(collection(db, "users"), async (snap) => {
-      if (snap.empty) {
-        const defaultUsers = [
-          { name: "Anish Patel", email: "anish@gmail.com", phone: "+91 9876543211", role: "user", authProvider: "google.com", status: "active", createdAt: new Date() },
-          { name: "Deepak Guide", email: "deepak@guide.com", phone: "+91 9876543212", role: "guide", authProvider: "password", status: "active", createdAt: new Date() },
-          { name: "Sarah Support", email: "sarah@support.com", phone: "+91 9876543213", role: "support", authProvider: "password", status: "active", createdAt: new Date() },
-          { name: "Rohan Suspension", email: "rohan@gmail.com", phone: "+91 9876543214", role: "user", authProvider: "google.com", status: "suspended", createdAt: new Date() },
-        ];
-        for (const u of defaultUsers) {
-          const fakeUid = `fake_uid_${Math.random().toString(36).substr(2, 9)}`;
-          await setDoc(doc(db, "users", fakeUid), { uid: fakeUid, ...u });
-        }
-      } else {
-        const list = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        // Auto-migrate any user document with role === "admin" to the admins collection
-        for (const docSnap of snap.docs) {
-          const data = docSnap.data();
-          if (data.role === "admin") {
-            const targetUid = docSnap.id;
-            setDoc(doc(db, "admins", targetUid), { ...data, role: "admin", updatedAt: serverTimestamp() })
-              .then(() => {
-                deleteDoc(doc(db, "users", targetUid));
-                toast.info(`Moved admin account (${data.email || targetUid}) from 'users' to 'admins' collection.`);
-                logAdminAction("Auto-migrated Admin Document", targetUid, `Moved ${data.email} from 'users' to 'admins' collection`);
-              })
-              .catch((err) => console.error("Migration error:", err));
+    let unsubs: (() => void)[] = [];
+
+    const unsubscribeAuth = onAuthStateChanged(adminAuth, async (user) => {
+      // Clean up any existing listeners on auth change
+      unsubs.forEach((unsub) => {
+        try { unsub(); } catch { }
+      });
+      unsubs = [];
+
+      if (!user) {
+        setAdminName("Officer");
+        setIsUsersLoading(false);
+        setIsAdminsLoading(false);
+        return;
+      }
+
+      // 1. Fetch Admin Display Name safely
+      try {
+        const adminDocSnap = await getDoc(doc(adminDb, "admins", user.uid));
+        if (adminDocSnap.exists()) {
+          const data = adminDocSnap.data();
+          setAdminName(data.name || data.displayName || data.email?.split("@")[0] || "Officer");
+        } else {
+          const userDocSnap = await getDoc(doc(adminDb, "users", user.uid));
+          if (userDocSnap.exists()) {
+            const data = userDocSnap.data();
+            setAdminName(data.name || data.displayName || data.email?.split("@")[0] || "Officer");
           }
         }
-        setUsers(list.filter((u: any) => u.role !== "admin"));
+      } catch (error) {
+        console.warn("Could not fetch admin name document:", error);
       }
-    });
 
-    const unsubAdmins = onSnapshot(collection(db, "admins"), async (snap) => {
-      if (snap.empty) {
-        const defaultAdmins = [
-          { name: "Rohin Kumar", email: "rohin@tourenvi.com", phone: "+91 9876543210", role: "admin", authProvider: "google.com", status: "active", createdAt: new Date() },
-        ];
-        for (const a of defaultAdmins) {
-          const fakeUid = `admin_uid_${Math.random().toString(36).substr(2, 9)}`;
-          await setDoc(doc(db, "admins", fakeUid), { uid: fakeUid, ...a });
-        }
-      } else {
-        const list = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setAdminsList(list);
-      }
-    });
-
-    const unsubFleet = onSnapshot(collection(db, "active_fleet"), async (snap) => {
-      if (snap.empty) {
-        const defaultFleet = [
-          { regNo: "MH-12-GQ-4820", model: "Tesla Model 3 (EV)", driver: "Amit Sharma", route: "Mumbai ➔ Pune", status: "In Transit", progress: 75, lat: 18.975, lng: 72.8258 },
-          { regNo: "DL-03-CA-9104", model: "Toyota Prius (Hybrid)", driver: "Vikram Singh", route: "Delhi ➔ Jaipur", status: "Delayed", progress: 40, lat: 28.6139, lng: 77.209 },
-          { regNo: "KA-01-MJ-6723", model: "Hyundai Ioniq 5 (EV)", driver: "Nikhil Gowda", route: "Bangalore ➔ Mysore", status: "In Transit", progress: 90, lat: 12.9716, lng: 77.5946 },
-          { regNo: "KL-07-BZ-5511", model: "Ford Endeavour (Gas)", driver: "Rahul Nair", route: "Cochin ➔ Munnar", status: "Resting", progress: 15, lat: 10.0159, lng: 76.3419 },
-        ];
-        for (const f of defaultFleet) {
-          await setDoc(doc(db, "active_fleet", f.regNo), f);
-        }
-      } else {
-        setFleet(snap.docs.map((doc) => ({ regNo: doc.id, ...doc.data() })));
-      }
-    });
-
-    const unsubFuel = onSnapshot(collection(db, "fuel_overrides"), async (snap) => {
-      if (!snap.empty) {
-        setFuelOverrides(snap.docs.map((doc) => doc.data()));
-      }
-    });
-
-    const unsubLogs = onSnapshot(
-      query(collection(db, "budget_logs"), orderBy("timestamp", "desc")),
-      (snap) => {
-        setBudgetLogs(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      }
-    );
-
-    const unsubInquiries = onSnapshot(collection(db, "inquiries"), async (snap) => {
-      if (snap.empty) {
-        const defaultInquiries = [
-          {
-            category: "Budget Calculation Bug",
-            name: "Anish Patel",
-            email: "anish@gmail.com",
-            message: "The fuel cost estimation for EV vehicles on Pune highway shows gas vehicle multiplier.",
-            userRole: "Registered User",
-            status: "Open",
-            assignedTo: null,
-            createdAt: new Date(Date.now() - 3600000 * 4),
-          },
-          {
-            category: "Route Navigation Issue",
-            name: "Priya Sharma",
-            email: "priya@gmail.com",
-            message: "Missing toll booth rates near Mumbai-Pune Expressway entrance.",
-            userRole: "Registered User",
-            status: "In Progress",
-            assignedTo: "Officer",
-            createdAt: new Date(Date.now() - 3600000 * 12),
-          },
-          {
-            category: "Hotel/Stay Query",
-            name: "Karan Singh",
-            email: "karan@gmail.com",
-            message: "Need confirmation on Agoda affiliate discount coupon code application.",
-            userRole: "Guest",
-            status: "Resolved",
-            assignedTo: "Officer",
-            createdAt: new Date(Date.now() - 3600000 * 48),
-          },
-        ];
-        for (const inq of defaultInquiries) {
-          await addDoc(collection(db, "inquiries"), {
-            ...inq,
-            updatedAt: serverTimestamp(),
+      // 2. Users Snapshot Listener
+      const unsubUsers = onSnapshot(
+        collection(adminDb, "users"),
+        (snap) => {
+          const list = snap.docs.map((docSnap) => {
+            const data = docSnap.data();
+            const docId = docSnap.id;
+            return {
+              id: docId,
+              uid: data.uid || docId,
+              name: data.name || data.displayName || data.fullName || data.username || (data.email ? data.email.split("@")[0] : "Traveler"),
+              email: data.email || "No email registered",
+              phone: data.phone || data.phoneNumber || data.mobile || "",
+              role: data.role || "user",
+              status: data.status || "active",
+              authProvider: data.authProvider || data.providerId || (data.email ? "password" : "unknown"),
+              createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
+              ...data,
+            };
           });
+          setUsers(list);
+          setIsUsersLoading(false);
+        },
+        (err) => {
+          console.warn("Users Firestore onSnapshot listener notice:", err.message);
+          setIsUsersLoading(false);
         }
-      } else {
-        const list = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setInquiries(list);
-      }
-    });
+      );
+      unsubs.push(unsubUsers);
 
-    const unsubAudit = onSnapshot(collection(db, "audit_logs"), async (snap) => {
-      if (snap.empty) {
-        const defaultAudits = [
-          {
-            adminName: "System",
-            adminEmail: "system@tourenvi.com",
-            action: "System Initialization",
-            target: "Core Platform",
-            details: "Audit logging system activated & baseline security verified.",
-            timestamp: new Date(Date.now() - 86400000),
-          },
-        ];
-        for (const aud of defaultAudits) {
-          await addDoc(collection(db, "audit_logs"), aud);
+      // 3. Admins Snapshot Listener
+      const unsubAdmins = onSnapshot(
+        collection(adminDb, "admins"),
+        (snap) => {
+          const list = snap.docs.map((docSnap) => {
+            const data = docSnap.data();
+            const docId = docSnap.id;
+            return {
+              id: docId,
+              uid: data.uid || docId,
+              name: data.name || data.displayName || data.fullName || data.username || (data.email ? data.email.split("@")[0] : "Admin Officer"),
+              email: data.email || "No email registered",
+              phone: data.phone || data.phoneNumber || data.mobile || "",
+              role: "admin",
+              status: data.status || "active",
+              authProvider: data.authProvider || data.providerId || "password",
+              createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : new Date()),
+              ...data,
+            };
+          });
+          setAdminsList(list);
+          setIsAdminsLoading(false);
+        },
+        (err) => {
+          console.warn("Admins Firestore onSnapshot listener notice:", err.message);
+          setIsAdminsLoading(false);
         }
-      } else {
-        const list = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setAuditLogs(list);
-      }
-    });
+      );
+      unsubs.push(unsubAdmins);
 
-    const unsubAnnouncements = onSnapshot(collection(db, "announcements"), async (snap) => {
-      if (snap.empty) {
-        const defaultAnnouncements = [
-          {
-            title: "Heavy Monsoon Rainfall Advisory: Mumbai-Pune Expressway",
-            message: "Waterlogging reported near Khalapur toll. Drive with fog lights and keep speed below 60 km/h.",
-            category: "Route Alert",
-            targetAudience: "All Travelers",
-            severity: "High",
-            isActive: true,
-            publisher: "Operations Team",
-            createdAt: new Date(),
-          },
-          {
-            title: "Toll Tariff Adjustment Notice",
-            message: "State Highway 14 FASTag surcharges updated across Maharashtra toll plazas.",
-            category: "System Advisory",
-            targetAudience: "Highway Drivers",
-            severity: "Normal",
-            isActive: true,
-            publisher: "Operations Team",
-            createdAt: new Date(Date.now() - 3600000 * 24),
-          },
-        ];
-        for (const ann of defaultAnnouncements) {
-          await addDoc(collection(db, "announcements"), ann);
-        }
-      } else {
-        const list = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        setAnnouncements(list);
-      }
+      // 4. Active Fleet Listener
+      const unsubFleet = onSnapshot(
+        collection(adminDb, "active_fleet"),
+        async (snap) => {
+          if (snap.empty) {
+            const defaultFleet = [
+              { regNo: "MH-12-GQ-4820", model: "Tesla Model 3 (EV)", driver: "Amit Sharma", route: "Mumbai ➔ Pune", status: "In Transit", progress: 75, lat: 18.975, lng: 72.8258 },
+              { regNo: "DL-03-CA-9104", model: "Toyota Prius (Hybrid)", driver: "Vikram Singh", route: "Delhi ➔ Jaipur", status: "Delayed", progress: 40, lat: 28.6139, lng: 77.209 },
+              { regNo: "KA-01-MJ-6723", model: "Hyundai Ioniq 5 (EV)", driver: "Nikhil Gowda", route: "Bangalore ➔ Mysore", status: "In Transit", progress: 90, lat: 12.9716, lng: 77.5946 },
+              { regNo: "KL-07-BZ-5511", model: "Ford Endeavour (Gas)", driver: "Rahul Nair", route: "Cochin ➔ Munnar", status: "Resting", progress: 15, lat: 10.0159, lng: 76.3419 },
+            ];
+            for (const f of defaultFleet) {
+              await setDoc(doc(adminDb, "active_fleet", f.regNo), f).catch(() => {});
+            }
+          } else {
+            setFleet(snap.docs.map((docSnap) => ({ regNo: docSnap.id, ...docSnap.data() })));
+          }
+        },
+        (err) => console.warn("Fleet listener notice:", err.message)
+      );
+      unsubs.push(unsubFleet);
+
+      // 5. Fuel Overrides Listener
+      const unsubFuel = onSnapshot(
+        collection(adminDb, "fuel_overrides"),
+        (snap) => {
+          if (!snap.empty) {
+            setFuelOverrides(snap.docs.map((docSnap) => docSnap.data()));
+          }
+        },
+        (err) => console.warn("Fuel overrides listener notice:", err.message)
+      );
+      unsubs.push(unsubFuel);
+
+      // 6. Budget Logs Listener
+      const unsubLogs = onSnapshot(
+        query(collection(adminDb, "budget_logs"), orderBy("timestamp", "desc")),
+        (snap) => {
+          setBudgetLogs(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
+        },
+        (err) => console.warn("Budget logs listener notice:", err.message)
+      );
+      unsubs.push(unsubLogs);
+
+      // 7. Inquiries Listener
+      const unsubInquiries = onSnapshot(
+        collection(adminDb, "inquiries"),
+        async (snap) => {
+          if (snap.empty) {
+            const defaultInquiries = [
+              {
+                category: "Budget Calculation Bug",
+                name: "Anish Patel",
+                email: "anish@gmail.com",
+                message: "The fuel cost estimation for EV vehicles on Pune highway shows gas vehicle multiplier.",
+                userRole: "Registered User",
+                status: "Open",
+                assignedTo: null,
+                createdAt: new Date(Date.now() - 3600000 * 4),
+              },
+              {
+                category: "Route Navigation Issue",
+                name: "Priya Sharma",
+                email: "priya@gmail.com",
+                message: "Missing toll booth rates near Mumbai-Pune Expressway entrance.",
+                userRole: "Registered User",
+                status: "In Progress",
+                assignedTo: "Officer",
+                createdAt: new Date(Date.now() - 3600000 * 12),
+              },
+              {
+                category: "Hotel/Stay Query",
+                name: "Karan Singh",
+                email: "karan@gmail.com",
+                message: "Need confirmation on Agoda affiliate discount coupon code application.",
+                userRole: "Guest",
+                status: "Resolved",
+                assignedTo: "Officer",
+                createdAt: new Date(Date.now() - 3600000 * 48),
+              },
+            ];
+            for (const inq of defaultInquiries) {
+              await addDoc(collection(adminDb, "inquiries"), {
+                ...inq,
+                updatedAt: serverTimestamp(),
+              }).catch(() => {});
+            }
+          } else {
+            const list = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+            setInquiries(list);
+          }
+        },
+        (err) => console.warn("Inquiries listener notice:", err.message)
+      );
+      unsubs.push(unsubInquiries);
+
+      // 8. Audit Logs Listener
+      const unsubAudit = onSnapshot(
+        collection(adminDb, "audit_logs"),
+        async (snap) => {
+          if (snap.empty) {
+            const defaultAudits = [
+              {
+                adminName: "System",
+                adminEmail: "system@tourenvi.com",
+                action: "System Initialization",
+                target: "Core Platform",
+                details: "Audit logging system activated & baseline security verified.",
+                timestamp: new Date(Date.now() - 86400000),
+              },
+            ];
+            for (const aud of defaultAudits) {
+              await addDoc(collection(adminDb, "audit_logs"), aud).catch(() => {});
+            }
+          } else {
+            const list = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+            setAuditLogs(list);
+          }
+        },
+        (err) => console.warn("Audit listener notice:", err.message)
+      );
+      unsubs.push(unsubAudit);
+
+      // 9. Announcements Listener
+      const unsubAnnouncements = onSnapshot(
+        collection(adminDb, "announcements"),
+        async (snap) => {
+          if (snap.empty) {
+            const defaultAnnouncements = [
+              {
+                title: "Heavy Monsoon Rainfall Advisory: Mumbai-Pune Expressway",
+                message: "Waterlogging reported near Khalapur toll. Drive with fog lights and keep speed below 60 km/h.",
+                category: "Route Alert",
+                targetAudience: "All Travelers",
+                severity: "High",
+                isActive: true,
+                publisher: "Operations Team",
+                createdAt: new Date(),
+              },
+              {
+                title: "Toll Tariff Adjustment Notice",
+                message: "State Highway 14 FASTag surcharges updated across Maharashtra toll plazas.",
+                category: "System Advisory",
+                targetAudience: "Highway Drivers",
+                severity: "Normal",
+                isActive: true,
+                publisher: "Operations Team",
+                createdAt: new Date(Date.now() - 3600000 * 24),
+              },
+            ];
+            for (const ann of defaultAnnouncements) {
+              await addDoc(collection(adminDb, "announcements"), ann).catch(() => {});
+            }
+          } else {
+            const list = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+            setAnnouncements(list);
+          }
+        },
+        (err) => console.warn("Announcements listener notice:", err.message)
+      );
+      unsubs.push(unsubAnnouncements);
     });
 
     return () => {
-      unsubUsers();
-      unsubAdmins();
-      unsubFleet();
-      unsubFuel();
-      unsubLogs();
-      unsubInquiries();
-      unsubAudit();
-      unsubAnnouncements();
+      unsubscribeAuth();
+      unsubs.forEach((unsub) => {
+        try { unsub(); } catch { }
+      });
     };
   }, []);
 
+  // Fleet live simulated telemetry progression
   useEffect(() => {
     const timer = setInterval(() => {
       setFleet((currentFleet) =>
@@ -493,7 +557,7 @@ const AdminDashboard: React.FC = () => {
             lng: v.lng + lngOffset,
           };
 
-          updateDoc(doc(db, "active_fleet", v.regNo), {
+          updateDoc(doc(adminDb, "active_fleet", v.regNo), {
             progress: newProgress,
             lat: updated.lat,
             lng: updated.lng,
@@ -507,6 +571,51 @@ const AdminDashboard: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
+  const handleForceSyncData = async () => {
+    setIsSyncing(true);
+    try {
+      const [userSnap, adminSnap] = await Promise.all([
+        getDocs(collection(adminDb, "users")),
+        getDocs(collection(adminDb, "admins")),
+      ]);
+
+      const uList = userSnap.docs.map((d) => ({
+        id: d.id,
+        uid: d.data().uid || d.id,
+        name: d.data().name || d.data().displayName || d.data().fullName || (d.data().email ? d.data().email.split("@")[0] : "Traveler"),
+        email: d.data().email || "No email",
+        phone: d.data().phone || d.data().phoneNumber || "",
+        role: d.data().role || "user",
+        status: d.data().status || "active",
+        authProvider: d.data().authProvider || d.data().providerId || "password",
+        createdAt: d.data().createdAt?.toDate ? d.data().createdAt.toDate() : new Date(),
+        ...d.data(),
+      }));
+
+      const aList = adminSnap.docs.map((d) => ({
+        id: d.id,
+        uid: d.data().uid || d.id,
+        name: d.data().name || d.data().displayName || (d.data().email ? d.data().email.split("@")[0] : "Admin Officer"),
+        email: d.data().email || "No email",
+        phone: d.data().phone || d.data().phoneNumber || "",
+        role: "admin",
+        status: d.data().status || "active",
+        authProvider: d.data().authProvider || "password",
+        createdAt: d.data().createdAt?.toDate ? d.data().createdAt.toDate() : new Date(),
+        ...d.data(),
+      }));
+
+      setUsers(uList);
+      setAdminsList(aList);
+      toast.success(`Database sync complete: ${uList.length} users, ${aList.length} admins.`);
+    } catch (err: any) {
+      console.error("Force sync error:", err);
+      toast.error("Failed to sync database: " + (err.message || "Unknown error"));
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handlePublishBroadcast = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBroadcastTitle.trim() || !newBroadcastMsg.trim()) {
@@ -515,7 +624,7 @@ const AdminDashboard: React.FC = () => {
     }
 
     try {
-      await addDoc(collection(db, "announcements"), {
+      await addDoc(collection(adminDb, "announcements"), {
         title: newBroadcastTitle.trim(),
         message: newBroadcastMsg.trim(),
         category: newBroadcastCategory,
@@ -537,7 +646,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleToggleBroadcastStatus = async (id: string, currentStatus: boolean) => {
     try {
-      await updateDoc(doc(db, "announcements", id), { isActive: !currentStatus });
+      await updateDoc(doc(adminDb, "announcements", id), { isActive: !currentStatus });
       toast.success(`Announcement ${!currentStatus ? "activated" : "deactivated"}.`);
     } catch {
       toast.error("Failed to update announcement status.");
@@ -547,7 +656,7 @@ const AdminDashboard: React.FC = () => {
   const handleDeleteBroadcast = async (id: string) => {
     if (!window.confirm("Delete this broadcast announcement?")) return;
     try {
-      await deleteDoc(doc(db, "announcements", id));
+      await deleteDoc(doc(adminDb, "announcements", id));
       toast.success("Announcement deleted.");
     } catch {
       toast.error("Failed to delete announcement.");
@@ -556,7 +665,7 @@ const AdminDashboard: React.FC = () => {
 
   const handlePromoteAdmin = async (targetUid: string) => {
     try {
-      const userRef = doc(db, "users", targetUid);
+      const userRef = doc(adminDb, "users", targetUid);
       const userSnap = await getDoc(userRef);
       let userData: any = users.find((u) => u.id === targetUid || u.uid === targetUid);
 
@@ -573,10 +682,10 @@ const AdminDashboard: React.FC = () => {
       };
 
       // 1. Write to admins collection
-      await setDoc(doc(db, "admins", targetUid), adminRecord);
+      await setDoc(doc(adminDb, "admins", targetUid), adminRecord);
 
       // 2. Delete from users collection
-      await deleteDoc(doc(db, "users", targetUid));
+      await deleteDoc(doc(adminDb, "users", targetUid));
 
       toast.success("User promoted to Admin! Account moved to 'admins' collection.");
       await logAdminAction("Promoted User to Admin", targetUid, "Moved record from 'users' to 'admins' collection");
@@ -588,7 +697,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleDemoteAdmin = async (targetUid: string) => {
     try {
-      const adminRef = doc(db, "admins", targetUid);
+      const adminRef = doc(adminDb, "admins", targetUid);
       const adminSnap = await getDoc(adminRef);
       let adminData: any = adminsList.find((a) => a.id === targetUid || a.uid === targetUid);
 
@@ -605,10 +714,10 @@ const AdminDashboard: React.FC = () => {
       };
 
       // 1. Write to users collection
-      await setDoc(doc(db, "users", targetUid), userRecord);
+      await setDoc(doc(adminDb, "users", targetUid), userRecord);
 
       // 2. Delete from admins collection
-      await deleteDoc(doc(db, "admins", targetUid));
+      await deleteDoc(doc(adminDb, "admins", targetUid));
 
       toast.success("Admin demoted to User! Account moved to 'users' collection.");
       await logAdminAction("Demoted Admin to User", targetUid, "Moved record from 'admins' to 'users' collection");
@@ -622,7 +731,7 @@ const AdminDashboard: React.FC = () => {
     const newStatus = currentStatus === "suspended" ? "active" : "suspended";
     try {
       const targetCol = adminsList.some((a) => a.id === targetUid || a.uid === targetUid) ? "admins" : "users";
-      await updateDoc(doc(db, targetCol, targetUid), { status: newStatus });
+      await updateDoc(doc(adminDb, targetCol, targetUid), { status: newStatus });
       toast.success(`Account has been ${newStatus}.`);
       await logAdminAction(newStatus === "suspended" ? "Suspended Account" : "Reactivated Account", targetUid, `Updated status to ${newStatus} in '${targetCol}' collection`);
     } catch {
@@ -634,7 +743,7 @@ const AdminDashboard: React.FC = () => {
     if (!window.confirm("Are you sure? This account will be permanently deleted.")) return;
     try {
       const targetCol = adminsList.some((a) => a.id === targetUid || a.uid === targetUid) ? "admins" : "users";
-      await deleteDoc(doc(db, targetCol, targetUid));
+      await deleteDoc(doc(adminDb, targetCol, targetUid));
       toast.success("Account deleted successfully.");
       await logAdminAction("Deleted Account", targetUid, `Purged from '${targetCol}' collection`);
     } catch {
@@ -648,11 +757,11 @@ const AdminDashboard: React.FC = () => {
 
     try {
       const targetUid = user.uid || user.id;
-      const q = query(collection(db, "trips"), where("userId", "==", targetUid));
+      const q = query(collection(adminDb, "trips"), where("userId", "==", targetUid));
       const snap = await getDocs(q);
 
       if (!snap.empty) {
-        setUserTripsModal(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+        setUserTripsModal(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
       } else {
         setUserTripsModal([]);
       }
@@ -677,7 +786,7 @@ const AdminDashboard: React.FC = () => {
       tollRate: parseFloat(overrideToll),
     };
     try {
-      await setDoc(doc(db, "fuel_overrides", data.city), data);
+      await setDoc(doc(adminDb, "fuel_overrides", data.city), data);
       toast.success(`Fuel rates updated for ${data.city}.`);
       await logAdminAction("Overrode Fuel Rates", data.city, `Petrol: ₹${data.petrol}, Diesel: ₹${data.diesel}, Toll: ₹${data.tollRate}`);
       setOverrideCity("");
@@ -691,7 +800,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleDeleteFuelOverride = async (city: string) => {
     try {
-      await deleteDoc(doc(db, "fuel_overrides", city));
+      await deleteDoc(doc(adminDb, "fuel_overrides", city));
       toast.success(`Fuel rates override removed for ${city}.`);
       await logAdminAction("Deleted Fuel Override", city, "Reverted city fuel rates to global baseline");
     } catch {
@@ -707,7 +816,7 @@ const AdminDashboard: React.FC = () => {
     ];
     const item = mockExceptions[Math.floor(Math.random() * mockExceptions.length)];
     try {
-      await addDoc(collection(db, "budget_logs"), {
+      await addDoc(collection(adminDb, "budget_logs"), {
         ...item,
         timestamp: serverTimestamp(),
       });
@@ -720,9 +829,9 @@ const AdminDashboard: React.FC = () => {
   const handleClearLogs = async () => {
     if (!window.confirm("Clear all recorded budget exception logs?")) return;
     try {
-      const q = await getDocs(collection(db, "budget_logs"));
+      const q = await getDocs(collection(adminDb, "budget_logs"));
       for (const d of q.docs) {
-        await deleteDoc(doc(db, "budget_logs", d.id));
+        await deleteDoc(doc(adminDb, "budget_logs", d.id));
       }
       toast.success("All budget exception logs cleared.");
     } catch {
@@ -735,13 +844,29 @@ const AdminDashboard: React.FC = () => {
   }, [users]);
 
   const filteredUsers = useMemo(() => {
-    return regularUsers.filter(
-      (u) =>
-        u.name?.toLowerCase().includes(userSearch.toLowerCase()) ||
-        u.email?.toLowerCase().includes(userSearch.toLowerCase()) ||
-        u.phone?.toLowerCase().includes(userSearch.toLowerCase())
-    );
-  }, [regularUsers, userSearch]);
+    const q = userSearch.trim().toLowerCase();
+    return regularUsers.filter((u) => {
+      if (userRoleFilter !== "all" && (u.role || "user").toLowerCase() !== userRoleFilter) {
+        return false;
+      }
+      if (userStatusFilter !== "all" && (u.status || "active").toLowerCase() !== userStatusFilter) {
+        return false;
+      }
+      if (!q) return true;
+      const nameStr = (u.name || "").toLowerCase();
+      const emailStr = (u.email || "").toLowerCase();
+      const phoneStr = (u.phone || "").toLowerCase();
+      const roleStr = (u.role || "").toLowerCase();
+      const idStr = (u.uid || u.id || "").toLowerCase();
+      return (
+        nameStr.includes(q) ||
+        emailStr.includes(q) ||
+        phoneStr.includes(q) ||
+        roleStr.includes(q) ||
+        idStr.includes(q)
+      );
+    });
+  }, [regularUsers, userSearch, userRoleFilter, userStatusFilter]);
 
   const totalUserPages = Math.ceil(filteredUsers.length / itemsPerPage) || 1;
   const paginatedUsers = useMemo(() => {
@@ -749,18 +874,34 @@ const AdminDashboard: React.FC = () => {
     return filteredUsers.slice(start, start + itemsPerPage);
   }, [filteredUsers, userPage]);
 
-  const adminUsers = useMemo(() => {
-    return adminsList.length > 0 ? adminsList : users.filter((u) => u.role === "admin");
+  const allAdminAccounts = useMemo(() => {
+    const directAdmins = adminsList;
+    const userAdmins = users.filter((u) => u.role === "admin");
+    const combined = [...directAdmins];
+    for (const ua of userAdmins) {
+      if (!combined.some((a) => a.id === ua.id || a.uid === ua.uid)) {
+        combined.push(ua);
+      }
+    }
+    return combined;
   }, [adminsList, users]);
 
   const filteredAdmins = useMemo(() => {
-    return adminUsers.filter(
-      (u) =>
-        u.name?.toLowerCase().includes(adminSearch.toLowerCase()) ||
-        u.email?.toLowerCase().includes(adminSearch.toLowerCase()) ||
-        u.phone?.toLowerCase().includes(adminSearch.toLowerCase())
-    );
-  }, [adminUsers, adminSearch]);
+    const q = adminSearch.trim().toLowerCase();
+    return allAdminAccounts.filter((u) => {
+      if (!q) return true;
+      const nameStr = (u.name || "").toLowerCase();
+      const emailStr = (u.email || "").toLowerCase();
+      const phoneStr = (u.phone || "").toLowerCase();
+      const idStr = (u.uid || u.id || "").toLowerCase();
+      return (
+        nameStr.includes(q) ||
+        emailStr.includes(q) ||
+        phoneStr.includes(q) ||
+        idStr.includes(q)
+      );
+    });
+  }, [allAdminAccounts, adminSearch]);
 
   const totalAdminPages = Math.ceil(filteredAdmins.length / itemsPerPage) || 1;
   const paginatedAdmins = useMemo(() => {
@@ -801,6 +942,9 @@ const AdminDashboard: React.FC = () => {
         setMobileOpen={setIsMobileMenuOpen}
       />
 
+      {/* Spacer to prevent layout shift with fixed sidebar */}
+      <div className="hidden lg:block w-72 xl:w-80 flex-shrink-0" />
+
       <main className="flex-1 space-y-6 max-w-7xl mx-auto pb-12 z-10 w-full min-w-0">
         <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs">
           <div className="flex items-center gap-3">
@@ -823,24 +967,19 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3 self-end sm:self-center">
-            <div className="px-3.5 py-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 flex items-center gap-2 text-xs font-semibold text-emerald-700">
+            {/* <div className="px-3.5 py-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 flex items-center gap-2 text-xs font-semibold text-emerald-700">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
               System Status: {systemHealth}
-            </div>
+            </div> */}
 
             <button
-              onClick={() => {
-                setIsSyncing(true);
-                setTimeout(() => {
-                  setIsSyncing(false);
-                  toast.success("Telemetry and user tables synchronized.");
-                }, 800);
-              }}
-              className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-[#1e3b34] transition-all cursor-pointer active:scale-95 shadow-xs"
-              title="Sync Telemetry Data"
+              onClick={handleForceSyncData}
+              disabled={isSyncing}
+              className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-[#1e3b34] transition-all cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
+              title="Force Sync Telemetry & Database Records"
             >
               <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin text-[#2ecc71]" : ""}`} />
             </button>
@@ -1139,29 +1278,41 @@ const AdminDashboard: React.FC = () => {
 
         {activeTab === "users" && (
           <div className="p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4 animate-fade-in">
-            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between border-b border-slate-100 pb-3">
+            <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                   <UsersIcon className="h-5 w-5 text-[#2ecc71]" /> User Accounts Management
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 ml-1">
+                    {regularUsers.length} total
+                  </span>
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Showing registered traveler accounts. Click any account to view planned trips and profile details.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Showing registered traveler, guide & support accounts from Firebase. Click any account to view planned trips and profile details.
                 </p>
               </div>
-              <div className="flex items-center gap-3 w-full sm:max-w-md">
-                <div className="relative flex-1">
+              <div className="flex items-center gap-2.5 w-full md:w-auto">
+                <div className="relative flex-1 md:w-64">
                   <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
                   <input
                     type="text"
-                    placeholder="Search by name, email or phone..."
+                    placeholder="Search by name, email, phone, role..."
                     value={userSearch}
                     onChange={(e) => {
                       setUserSearch(e.target.value);
                       setUserPage(1);
                     }}
-                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2ecc71] focus:bg-white transition-all"
+                    className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2ecc71] focus:bg-white transition-all"
                   />
                 </div>
+                <button
+                  onClick={handleForceSyncData}
+                  disabled={isSyncing}
+                  className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition-all shrink-0 cursor-pointer shadow-xs disabled:opacity-50"
+                  title="Re-fetch users collection directly from Firebase"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? "animate-spin text-[#2ecc71]" : ""}`} />
+                  Sync
+                </button>
                 <button
                   onClick={() => exportToCSV("Tourenvi_Users_Report", regularUsers)}
                   className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-[#2ecc71] text-white font-bold text-xs hover:bg-[#27ae60] transition-all shrink-0 cursor-pointer shadow-xs"
@@ -1172,40 +1323,87 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
+            {/* Quick Filter Badges for Role & Status */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-1">
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="text-[11px] font-bold text-slate-400 uppercase mr-1">Role:</span>
+                {(["all", "user", "guide", "support"] as const).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => {
+                      setUserRoleFilter(r);
+                      setUserPage(1);
+                    }}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold capitalize transition-all cursor-pointer ${
+                      userRoleFilter === r
+                        ? "bg-[#1e3b34] text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {r === "all" ? "All Roles" : r}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="text-[11px] font-bold text-slate-400 uppercase mr-1">Status:</span>
+                {(["all", "active", "suspended"] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => {
+                      setUserStatusFilter(s);
+                      setUserPage(1);
+                    }}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold capitalize transition-all cursor-pointer ${
+                      userStatusFilter === s
+                        ? "bg-[#2ecc71] text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {s === "all" ? "All Status" : s}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <div className="overflow-x-auto border border-slate-200/80 rounded-xl bg-white shadow-2xs">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    <th className="px-6 py-4">Full Name</th>
-                    <th className="px-6 py-4">Contact Details</th>
-                    <th className="px-6 py-4">Login Method</th>
-                    <th className="px-6 py-4">Role</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Full Name</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Contact Details</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Login Method</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Role</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Status</th>
+                    <th className="px-6 py-4 text-right whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
-                  {paginatedUsers.length > 0 ? (
+                  {isUsersLoading ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-12 text-slate-500">
+                        <RefreshCw className="h-6 w-6 animate-spin mx-auto mb-2 text-[#2ecc71]" />
+                        <span className="font-semibold text-xs">Fetching users from Firebase database...</span>
+                      </td>
+                    </tr>
+                  ) : paginatedUsers.length > 0 ? (
                     paginatedUsers.map((user) => (
                       <tr key={user.id} className="hover:bg-slate-50/70 transition-colors duration-150">
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <button
                             onClick={() => handleOpenUserModal(user)}
-                            className="text-left font-semibold text-slate-900 hover:text-[#2ecc71] transition-colors group flex items-center gap-1.5 cursor-pointer"
+                            className="text-left font-bold text-slate-900 hover:text-[#2ecc71] transition-colors group inline-flex items-center gap-1.5 cursor-pointer"
                           >
-                            <span>{user.name || "Anonymous User"}</span>
+                            <span>{user.name || user.displayName || "Anonymous User"}</span>
                             <Eye className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 text-[#2ecc71] transition-opacity" />
                           </button>
-                          <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">
-                            UID: {user.uid?.substr(0, 8) || user.id?.substr(0, 8)}...
-                          </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-slate-800 font-medium">{user.email}</div>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-slate-800 font-medium text-xs">{user.email}</div>
                           <div className="text-xs text-slate-400 mt-0.5">{user.phone || "No phone registered"}</div>
                         </td>
-                        <td className="px-6 py-4">{renderAuthProviderBadge(user)}</td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">{renderAuthProviderBadge(user)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
                               user.role === "guide"
@@ -1218,7 +1416,7 @@ const AdminDashboard: React.FC = () => {
                             {user.role || "user"}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
                               user.status === "suspended" ? "text-red-600" : "text-emerald-600"
@@ -1235,40 +1433,43 @@ const AdminDashboard: React.FC = () => {
                             )}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2">
+                        <td className="px-6 py-4 text-right whitespace-nowrap">
+                          <div className="flex justify-end items-center gap-1.5">
                             <button
                               onClick={() => handleOpenUserModal(user)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
-                              title="Inspect User Details & Trip Plans"
+                              className="p-2 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                              title="View User Details & Saved Trips"
                             >
-                              <Eye className="h-3.5 w-3.5" /> View Trips
+                              <Eye className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handlePromoteAdmin(user.id)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
+                              className="p-2 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-all cursor-pointer active:scale-95 shadow-2xs"
                               title="Promote to Administrator"
                             >
-                              <Shield className="h-3.5 w-3.5" /> Promote
+                              <ShieldCheck className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleToggleSuspension(user.id, user.status)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs ${
+                              className={`p-2 rounded-xl border transition-all cursor-pointer active:scale-95 shadow-2xs ${
                                 user.status === "suspended"
                                   ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
                                   : "border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700"
                               }`}
-                              title={user.status === "suspended" ? "Unsuspend account" : "Suspend account"}
+                              title={user.status === "suspended" ? "Unsuspend / Activate Account" : "Suspend Account"}
                             >
-                              <UserX className="h-3.5 w-3.5" />
-                              {user.status === "suspended" ? "Activate" : "Suspend"}
+                              {user.status === "suspended" ? (
+                                <CheckCircle className="h-4 w-4" />
+                              ) : (
+                                <UserX className="h-4 w-4" />
+                              )}
                             </button>
                             <button
                               onClick={() => handleDeleteUser(user.id)}
-                              className="p-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                              className="p-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
                               title="Delete Account permanently"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         </td>
@@ -1276,8 +1477,14 @@ const AdminDashboard: React.FC = () => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="text-center py-8 text-slate-500 font-semibold">
-                        No non-admin accounts match your filter.
+                      <td colSpan={6} className="text-center py-10 text-slate-500 space-y-2">
+                        <UsersIcon className="h-8 w-8 mx-auto text-slate-300" />
+                        <div className="font-semibold text-sm text-slate-700">No user accounts found</div>
+                        <p className="text-xs text-slate-400">
+                          {userSearch || userRoleFilter !== "all" || userStatusFilter !== "all"
+                            ? "Try adjusting your search query or filter options."
+                            : "Click 'Sync' above to fetch records from your Firebase 'users' collection."}
+                        </p>
                       </td>
                     </tr>
                   )}
@@ -1339,35 +1546,32 @@ const AdminDashboard: React.FC = () => {
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    <th className="px-6 py-4">Administrator Name</th>
-                    <th className="px-6 py-4">Contact Info</th>
-                    <th className="px-6 py-4">Login Method</th>
-                    <th className="px-6 py-4">Access Role</th>
-                    <th className="px-6 py-4">Status</th>
-                    <th className="px-6 py-4 text-right">Demote / Manage Action</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Administrator Name</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Contact Info</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Login Method</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Access Role</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Status</th>
+                    <th className="px-6 py-4 text-right whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {paginatedAdmins.length > 0 ? (
                     paginatedAdmins.map((user) => (
                       <tr key={user.id} className="hover:bg-slate-50/70 transition-colors duration-150">
-                        <td className="px-6 py-4">
-                          <div className="font-semibold text-slate-900">{user.name || "Administrator"}</div>
-                          <div className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">
-                            UID: {user.uid?.substr(0, 8) || user.id?.substr(0, 8)}...
-                          </div>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="font-bold text-slate-900">{user.name || "Administrator"}</div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="text-slate-800 font-medium">{user.email}</div>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-slate-800 font-medium text-xs">{user.email}</div>
                           <div className="text-xs text-slate-400 mt-0.5">{user.phone || "No phone registered"}</div>
                         </td>
-                        <td className="px-6 py-4">{renderAuthProviderBadge(user)}</td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">{renderAuthProviderBadge(user)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
                             admin
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <span
                             className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
                               user.status === "suspended" ? "text-red-600" : "text-emerald-600"
@@ -1384,33 +1588,36 @@ const AdminDashboard: React.FC = () => {
                             )}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex justify-end gap-2">
+                        <td className="px-6 py-4 text-right whitespace-nowrap">
+                          <div className="flex justify-end items-center gap-1.5">
                             <button
                               onClick={() => handleDemoteAdmin(user.id)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
+                              className="p-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 transition-all cursor-pointer active:scale-95 shadow-2xs"
                               title="Demote Admin back to Regular User"
                             >
-                              <ShieldAlert className="h-3.5 w-3.5" /> Demote to User
+                              <ShieldAlert className="h-4 w-4" />
                             </button>
                             <button
                               onClick={() => handleToggleSuspension(user.id, user.status)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs ${
+                              className={`p-2 rounded-xl border transition-all cursor-pointer active:scale-95 shadow-2xs ${
                                 user.status === "suspended"
                                   ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
                                   : "border-red-200 bg-red-50 hover:bg-red-100 text-red-600"
                               }`}
-                              title={user.status === "suspended" ? "Unsuspend account" : "Suspend account"}
+                              title={user.status === "suspended" ? "Unsuspend / Activate Account" : "Suspend Account"}
                             >
-                              <UserX className="h-3.5 w-3.5" />
-                              {user.status === "suspended" ? "Activate" : "Suspend"}
+                              {user.status === "suspended" ? (
+                                <CheckCircle className="h-4 w-4" />
+                              ) : (
+                                <UserX className="h-4 w-4" />
+                              )}
                             </button>
                             <button
                               onClick={() => handleDeleteUser(user.id)}
-                              className="p-1.5 rounded-lg border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                              className="p-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
                               title="Delete Account permanently"
                             >
-                              <Trash2 className="h-3.5 w-3.5" />
+                              <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         </td>
@@ -1870,18 +2077,17 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Tickets Table */}
+              {/* Inquiries Table */}
               <div className="overflow-x-auto border border-slate-200/80 rounded-xl bg-white shadow-2xs">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold text-slate-600 uppercase tracking-wider">
-                      <th className="px-6 py-4">Ticket ID</th>
-                      <th className="px-6 py-4">User Details</th>
-                      <th className="px-6 py-4">Category</th>
-                      <th className="px-6 py-4">Submitted Date</th>
-                      <th className="px-6 py-4">Assigned To</th>
-                      <th className="px-6 py-4">Status</th>
-                      <th className="px-6 py-4 text-right">Actions</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Traveler Details</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Inquiry Category</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Submitted Date</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Assigned Staff</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Status</th>
+                      <th className="px-6 py-4 text-right whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
@@ -1890,32 +2096,29 @@ const AdminDashboard: React.FC = () => {
                         .filter((inq) => supportFilter === "All" || inq.status === supportFilter)
                         .map((inq) => (
                           <tr key={inq.id} className="hover:bg-slate-50/70 transition-colors">
-                            <td className="px-6 py-4 font-mono text-[#2ecc71] font-bold">
-                              #{inq.id.substring(0, 6)}
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="font-bold text-slate-900">{inq.name || "Anonymous"}</div>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="font-bold text-slate-900 text-xs">{inq.name || "Anonymous Traveler"}</div>
                               <div className="text-slate-400 text-[11px]">{inq.email}</div>
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-6 py-4 whitespace-nowrap">
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 border border-slate-200 text-slate-700">
                                 <Tag className="h-3 w-3 text-[#2ecc71]" />
                                 {inq.category}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-slate-400 font-mono text-[11px]">
+                            <td className="px-6 py-4 text-slate-400 font-mono text-[11px] whitespace-nowrap">
                               {inq.createdAt?.seconds
                                 ? new Date(inq.createdAt.seconds * 1000).toLocaleDateString()
                                 : new Date().toLocaleDateString()}
                             </td>
-                            <td className="px-6 py-4 text-slate-600">
+                            <td className="px-6 py-4 text-slate-600 whitespace-nowrap">
                               {inq.assignedTo ? (
                                 <span className="font-semibold text-blue-600">{inq.assignedTo}</span>
                               ) : (
                                 <span className="text-slate-400 italic">Unassigned</span>
                               )}
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-6 py-4 whitespace-nowrap">
                               <span
                                 className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${
                                   inq.status === "Open"
@@ -1937,20 +2140,20 @@ const AdminDashboard: React.FC = () => {
                                 {inq.status}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-right">
+                            <td className="px-6 py-4 text-right whitespace-nowrap">
                               <button
                                 onClick={() => setSelectedTicket(inq)}
-                                className="px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-2xs"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs transition-all active:scale-95 cursor-pointer shadow-2xs"
                               >
-                                View Ticket
+                                <Eye className="h-3.5 w-3.5" /> View Inquiry
                               </button>
                             </td>
                           </tr>
                         ))
                     ) : (
                       <tr>
-                        <td colSpan={7} className="text-center py-8 text-slate-500 font-semibold">
-                          No support tickets found for filter "{supportFilter}".
+                        <td colSpan={6} className="text-center py-8 text-slate-500 font-semibold">
+                          No support inquiries found for filter "{supportFilter}".
                         </td>
                       </tr>
                     )}
@@ -2611,8 +2814,14 @@ const AdminDashboard: React.FC = () => {
               </div>
 
               <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
-                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">User ID</span>
-                <div className="font-mono text-slate-600 text-[11px] truncate">{selectedUserModal.uid || selectedUserModal.id}</div>
+                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Member Since</span>
+                <div className="font-semibold text-slate-700 text-xs">
+                  {selectedUserModal.createdAt?.toLocaleDateString
+                    ? selectedUserModal.createdAt.toLocaleDateString()
+                    : selectedUserModal.createdAt?.seconds
+                    ? new Date(selectedUserModal.createdAt.seconds * 1000).toLocaleDateString()
+                    : "Registered Traveler"}
+                </div>
               </div>
             </div>
 
@@ -2781,7 +2990,7 @@ const AdminDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* --- SUPPORT TICKET DETAIL MODAL / DRAWER --- */}
+      {/* --- SUPPORT INQUIRY DETAIL MODAL / DRAWER --- */}
       {selectedTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
           <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-2xl p-4 sm:p-6 space-y-5">
@@ -2794,7 +3003,7 @@ const AdminDashboard: React.FC = () => {
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="text-base sm:text-lg font-bold text-slate-800">
-                      Support Ticket #{selectedTicket.id?.substring(0, 6)}
+                      Support Inquiry
                     </h3>
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${selectedTicket.status === "Open"
@@ -2825,15 +3034,15 @@ const AdminDashboard: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
                 <span className="text-slate-400 text-[10px] font-bold uppercase">Submitted By</span>
-                <div className="font-bold text-slate-800">{selectedTicket.name || "Anonymous"}</div>
+                <div className="font-bold text-slate-800">{selectedTicket.name || "Anonymous Traveler"}</div>
                 <div className="text-slate-500 text-[10px] truncate">{selectedTicket.email}</div>
               </div>
 
               <div className="p-3 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
                 <span className="text-slate-400 text-[10px] font-bold uppercase">Account Status</span>
                 <div className="font-bold text-blue-600">{selectedTicket.userRole || "Registered User"}</div>
-                <div className="text-slate-500 text-[10px] truncate">
-                  UID: {selectedTicket.userId ? selectedTicket.userId.substring(0, 8) : "N/A (Guest)"}
+                <div className="text-slate-500 text-[10px]">
+                  Verified Account
                 </div>
               </div>
 
@@ -2891,10 +3100,7 @@ const AdminDashboard: React.FC = () => {
 
               <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                 <a
-                  href={`mailto:${selectedTicket.email}?subject=Tourenvi Support Ticket [${selectedTicket.id?.substring(
-                    0,
-                    6
-                  )}] - Response&body=Hi ${selectedTicket.name || "Traveler"},\n\nThank you for reaching out to Tourenvi Support regarding your inquiry (${selectedTicket.category}).\n\n`}
+                  href={`mailto:${selectedTicket.email}?subject=Tourenvi Support Inquiry - Response&body=Hi ${selectedTicket.name || "Traveler"},\n\nThank you for reaching out to Tourenvi Support regarding your inquiry (${selectedTicket.category}).\n\n`}
                   className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-all cursor-pointer shadow-xs active:scale-95"
                 >
                   <Mail className="h-3.5 w-3.5" /> Reply via Email
