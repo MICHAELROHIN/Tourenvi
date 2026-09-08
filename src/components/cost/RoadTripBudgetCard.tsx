@@ -75,16 +75,16 @@ export const RoadTripBudgetCard: React.FC<RoadTripBudgetCardProps> = ({
     <div className={`bg-white rounded-3xl p-6 shadow-md border border-gray-100 ${className}`}>
       <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
         <div>
-          <span className="px-3 py-1 bg-gt-gold/15 text-gt-gold font-bold text-xs uppercase tracking-wider rounded-full flex items-center gap-1.5 w-fit mb-1">
+          <span className="px-3 py-1 bg-emerald-100 text-emerald-800 font-bold text-xs uppercase tracking-wider rounded-full flex items-center gap-1.5 w-fit mb-1">
             <Wallet size={14} /> Self-Drive Road Trip Budget
           </span>
-          <h3 className="text-xl font-serif font-bold text-gt-blue">
+          <h3 className="text-xl font-serif font-bold text-emerald-950">
             Estimated Trip Cost Breakdown
           </h3>
         </div>
         <div className="text-right">
           <span className="text-xs text-gray-400 font-sans block">Total Budget Cap</span>
-          <span className="text-sm font-bold text-gt-blue">
+          <span className="text-sm font-bold text-emerald-900">
             ₹{tripData?.budgetCap ? tripData.budgetCap.toLocaleString() : "50,000"}
           </span>
         </div>
@@ -202,16 +202,16 @@ export const RoadTripBudgetCard: React.FC<RoadTripBudgetCardProps> = ({
       </div>
 
       {/* 💰 TOTAL ESTIMATED ROAD TRIP BUDGET */}
-      <div className="mt-6 pt-4 border-t border-gray-200 flex items-center justify-between bg-gt-blue/5 p-4 rounded-2xl">
+      <div className="mt-6 pt-4 border-t border-emerald-100 flex items-center justify-between bg-emerald-50/80 p-4 rounded-2xl">
         <div>
-          <span className="text-xs uppercase tracking-wider font-bold text-gt-gold block">
+          <span className="text-xs uppercase tracking-wider font-bold text-emerald-800 block">
             Final Calculation
           </span>
-          <span className="text-base font-serif font-bold text-gt-blue">
+          <span className="text-base font-serif font-bold text-emerald-950">
             TOTAL ESTIMATED ROAD TRIP BUDGET
           </span>
         </div>
-        <span className="text-2xl font-serif font-extrabold text-gt-gold">
+        <span className="text-2xl font-serif font-extrabold text-emerald-700">
           ₹{calcResult.totalCalculatedBudget.toLocaleString()}
         </span>
       </div>
