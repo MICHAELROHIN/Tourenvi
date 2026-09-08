@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuth() { return request.auth != null; }
+    function role() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    match /users/{uid} {
+      allow read: if isAuth() && (request.auth.uid == uid || role() == 'admin');
+      allow create, update: if isAuth() && request.auth.uid == uid;
+    }
+
+    match /trips/{tripId} {
+      allow read: if isAuth() &&
+        (resource.data.userId == request.auth.uid || resource.data.memberIds.hasAny([request.auth.uid]));
+      allow create: if isAuth();
+      allow update, delete: if isAuth() && resource.data.userId == request.auth.uid;
+    }
+
+    match /attractions/{id} {
+      allow read: if true;
+      allow create: if isAuth();
+      allow update: if isAuth() && (role() == 'admin' || role() == 'guide');
+      allow delete: if role() == 'admin';
+    }
+
+    match /dangerZones/{id} {
+      allow read: if true;
+      allow write: if role() == 'admin';
+    }
+
+    match /reports/{id} {
+      allow read: if role() == 'admin' || role() == 'support';
+      allow create: if isAuth();
+      allow update: if role() == 'admin' || role() == 'support';
+    }
+
+    match /guideContent/{id} {
+      allow read: if true;
+      allow create: if role() == 'guide';
+      allow update: if isAuth() &&
+        (resource.data.guideId == request.auth.uid || role() == 'admin');
+    }
+  }
+}
