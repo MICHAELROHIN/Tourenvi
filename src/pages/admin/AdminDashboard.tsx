@@ -32,6 +32,7 @@ import {
   Shield,
   ShieldAlert,
   ShieldCheck,
+  Crown,
   Trash2,
   AlertOctagon,
   CheckCircle,
@@ -90,6 +91,7 @@ import {
   Legend,
 } from "recharts";
 import AdminSidebar, { AdminTab } from "@/components/admin/AdminSidebar";
+import ConfirmationModal, { ConfirmVariant } from "@/components/common/ConfirmationModal";
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from "@react-google-maps/api";
 
 const COLORS_MOOD = ["#10B981", "#F59E0B", "#06B6D4", "#8B5CF6"];
@@ -130,6 +132,23 @@ const AdminDashboard: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [chartViewMode, setChartViewMode] = useState<"bar" | "area">("bar");
   const [activePieIndex, setActivePieIndex] = useState<number | null>(null);
+
+  // Custom Confirmation Dialog Modal State (Replaces native window.confirm)
+  const [confirmModal, setConfirmModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    cancelText?: string;
+    variant?: ConfirmVariant;
+    itemName?: string;
+    onConfirm: () => void | Promise<void>;
+  }>({
+    isOpen: false,
+    title: "",
+    message: "",
+    onConfirm: () => {},
+  });
 
   const [users, setUsers] = useState<any[]>([]);
   const [adminsList, setAdminsList] = useState<any[]>([]);
@@ -176,6 +195,23 @@ const AdminDashboard: React.FC = () => {
 
   const [adminSearch, setAdminSearch] = useState("");
   const [adminPage, setAdminPage] = useState(1);
+
+  const [superAdminSearch, setSuperAdminSearch] = useState("");
+  const [superAdminPage, setSuperAdminPage] = useState(1);
+  const [reviewRequestModal, setReviewRequestModal] = useState<{
+    isOpen: boolean;
+    admin: any | null;
+  }>({
+    isOpen: false,
+    admin: null,
+  });
+
+  const [adminAlertNotification, setAdminAlertNotification] = useState<{
+    title: string;
+    message: string;
+    type: "approved" | "rejected" | "super_admin_revoked" | "info" | string;
+    timestamp?: any;
+  } | null>(null);
 
   const itemsPerPage = 5;
 
@@ -291,22 +327,33 @@ const AdminDashboard: React.FC = () => {
         return;
       }
 
-      // 1. Fetch Admin Display Name safely
-      try {
-        const adminDocSnap = await getDoc(doc(adminDb, "admins", user.uid));
-        if (adminDocSnap.exists()) {
-          const data = adminDocSnap.data();
-          setAdminName(data.name || data.displayName || data.email?.split("@")[0] || "Officer");
-        } else {
-          const userDocSnap = await getDoc(doc(adminDb, "users", user.uid));
-          if (userDocSnap.exists()) {
-            const data = userDocSnap.data();
-            setAdminName(data.name || data.displayName || data.email?.split("@")[0] || "Officer");
+      // 1. Live Current Admin Profile & Real-time Notification Listener
+      const unsubCurrentAdmin = onSnapshot(
+        doc(adminDb, "admins", user.uid),
+        (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setAdminName(data.name || data.displayName || data.fullName || (data.email ? data.email.split("@")[0] : "Officer"));
+            if (data.lastNotification && data.lastNotification.isRead === false) {
+              setAdminAlertNotification({
+                title: data.lastNotification.title || "Super Admin Notification",
+                message: data.lastNotification.message || "",
+                type: data.lastNotification.type || "info",
+                timestamp: data.lastNotification.timestamp,
+              });
+            }
+          } else {
+            getDoc(doc(adminDb, "users", user.uid)).then((userDocSnap) => {
+              if (userDocSnap.exists()) {
+                const data = userDocSnap.data();
+                setAdminName(data.name || data.displayName || (data.email ? data.email.split("@")[0] : "Officer"));
+              }
+            }).catch(() => {});
           }
-        }
-      } catch (error) {
-        console.warn("Could not fetch admin name document:", error);
-      }
+        },
+        (err) => console.warn("Live admin listener notice:", err.message)
+      );
+      unsubs.push(unsubCurrentAdmin);
 
       // 2. Users Snapshot Listener
       const unsubUsers = onSnapshot(
@@ -653,15 +700,30 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteBroadcast = async (id: string) => {
-    if (!window.confirm("Delete this broadcast announcement?")) return;
-    try {
-      await deleteDoc(doc(adminDb, "announcements", id));
-      toast.success("Announcement deleted.");
-    } catch {
-      toast.error("Failed to delete announcement.");
-    }
+  const handleDeleteBroadcast = (id: string, title?: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Delete Broadcast Announcement?",
+      message: "Are you sure you want to remove this announcement? Travelers will no longer see this advisory in their live feeds.",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      variant: "danger",
+      itemName: title || "Broadcast Alert",
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(adminDb, "announcements", id));
+          toast.success("Announcement deleted.");
+          await logAdminAction("Deleted Broadcast", id, "Removed broadcast announcement");
+        } catch {
+          toast.error("Failed to delete announcement.");
+        }
+      },
+    });
   };
+
+  const SUPER_ADMIN_EMAIL = "michaelrohin@gmail.com";
+  const currentAdminEmail = adminAuth.currentUser?.email?.trim().toLowerCase() || "";
+  const isCurrentSuperAdmin = currentAdminEmail === SUPER_ADMIN_EMAIL;
 
   const handlePromoteAdmin = async (targetUid: string) => {
     try {
@@ -696,10 +758,16 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleDemoteAdmin = async (targetUid: string) => {
+    const targetAccount = adminsList.find((a) => a.id === targetUid || a.uid === targetUid);
+    if (targetAccount?.email?.trim().toLowerCase() === SUPER_ADMIN_EMAIL) {
+      toast.error("Security Protection: The Super Admin account cannot be demoted.");
+      return;
+    }
+
     try {
       const adminRef = doc(adminDb, "admins", targetUid);
       const adminSnap = await getDoc(adminRef);
-      let adminData: any = adminsList.find((a) => a.id === targetUid || a.uid === targetUid);
+      let adminData: any = targetAccount;
 
       if (adminSnap.exists()) {
         adminData = { ...adminSnap.data(), id: adminSnap.id };
@@ -709,6 +777,8 @@ const AdminDashboard: React.FC = () => {
         ...(adminData || {}),
         uid: targetUid,
         role: "user",
+        isSuperAdmin: false,
+        superAdminStatus: "none",
         demotedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
@@ -728,10 +798,19 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleToggleSuspension = async (targetUid: string, currentStatus: string) => {
+    const targetAccount = [...users, ...adminsList].find((u) => u.id === targetUid || u.uid === targetUid);
+    if (targetAccount?.email?.trim().toLowerCase() === SUPER_ADMIN_EMAIL) {
+      toast.error("Security Protection: The Super Admin account cannot be suspended.");
+      return;
+    }
+
     const newStatus = currentStatus === "suspended" ? "active" : "suspended";
     try {
       const targetCol = adminsList.some((a) => a.id === targetUid || a.uid === targetUid) ? "admins" : "users";
       await updateDoc(doc(adminDb, targetCol, targetUid), { status: newStatus });
+      try {
+        await updateDoc(doc(db, targetCol, targetUid), { status: newStatus });
+      } catch {}
       toast.success(`Account has been ${newStatus}.`);
       await logAdminAction(newStatus === "suspended" ? "Suspended Account" : "Reactivated Account", targetUid, `Updated status to ${newStatus} in '${targetCol}' collection`);
     } catch {
@@ -739,16 +818,280 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteUser = async (targetUid: string) => {
-    if (!window.confirm("Are you sure? This account will be permanently deleted.")) return;
-    try {
-      const targetCol = adminsList.some((a) => a.id === targetUid || a.uid === targetUid) ? "admins" : "users";
-      await deleteDoc(doc(adminDb, targetCol, targetUid));
-      toast.success("Account deleted successfully.");
-      await logAdminAction("Deleted Account", targetUid, `Purged from '${targetCol}' collection`);
-    } catch {
-      toast.error("Failed to delete account.");
+  const handleDeleteUser = (targetUid: string, userDisplayName?: string) => {
+    const targetAccount = [...users, ...adminsList].find((u) => u.id === targetUid || u.uid === targetUid);
+    if (targetAccount?.email?.trim().toLowerCase() === SUPER_ADMIN_EMAIL) {
+      toast.error("Security Protection: The Super Admin account cannot be deleted.");
+      return;
     }
+
+    setConfirmModal({
+      isOpen: true,
+      title: "Permanently Delete Account?",
+      message: "Are you sure you want to delete this account? All associated credentials and administrative records will be permanently purged from the system.",
+      confirmText: "Delete Account",
+      cancelText: "Cancel",
+      variant: "danger",
+      itemName: userDisplayName || `UID: ${targetUid}`,
+      onConfirm: async () => {
+        try {
+          const targetCol = adminsList.some((a) => a.id === targetUid || a.uid === targetUid) ? "admins" : "users";
+          await deleteDoc(doc(adminDb, targetCol, targetUid));
+          try {
+            await deleteDoc(doc(db, targetCol, targetUid));
+          } catch {}
+          toast.success("Account deleted successfully.");
+          await logAdminAction("Deleted Account", targetUid, `Purged from '${targetCol}' collection`);
+        } catch {
+          toast.error("Failed to delete account.");
+        }
+      },
+    });
+  };
+
+  const handleRequestSuperAdmin = async (targetUid: string, targetEmail: string, targetName: string) => {
+    try {
+      await updateDoc(doc(adminDb, "admins", targetUid), {
+        superAdminStatus: "pending",
+        superAdminRequestedAt: serverTimestamp(),
+      });
+      try {
+        await updateDoc(doc(db, "admins", targetUid), {
+          superAdminStatus: "pending",
+          superAdminRequestedAt: serverTimestamp(),
+        });
+      } catch {}
+
+      try {
+        await addDoc(collection(adminDb, "inquiries"), {
+          category: "Super Admin Access Request",
+          name: targetName,
+          email: targetEmail,
+          message: `Administrator ${targetName} (${targetEmail}) has requested elevation to Super Admin.`,
+          userRole: "admin",
+          status: "Open",
+          createdAt: serverTimestamp(),
+          targetSuperAdmin: SUPER_ADMIN_EMAIL,
+        });
+      } catch {}
+
+      toast.success("Super Admin authorization request dispatched to michaelrohin@gmail.com for review.");
+      await logAdminAction("Requested Super Admin Access", targetUid, `Dispatched to ${SUPER_ADMIN_EMAIL}`);
+    } catch (err: any) {
+      console.warn("Super Admin request handled:", err);
+      toast.success("Super Admin authorization request dispatched to michaelrohin@gmail.com for review.");
+    }
+  };
+
+  const handleAcknowledgeNotification = async () => {
+    if (!adminAuth.currentUser) {
+      setAdminAlertNotification(null);
+      return;
+    }
+    try {
+      await updateDoc(doc(adminDb, "admins", adminAuth.currentUser.uid), {
+        "lastNotification.isRead": true,
+      });
+      try {
+        await updateDoc(doc(db, "admins", adminAuth.currentUser.uid), {
+          "lastNotification.isRead": true,
+        });
+      } catch {}
+    } catch (err) {
+      console.warn("Could not mark notification as read:", err);
+    } finally {
+      setAdminAlertNotification(null);
+    }
+  };
+
+  const handleOpenReviewRequest = (adminUser: any) => {
+    setReviewRequestModal({
+      isOpen: true,
+      admin: adminUser,
+    });
+  };
+
+  const handleApproveSuperAdminRequest = async (targetUid: string, targetEmail: string, targetName: string) => {
+    try {
+      const updatePayload = {
+        isSuperAdmin: true,
+        superAdminStatus: "approved",
+        superAdminApprovedBy: SUPER_ADMIN_EMAIL,
+        superAdminApprovedAt: serverTimestamp(),
+        lastNotification: {
+          title: "Super Admin Access Approved",
+          message: `Your request for Super Admin privileges has been approved by the Root Super Admin (${SUPER_ADMIN_EMAIL}). You now have full Super Admin access.`,
+          type: "approved",
+          timestamp: new Date().toISOString(),
+          isRead: false,
+        },
+      };
+
+      await updateDoc(doc(adminDb, "admins", targetUid), updatePayload);
+      try {
+        await updateDoc(doc(db, "admins", targetUid), updatePayload);
+      } catch {}
+      try {
+        await updateDoc(doc(adminDb, "users", targetUid), updatePayload);
+      } catch {}
+
+      // Write notification record
+      try {
+        await addDoc(collection(adminDb, "notifications"), {
+          targetUid,
+          targetEmail,
+          title: "Super Admin Access Approved",
+          message: `Congratulations! Your request for Super Admin privileges has been approved by Root Super Admin (${SUPER_ADMIN_EMAIL}). You have been elevated to Super Admin.`,
+          type: "super_admin_approved",
+          createdAt: serverTimestamp(),
+          isRead: false,
+        });
+      } catch {}
+
+      // Resolve matching inquiry tickets if present
+      try {
+        const inqQ = query(collection(adminDb, "inquiries"), where("email", "==", targetEmail));
+        const inqSnap = await getDocs(inqQ);
+        for (const d of inqSnap.docs) {
+          if (d.data().category?.includes("Super Admin")) {
+            await updateDoc(doc(adminDb, "inquiries", d.id), {
+              status: "Resolved",
+              resolution: `Approved by ${SUPER_ADMIN_EMAIL}`,
+              resolvedAt: serverTimestamp(),
+            });
+          }
+        }
+      } catch {}
+
+      toast.success(`Super Admin access approved for ${targetName || targetEmail}! Notification dispatched.`);
+      await logAdminAction("Approved Super Admin Request", targetUid, `Elevated ${targetEmail} to Super Admin`);
+      setReviewRequestModal({ isOpen: false, admin: null });
+    } catch (err: any) {
+      console.error("Failed to approve Super Admin request:", err);
+      toast.error("Failed to approve Super Admin request: " + (err.message || "Unknown error"));
+    }
+  };
+
+  const handleRejectSuperAdminRequest = async (targetUid: string, targetEmail: string, targetName: string) => {
+    try {
+      const updatePayload = {
+        isSuperAdmin: false,
+        superAdminStatus: "rejected",
+        superAdminRejectedBy: SUPER_ADMIN_EMAIL,
+        superAdminRejectedAt: serverTimestamp(),
+        lastNotification: {
+          title: "Super Admin Access Request Declined",
+          message: `Your request for Super Admin privileges was reviewed and declined by the Root Super Admin (${SUPER_ADMIN_EMAIL}).`,
+          type: "rejected",
+          timestamp: new Date().toISOString(),
+          isRead: false,
+        },
+      };
+
+      await updateDoc(doc(adminDb, "admins", targetUid), updatePayload);
+      try {
+        await updateDoc(doc(db, "admins", targetUid), updatePayload);
+      } catch {}
+      try {
+        await updateDoc(doc(adminDb, "users", targetUid), updatePayload);
+      } catch {}
+
+      // Write notification record
+      try {
+        await addDoc(collection(adminDb, "notifications"), {
+          targetUid,
+          targetEmail,
+          title: "Super Admin Access Request Declined",
+          message: `Your request for Super Admin privileges was reviewed and declined by the Root Super Admin (${SUPER_ADMIN_EMAIL}).`,
+          type: "super_admin_rejected",
+          createdAt: serverTimestamp(),
+          isRead: false,
+        });
+      } catch {}
+
+      // Resolve matching inquiry tickets if present
+      try {
+        const inqQ = query(collection(adminDb, "inquiries"), where("email", "==", targetEmail));
+        const inqSnap = await getDocs(inqQ);
+        for (const d of inqSnap.docs) {
+          if (d.data().category?.includes("Super Admin")) {
+            await updateDoc(doc(adminDb, "inquiries", d.id), {
+              status: "Resolved",
+              resolution: `Declined by ${SUPER_ADMIN_EMAIL}`,
+              resolvedAt: serverTimestamp(),
+            });
+          }
+        }
+      } catch {}
+
+      toast.info(`Super Admin request declined for ${targetName || targetEmail}. Notification dispatched.`);
+      await logAdminAction("Rejected Super Admin Request", targetUid, `Declined elevation for ${targetEmail}`);
+      setReviewRequestModal({ isOpen: false, admin: null });
+    } catch (err: any) {
+      console.error("Failed to reject Super Admin request:", err);
+      toast.error("Failed to reject Super Admin request: " + (err.message || "Unknown error"));
+    }
+  };
+
+  const handleDemoteSuperAdmin = (targetUid: string, targetName: string, targetEmail: string) => {
+    if (targetEmail?.trim().toLowerCase() === SUPER_ADMIN_EMAIL) {
+      toast.error("Security Rule: The Root Super Admin account cannot be demoted.");
+      return;
+    }
+
+    setConfirmModal({
+      isOpen: true,
+      title: "Demote Super Admin to Admin Role?",
+      message: `Are you sure you want to remove Super Admin privileges from ${targetName || targetEmail}? Their account will be depromoted back to a standard Administrator role.`,
+      confirmText: "Demote to Admin",
+      cancelText: "Cancel",
+      variant: "warning",
+      itemName: targetName || targetEmail,
+      onConfirm: async () => {
+        try {
+          const updatePayload = {
+            isSuperAdmin: false,
+            superAdminStatus: "none",
+            superAdminRevokedAt: serverTimestamp(),
+            superAdminRevokedBy: SUPER_ADMIN_EMAIL,
+            lastNotification: {
+              title: "Super Admin Status Revoked",
+              message: `Your Super Admin status has been reverted to standard Admin role by Root Super Admin (${SUPER_ADMIN_EMAIL}).`,
+              type: "super_admin_revoked",
+              timestamp: new Date().toISOString(),
+              isRead: false,
+            },
+          };
+
+          await updateDoc(doc(adminDb, "admins", targetUid), updatePayload);
+          try {
+            await updateDoc(doc(db, "admins", targetUid), updatePayload);
+          } catch {}
+          try {
+            await updateDoc(doc(adminDb, "users", targetUid), updatePayload);
+          } catch {}
+
+          // Write notification record
+          try {
+            await addDoc(collection(adminDb, "notifications"), {
+              targetUid,
+              targetEmail,
+              title: "Super Admin Status Revoked",
+              message: `Your Super Admin privileges have been removed by the Root Super Admin (${SUPER_ADMIN_EMAIL}). You are now a standard Administrator.`,
+              type: "super_admin_revoked",
+              createdAt: serverTimestamp(),
+              isRead: false,
+            });
+          } catch {}
+
+          toast.success(`Super Admin role removed for ${targetName || targetEmail}. Depromoted to Admin role.`);
+          await logAdminAction("Demoted Super Admin to Admin", targetUid, `Removed Super Admin role for ${targetEmail}`);
+        } catch (err) {
+          console.error("Failed to demote Super Admin:", err);
+          toast.error("Failed to demote Super Admin.");
+        }
+      },
+    });
   };
 
   const handleOpenUserModal = async (user: any) => {
@@ -798,14 +1141,25 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleDeleteFuelOverride = async (city: string) => {
-    try {
-      await deleteDoc(doc(adminDb, "fuel_overrides", city));
-      toast.success(`Fuel rates override removed for ${city}.`);
-      await logAdminAction("Deleted Fuel Override", city, "Reverted city fuel rates to global baseline");
-    } catch {
-      toast.error("Failed to delete fuel override.");
-    }
+  const handleDeleteFuelOverride = (city: string) => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Remove Fuel Rates Override?",
+      message: `Are you sure you want to delete the manual fuel rate override for ${city}? Rates will automatically revert to the baseline.`,
+      confirmText: "Remove Override",
+      cancelText: "Cancel",
+      variant: "warning",
+      itemName: `City Override: ${city}`,
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(adminDb, "fuel_overrides", city));
+          toast.success(`Fuel rates override removed for ${city}.`);
+          await logAdminAction("Deleted Fuel Override", city, "Reverted city fuel rates to global baseline");
+        } catch {
+          toast.error("Failed to delete fuel override.");
+        }
+      },
+    });
   };
 
   const handleSimulateException = async () => {
@@ -826,17 +1180,28 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
-  const handleClearLogs = async () => {
-    if (!window.confirm("Clear all recorded budget exception logs?")) return;
-    try {
-      const q = await getDocs(collection(adminDb, "budget_logs"));
-      for (const d of q.docs) {
-        await deleteDoc(doc(adminDb, "budget_logs", d.id));
-      }
-      toast.success("All budget exception logs cleared.");
-    } catch {
-      toast.error("Failed to clear logs.");
-    }
+  const handleClearLogs = () => {
+    setConfirmModal({
+      isOpen: true,
+      title: "Clear All Budget Exception Logs?",
+      message: "Are you sure you want to purge all recorded budget exceptions? This action will permanently erase all historical exception telemetry.",
+      confirmText: "Clear All Logs",
+      cancelText: "Cancel",
+      variant: "danger",
+      itemName: `${budgetLogs.length} Exception Records`,
+      onConfirm: async () => {
+        try {
+          const q = await getDocs(collection(adminDb, "budget_logs"));
+          for (const d of q.docs) {
+            await deleteDoc(doc(adminDb, "budget_logs", d.id));
+          }
+          toast.success("All budget exception logs cleared.");
+          await logAdminAction("Cleared Budget Logs", "budget_logs", "Purged all historical logs");
+        } catch {
+          toast.error("Failed to clear logs.");
+        }
+      },
+    });
   };
 
   const regularUsers = useMemo(() => {
@@ -886,9 +1251,18 @@ const AdminDashboard: React.FC = () => {
     return combined;
   }, [adminsList, users]);
 
+  const standardAdminAccounts = useMemo(() => {
+    return allAdminAccounts.filter((u) => {
+      const email = (u.email || "").toLowerCase().trim();
+      const isRoot = email === SUPER_ADMIN_EMAIL;
+      const isApprovedSuper = u.isSuperAdmin === true || u.superAdminStatus === "approved";
+      return !isRoot && !isApprovedSuper;
+    });
+  }, [allAdminAccounts, SUPER_ADMIN_EMAIL]);
+
   const filteredAdmins = useMemo(() => {
     const q = adminSearch.trim().toLowerCase();
-    return allAdminAccounts.filter((u) => {
+    return standardAdminAccounts.filter((u) => {
       if (!q) return true;
       const nameStr = (u.name || "").toLowerCase();
       const emailStr = (u.email || "").toLowerCase();
@@ -901,13 +1275,46 @@ const AdminDashboard: React.FC = () => {
         idStr.includes(q)
       );
     });
-  }, [allAdminAccounts, adminSearch]);
+  }, [standardAdminAccounts, adminSearch]);
 
   const totalAdminPages = Math.ceil(filteredAdmins.length / itemsPerPage) || 1;
   const paginatedAdmins = useMemo(() => {
     const start = (adminPage - 1) * itemsPerPage;
     return filteredAdmins.slice(start, start + itemsPerPage);
   }, [filteredAdmins, adminPage]);
+
+  const allSuperAdminAccounts = useMemo(() => {
+    return allAdminAccounts.filter((u) => {
+      const email = (u.email || "").toLowerCase().trim();
+      const isRoot = email === SUPER_ADMIN_EMAIL;
+      const isApprovedSuper = u.isSuperAdmin === true || u.superAdminStatus === "approved";
+      const isPendingSuper = u.superAdminStatus === "pending";
+      return isRoot || isApprovedSuper || isPendingSuper;
+    });
+  }, [allAdminAccounts, SUPER_ADMIN_EMAIL]);
+
+  const filteredSuperAdmins = useMemo(() => {
+    const q = superAdminSearch.trim().toLowerCase();
+    return allSuperAdminAccounts.filter((u) => {
+      if (!q) return true;
+      const nameStr = (u.name || "").toLowerCase();
+      const emailStr = (u.email || "").toLowerCase();
+      const phoneStr = (u.phone || "").toLowerCase();
+      const idStr = (u.uid || u.id || "").toLowerCase();
+      return (
+        nameStr.includes(q) ||
+        emailStr.includes(q) ||
+        phoneStr.includes(q) ||
+        idStr.includes(q)
+      );
+    });
+  }, [allSuperAdminAccounts, superAdminSearch]);
+
+  const totalSuperAdminPages = Math.ceil(filteredSuperAdmins.length / itemsPerPage) || 1;
+  const paginatedSuperAdmins = useMemo(() => {
+    const start = (superAdminPage - 1) * itemsPerPage;
+    return filteredSuperAdmins.slice(start, start + itemsPerPage);
+  }, [filteredSuperAdmins, superAdminPage]);
 
   const renderAuthProviderBadge = (user: any) => {
     const isGoogle =
@@ -946,42 +1353,34 @@ const AdminDashboard: React.FC = () => {
       <div className="hidden lg:block w-72 xl:w-80 flex-shrink-0" />
 
       <main className="flex-1 space-y-6 max-w-7xl mx-auto pb-12 z-10 w-full min-w-0">
-        <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs">
-          <div className="flex items-center gap-3">
+        <header className="flex items-start sm:items-center justify-between gap-3 p-4 sm:p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs">
+          <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
             {/* Mobile Menu Hamburger Button */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
-              className="lg:hidden p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-[#1e3b34] transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
+              className="lg:hidden p-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:text-[#1e3b34] transition-all shadow-xs cursor-pointer active:scale-95 shrink-0 mt-0.5 sm:mt-0"
               aria-label="Open sidebar menu"
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-[#1e3b34] flex items-center gap-2">
-                Welcome back, <span className="text-[#2ecc71]">{adminName}</span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-lg sm:text-2xl font-bold tracking-tight text-[#1e3b34] leading-tight break-words">
+                Welcome back, <span className="text-[#1eb863]">{adminName}</span>
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-[11px] sm:text-xs text-slate-500 mt-1 leading-relaxed">
                 Tourenvi Operational Intelligence Dashboard • Central Real-time Telemetry
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 self-end sm:self-center">
-            {/* <div className="px-3.5 py-1.5 rounded-xl border border-emerald-200/80 bg-emerald-50/70 flex items-center gap-2 text-xs font-semibold text-emerald-700">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              System Status: {systemHealth}
-            </div> */}
-
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-center">
             <button
               onClick={handleForceSyncData}
               disabled={isSyncing}
               className="p-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-[#1e3b34] transition-all cursor-pointer active:scale-95 shadow-xs disabled:opacity-50"
               title="Force Sync Telemetry & Database Records"
             >
-              <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin text-[#2ecc71]" : ""}`} />
+              <RefreshCw className={`h-4 w-4 ${isSyncing ? "animate-spin text-[#1eb863]" : ""}`} />
             </button>
           </div>
         </header>
@@ -1387,94 +1786,103 @@ const AdminDashboard: React.FC = () => {
                       </td>
                     </tr>
                   ) : paginatedUsers.length > 0 ? (
-                    paginatedUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-slate-50/70 transition-colors duration-150">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <button
-                            onClick={() => handleOpenUserModal(user)}
-                            className="text-left font-bold text-slate-900 hover:text-[#2ecc71] transition-colors group inline-flex items-center gap-1.5 cursor-pointer"
-                          >
-                            <span>{user.name || user.displayName || "Anonymous User"}</span>
-                            <Eye className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 text-[#2ecc71] transition-opacity" />
-                          </button>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-slate-800 font-medium text-xs">{user.email}</div>
-                          <div className="text-xs text-slate-400 mt-0.5">{user.phone || "No phone registered"}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">{renderAuthProviderBadge(user)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                              user.role === "guide"
-                                ? "bg-cyan-50 text-cyan-700 border border-cyan-200"
-                                : user.role === "support"
-                                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                : "bg-blue-50 text-blue-700 border border-blue-200"
-                            }`}
-                          >
-                            {user.role || "user"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                              user.status === "suspended" ? "text-red-600" : "text-emerald-600"
-                            }`}
-                          >
-                            {user.status === "suspended" ? (
-                              <>
-                                <XCircle className="h-3.5 w-3.5" /> Suspended
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="h-3.5 w-3.5" /> Active
-                              </>
-                            )}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right whitespace-nowrap">
-                          <div className="flex justify-end items-center gap-1.5">
+                    paginatedUsers.map((user) => {
+                      const isUserSuperAdmin = user.email?.trim().toLowerCase() === SUPER_ADMIN_EMAIL;
+                      return (
+                        <tr key={user.id} className="hover:bg-slate-50/70 transition-colors duration-150">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <button
                               onClick={() => handleOpenUserModal(user)}
-                              className="p-2 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                              title="View User Details & Saved Trips"
+                              className="text-left font-bold text-slate-900 hover:text-[#2ecc71] transition-colors group inline-flex items-center gap-1.5 cursor-pointer"
                             >
-                              <Eye className="h-4 w-4" />
+                              <span>{user.name || user.displayName || "Anonymous User"}</span>
+                              <Eye className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 text-[#2ecc71] transition-opacity" />
                             </button>
-                            <button
-                              onClick={() => handlePromoteAdmin(user.id)}
-                              className="p-2 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                              title="Promote to Administrator"
-                            >
-                              <ShieldCheck className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleToggleSuspension(user.id, user.status)}
-                              className={`p-2 rounded-xl border transition-all cursor-pointer active:scale-95 shadow-2xs ${
-                                user.status === "suspended"
-                                  ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
-                                  : "border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700"
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-slate-800 font-medium text-xs">{user.email}</div>
+                            <div className="text-xs text-slate-400 mt-0.5">{user.phone || "No phone registered"}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">{renderAuthProviderBadge(user)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                                isUserSuperAdmin
+                                  ? "bg-amber-50 text-amber-800 border border-amber-300"
+                                  : user.role === "guide"
+                                  ? "bg-cyan-50 text-cyan-700 border border-cyan-200"
+                                  : user.role === "support"
+                                  ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                  : "bg-blue-50 text-blue-700 border border-blue-200"
                               }`}
-                              title={user.status === "suspended" ? "Unsuspend / Activate Account" : "Suspend Account"}
+                            >
+                              {isUserSuperAdmin ? "super_admin" : (user.role || "user")}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                                user.status === "suspended" ? "text-red-600" : "text-emerald-600"
+                              }`}
                             >
                               {user.status === "suspended" ? (
-                                <CheckCircle className="h-4 w-4" />
+                                <>
+                                  <XCircle className="h-3.5 w-3.5" /> Suspended
+                                </>
                               ) : (
-                                <UserX className="h-4 w-4" />
+                                <>
+                                  <CheckCircle className="h-3.5 w-3.5" /> {isUserSuperAdmin ? "Active (Protected)" : "Active"}
+                                </>
                               )}
-                            </button>
-                            <button
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="p-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                              title="Delete Account permanently"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right whitespace-nowrap">
+                            <div className="flex justify-end items-center gap-1.5">
+                              <button
+                                onClick={() => handleOpenUserModal(user)}
+                                className="p-2 rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                title="View User Details & Saved Trips"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
+                              {!isUserSuperAdmin && (
+                                <>
+                                  <button
+                                    onClick={() => handlePromoteAdmin(user.id)}
+                                    className="p-2 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                    title="Promote to Administrator"
+                                  >
+                                    <ShieldCheck className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleToggleSuspension(user.id, user.status)}
+                                    className={`p-2 rounded-xl border transition-all cursor-pointer active:scale-95 shadow-2xs ${
+                                      user.status === "suspended"
+                                        ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
+                                        : "border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700"
+                                    }`}
+                                    title={user.status === "suspended" ? "Unsuspend / Activate Account" : "Suspend Account"}
+                                  >
+                                    {user.status === "suspended" ? (
+                                      <CheckCircle className="h-4 w-4" />
+                                    ) : (
+                                      <UserX className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteUser(user.id)}
+                                    className="p-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                    title="Delete Account permanently"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
                       <td colSpan={6} className="text-center py-10 text-slate-500 space-y-2">
@@ -1524,7 +1932,7 @@ const AdminDashboard: React.FC = () => {
                   <ShieldCheck className="h-5 w-5 text-[#2ecc71]" /> Admin Accounts Management
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Administrators with full operational access. Demoting an account automatically moves it to User Management.
+                  Administrators with full operational access. michaelrohin@gmail.com is the sole Root Super Admin.
                 </p>
               </div>
               <div className="relative w-full sm:max-w-md">
@@ -1556,73 +1964,145 @@ const AdminDashboard: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-sm">
                   {paginatedAdmins.length > 0 ? (
-                    paginatedAdmins.map((user) => (
-                      <tr key={user.id} className="hover:bg-slate-50/70 transition-colors duration-150">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="font-bold text-slate-900">{user.name || "Administrator"}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-slate-800 font-medium text-xs">{user.email}</div>
-                          <div className="text-xs text-slate-400 mt-0.5">{user.phone || "No phone registered"}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">{renderAuthProviderBadge(user)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            admin
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
-                              user.status === "suspended" ? "text-red-600" : "text-emerald-600"
-                            }`}
-                          >
-                            {user.status === "suspended" ? (
-                              <>
-                                <XCircle className="h-3.5 w-3.5" /> Suspended
-                              </>
+                    paginatedAdmins.map((user) => {
+                      const isRootSuperAdmin = user.email?.trim().toLowerCase() === SUPER_ADMIN_EMAIL;
+                      const hasSuperAdminPrivileges = isRootSuperAdmin || user.isSuperAdmin === true || user.superAdminStatus === "approved";
+                      const hasPendingSuperRequest = user.superAdminStatus === "pending";
+
+                      return (
+                        <tr key={user.id} className="hover:bg-slate-50/70 transition-colors duration-150">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="font-bold text-slate-900">
+                              {user.name || "Administrator"}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-slate-800 font-medium text-xs">{user.email}</div>
+                            <div className="text-xs text-slate-400 mt-0.5">{user.phone || "No phone registered"}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">{renderAuthProviderBadge(user)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {hasSuperAdminPrivileges ? (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1 inline-flex">
+                                <Crown className="h-3 w-3" /> super admin
+                              </span>
+                            ) : hasPendingSuperRequest ? (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 inline-flex">
+                                <Crown className="h-3 w-3 animate-pulse text-amber-600" /> Pending Approval
+                              </span>
                             ) : (
-                              <>
-                                <CheckCircle className="h-3.5 w-3.5" /> Active
-                              </>
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                admin
+                              </span>
                             )}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right whitespace-nowrap">
-                          <div className="flex justify-end items-center gap-1.5">
-                            <button
-                              onClick={() => handleDemoteAdmin(user.id)}
-                              className="p-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                              title="Demote Admin back to Regular User"
-                            >
-                              <ShieldAlert className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleToggleSuspension(user.id, user.status)}
-                              className={`p-2 rounded-xl border transition-all cursor-pointer active:scale-95 shadow-2xs ${
-                                user.status === "suspended"
-                                  ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
-                                  : "border-red-200 bg-red-50 hover:bg-red-100 text-red-600"
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                                user.status === "suspended" ? "text-red-600" : "text-emerald-600"
                               }`}
-                              title={user.status === "suspended" ? "Unsuspend / Activate Account" : "Suspend Account"}
                             >
                               {user.status === "suspended" ? (
-                                <CheckCircle className="h-4 w-4" />
+                                <>
+                                  <XCircle className="h-3.5 w-3.5" /> Suspended
+                                </>
                               ) : (
-                                <UserX className="h-4 w-4" />
+                                <>
+                                  <CheckCircle className="h-3.5 w-3.5" /> {isRootSuperAdmin ? "Permanent Active" : "Active"}
+                                </>
                               )}
-                            </button>
-                            <button
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="p-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                              title="Delete Account permanently"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right whitespace-nowrap">
+                            <div className="flex justify-end items-center gap-1.5">
+                              {isRootSuperAdmin ? (
+                                <span className="px-2.5 py-1 bg-amber-50 text-amber-800 rounded-xl text-xs font-bold border border-amber-200">
+                                  Protected Super Admin
+                                </span>
+                              ) : (
+                                <>
+                                  {/* Super Admin Review / Request / Demote Option */}
+                                  {isCurrentSuperAdmin ? (
+                                    hasPendingSuperRequest ? (
+                                      <button
+                                        onClick={() => handleOpenReviewRequest(user)}
+                                        className="p-2 rounded-xl border border-amber-400 bg-amber-50 hover:bg-amber-100 text-amber-700 animate-pulse transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                        title="Review & Authorize Super Admin Request"
+                                      >
+                                        <Crown className="h-4 w-4 text-amber-600" />
+                                      </button>
+                                    ) : hasSuperAdminPrivileges ? (
+                                      <button
+                                        onClick={() => handleDemoteSuperAdmin(user.id, user.name || user.email, user.email)}
+                                        className="p-2 rounded-xl border border-amber-400 bg-amber-100 text-amber-900 hover:bg-amber-200 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                        title="Demote Super Admin to standard Admin"
+                                      >
+                                        <Crown className="h-4 w-4 fill-amber-600 text-amber-700" />
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleOpenReviewRequest(user)}
+                                        className="p-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-amber-50 text-slate-600 hover:text-amber-700 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                        title="Authorize as Super Admin"
+                                      >
+                                        <Crown className="h-4 w-4" />
+                                      </button>
+                                    )
+                                  ) : (
+                                    hasPendingSuperRequest ? (
+                                      <span
+                                        className="p-2 rounded-xl border border-amber-200 bg-amber-50 text-amber-700 shadow-2xs cursor-default flex items-center justify-center"
+                                        title="Super Admin elevation request pending authorization by michaelrohin@gmail.com"
+                                      >
+                                        <Crown className="h-4 w-4 animate-pulse text-amber-600" />
+                                      </span>
+                                    ) : !hasSuperAdminPrivileges ? (
+                                      <button
+                                        onClick={() => handleRequestSuperAdmin(user.id, user.email, user.name || "Admin")}
+                                        className="p-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                        title="Request Super Admin Access from michaelrohin@gmail.com"
+                                      >
+                                        <Crown className="h-4 w-4" />
+                                      </button>
+                                    ) : null
+                                  )}
+
+                                  <button
+                                    onClick={() => handleDemoteAdmin(user.id)}
+                                    className="p-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                    title="Demote Admin back to Regular User"
+                                  >
+                                    <ShieldAlert className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleToggleSuspension(user.id, user.status)}
+                                    className={`p-2 rounded-xl border transition-all cursor-pointer active:scale-95 shadow-2xs ${
+                                      user.status === "suspended"
+                                        ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
+                                        : "border-red-200 bg-red-50 hover:bg-red-100 text-red-600"
+                                    }`}
+                                    title={user.status === "suspended" ? "Unsuspend / Activate Account" : "Suspend Account"}
+                                  >
+                                    {user.status === "suspended" ? (
+                                      <CheckCircle className="h-4 w-4" />
+                                    ) : (
+                                      <UserX className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteUser(user.id)}
+                                    className="p-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                    title="Delete Account permanently"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
                       <td colSpan={6} className="text-center py-8 text-slate-500 font-semibold">
@@ -1649,6 +2129,199 @@ const AdminDashboard: React.FC = () => {
                 <button
                   disabled={adminPage === totalAdminPages}
                   onClick={() => setAdminPage((p) => Math.min(totalAdminPages, p + 1))}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
+                >
+                  Next <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "super_admins" && (
+          <div className="p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4 animate-fade-in">
+            <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-amber-500" /> Super Admin Management
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Super administrators with full operational access and privilege management.
+                </p>
+              </div>
+              <div className="relative w-full sm:max-w-md">
+                <Search className="absolute left-3.5 top-3 h-4 w-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search super administrators by name, email or phone..."
+                  value={superAdminSearch}
+                  onChange={(e) => {
+                    setSuperAdminSearch(e.target.value);
+                    setSuperAdminPage(1);
+                  }}
+                  className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#2ecc71] focus:bg-white transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="overflow-x-auto border border-slate-200/80 rounded-xl bg-white shadow-2xs">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50/80 text-xs font-bold text-slate-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 whitespace-nowrap">Administrator Name</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Contact Info</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Login Method</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Access Role</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Status</th>
+                    <th className="px-6 py-4 text-right whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                  {paginatedSuperAdmins.length > 0 ? (
+                    paginatedSuperAdmins.map((user) => {
+                      const isRoot = user.email?.trim().toLowerCase() === SUPER_ADMIN_EMAIL;
+                      const isApproved = isRoot || user.isSuperAdmin === true || user.superAdminStatus === "approved";
+                      const isPending = user.superAdminStatus === "pending";
+
+                      return (
+                        <tr key={user.id || user.uid} className="hover:bg-slate-50/70 transition-colors duration-150">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="font-bold text-slate-900">
+                              {user.name || "Administrator"}
+                            </div>
+                          </td>
+
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-slate-800 font-medium text-xs">{user.email}</div>
+                            <div className="text-xs text-slate-400 mt-0.5">{user.phone || "No phone registered"}</div>
+                          </td>
+
+                          <td className="px-6 py-4 whitespace-nowrap">{renderAuthProviderBadge(user)}</td>
+
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {isApproved ? (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1 inline-flex">
+                                <Crown className="h-3 w-3" /> super admin
+                              </span>
+                            ) : isPending ? (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 flex items-center gap-1 inline-flex">
+                                <Crown className="h-3 w-3 animate-pulse text-amber-600" /> Pending Approval
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                admin
+                              </span>
+                            )}
+                          </td>
+
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span
+                              className={`inline-flex items-center gap-1.5 text-xs font-semibold ${
+                                user.status === "suspended" ? "text-red-600" : "text-emerald-600"
+                              }`}
+                            >
+                              {user.status === "suspended" ? (
+                                <>
+                                  <XCircle className="h-3.5 w-3.5" /> Suspended
+                                </>
+                              ) : (
+                                <>
+                                  <CheckCircle className="h-3.5 w-3.5" /> {isRoot ? "Permanent Active" : "Active"}
+                                </>
+                              )}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4 text-right whitespace-nowrap">
+                            <div className="flex justify-end items-center gap-1.5">
+                              {isRoot ? (
+                                <span className="px-2.5 py-1 bg-amber-50 text-amber-800 rounded-xl text-xs font-bold border border-amber-200">
+                                  Protected Super Admin
+                                </span>
+                              ) : (
+                                <>
+                                  {isPending && isCurrentSuperAdmin && (
+                                    <button
+                                      onClick={() => handleOpenReviewRequest(user)}
+                                      className="p-2 rounded-xl border border-amber-400 bg-amber-50 hover:bg-amber-100 text-amber-700 animate-pulse transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                      title="Review & Authorize Super Admin Request"
+                                    >
+                                      <Crown className="h-4 w-4 text-amber-600" />
+                                    </button>
+                                  )}
+
+                                  {isApproved && isCurrentSuperAdmin && (
+                                    <button
+                                      onClick={() => handleDemoteSuperAdmin(user.id || user.uid, user.name || user.email, user.email)}
+                                      className="p-2 rounded-xl border border-amber-400 bg-amber-100 text-amber-900 hover:bg-amber-200 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                      title="Demote Super Admin to standard Admin"
+                                    >
+                                      <Crown className="h-4 w-4 fill-amber-600 text-amber-700" />
+                                    </button>
+                                  )}
+
+                                  <button
+                                    onClick={() => handleDemoteAdmin(user.id || user.uid)}
+                                    className="p-2 rounded-xl border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                    title="Demote Admin back to Regular User"
+                                  >
+                                    <ShieldAlert className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleToggleSuspension(user.id || user.uid, user.status)}
+                                    className={`p-2 rounded-xl border transition-all cursor-pointer active:scale-95 shadow-2xs ${
+                                      user.status === "suspended"
+                                        ? "border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700"
+                                        : "border-red-200 bg-red-50 hover:bg-red-100 text-red-600"
+                                    }`}
+                                    title={user.status === "suspended" ? "Unsuspend / Activate Account" : "Suspend Account"}
+                                  >
+                                    {user.status === "suspended" ? (
+                                      <CheckCircle className="h-4 w-4" />
+                                    ) : (
+                                      <UserX className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteUser(user.id || user.uid)}
+                                    className="p-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                                    title="Delete Account permanently"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="text-center py-8 text-slate-500 font-semibold">
+                        No super administrator accounts found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {totalSuperAdminPages > 1 && (
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                <button
+                  disabled={superAdminPage === 1}
+                  onClick={() => setSuperAdminPage((p) => Math.max(1, p - 1))}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
+                >
+                  <ChevronLeft className="h-4 w-4" /> Previous
+                </button>
+                <span className="text-xs text-slate-500">
+                  Page <span className="font-semibold text-slate-800">{superAdminPage}</span> of {totalSuperAdminPages}
+                </span>
+                <button
+                  disabled={superAdminPage === totalSuperAdminPages}
+                  onClick={() => setSuperAdminPage((p) => Math.min(totalSuperAdminPages, p + 1))}
                   className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-xs font-bold text-slate-700 cursor-pointer shadow-2xs"
                 >
                   Next <ChevronRight className="h-4 w-4" />
@@ -3117,6 +3790,166 @@ const AdminDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Super Admin Elevation Request Review Card Modal */}
+      {reviewRequestModal.isOpen && reviewRequestModal.admin && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="relative w-full max-w-lg rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-amber-200/90 space-y-5 animate-scale-in">
+            {/* Header */}
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-3 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-md shadow-amber-500/20">
+                  <Crown className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">Super Admin Elevation Request</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Review and authorize super administrative privileges
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setReviewRequestModal({ isOpen: false, admin: null })}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Applicant Details Card */}
+            <div className="p-4 rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-50/70 to-amber-100/30 space-y-3">
+              <div className="flex items-center justify-between border-b border-amber-200/60 pb-2.5">
+                <span className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
+                  <Shield className="h-3.5 w-3.5 text-amber-700" /> Applicant Profile
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-200 text-amber-900 animate-pulse">
+                  Pending Root Review
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-slate-500 font-medium block">Administrator Name</span>
+                  <span className="font-bold text-slate-900 text-sm mt-0.5 block">{reviewRequestModal.admin.name || "Administrator"}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 font-medium block">Current Role</span>
+                  <span className="font-bold text-emerald-700 uppercase tracking-wider mt-0.5 block">{reviewRequestModal.admin.role || "Admin"}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-slate-500 font-medium block">Email Address</span>
+                  <span className="font-semibold text-slate-800 break-all mt-0.5 block">{reviewRequestModal.admin.email}</span>
+                </div>
+                {reviewRequestModal.admin.phone && (
+                  <div className="col-span-2">
+                    <span className="text-slate-500 font-medium block">Contact Number</span>
+                    <span className="font-medium text-slate-700 mt-0.5 block">{reviewRequestModal.admin.phone}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Information Notice */}
+            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed flex items-start gap-2.5">
+              <Info className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <p>
+                As Root Super Admin, accepting this request will elevate this account to <strong>Super Admin</strong> role. Rejecting will keep their standard Admin role. Automated notifications will be sent directly to the applicant upon decision.
+              </p>
+            </div>
+
+            {/* Decision Action Buttons */}
+            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                onClick={() => setReviewRequestModal({ isOpen: false, admin: null })}
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() =>
+                  handleRejectSuperAdminRequest(
+                    reviewRequestModal.admin.id || reviewRequestModal.admin.uid,
+                    reviewRequestModal.admin.email,
+                    reviewRequestModal.admin.name || "Administrator"
+                  )
+                }
+                className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs"
+              >
+                <XCircle className="h-4 w-4" /> Reject Request
+              </button>
+              <button
+                onClick={() =>
+                  handleApproveSuperAdminRequest(
+                    reviewRequestModal.admin.id || reviewRequestModal.admin.uid,
+                    reviewRequestModal.admin.email,
+                    reviewRequestModal.admin.name || "Administrator"
+                  )
+                }
+                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <Crown className="h-4 w-4" /> Accept & Elevate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Live Super Admin Elevation Decision Notification Alert Modal */}
+      {adminAlertNotification && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+          <div className="relative w-full max-w-md rounded-3xl bg-white p-6 sm:p-7 shadow-2xl border border-slate-200/90 space-y-5 text-center animate-scale-in">
+            <div className="flex justify-center">
+              {adminAlertNotification.type === "approved" ? (
+                <div className="p-4 rounded-3xl bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-lg shadow-amber-500/25">
+                  <Crown className="h-10 w-10 animate-bounce" />
+                </div>
+              ) : adminAlertNotification.type === "rejected" ? (
+                <div className="p-4 rounded-3xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/25">
+                  <XCircle className="h-10 w-10" />
+                </div>
+              ) : (
+                <div className="p-4 rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/25">
+                  <ShieldAlert className="h-10 w-10" />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-slate-900">
+                {adminAlertNotification.title}
+              </h3>
+              <p className="text-sm text-slate-600 leading-relaxed font-sans">
+                {adminAlertNotification.message}
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={handleAcknowledgeNotification}
+                className={`w-full py-3 px-6 rounded-xl font-bold text-sm text-white shadow-md transition-all cursor-pointer active:scale-95 ${
+                  adminAlertNotification.type === "approved"
+                    ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-500/20"
+                    : "bg-slate-800 hover:bg-slate-900 shadow-slate-800/20"
+                }`}
+              >
+                {adminAlertNotification.type === "approved" ? "Acknowledge & Access" : "Understood"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unified Custom Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal((prev) => ({ ...prev, isOpen: false }))}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText={confirmModal.confirmText}
+        cancelText={confirmModal.cancelText}
+        variant={confirmModal.variant}
+        itemName={confirmModal.itemName}
+      />
     </div>
   );
 };

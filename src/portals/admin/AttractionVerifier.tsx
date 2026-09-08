@@ -7,6 +7,7 @@ import { db } from "@/firebase";
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { toast } from "sonner";
 import { RefreshCw, MapPin, Check, X, ShieldAlert } from "lucide-react";
+import ConfirmationModal from "@/components/common/ConfirmationModal";
 
 export interface AttractionItem {
   id: string;
@@ -107,8 +108,11 @@ const AttractionVerifier = () => {
     }
   };
 
-  const handleReject = async (id: string) => {
-    if (!window.confirm("Reject and remove this attraction submission?")) return;
+  const [itemToReject, setItemToReject] = useState<AttractionItem | null>(null);
+
+  const executeReject = async () => {
+    if (!itemToReject) return;
+    const id = itemToReject.id;
     try {
       if (id.startsWith("mock-")) {
         setQueue((prev) => prev.filter((item) => item.id !== id));
@@ -120,6 +124,8 @@ const AttractionVerifier = () => {
     } catch (err) {
       console.error("Failed to delete attraction:", err);
       toast.error("Failed to delete attraction.");
+    } finally {
+      setItemToReject(null);
     }
   };
 
@@ -172,13 +178,14 @@ const AttractionVerifier = () => {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                  <Button onClick={() => handleApprove(item.id)} size="sm" className="bg-emerald-600 hover:bg-emerald-700">
+                  <Button onClick={() => handleApprove(item.id)} size="sm" className="bg-emerald-600 hover:bg-emerald-700 cursor-pointer">
                     <Check className="h-3.5 w-3.5 mr-1" /> Approve
                   </Button>
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => handleReject(item.id)}
+                    onClick={() => setItemToReject(item)}
+                    className="cursor-pointer"
                   >
                     <X className="h-3.5 w-3.5 mr-1" /> Reject & Remove
                   </Button>
@@ -188,6 +195,19 @@ const AttractionVerifier = () => {
           ))}
         </div>
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={!!itemToReject}
+        onClose={() => setItemToReject(null)}
+        onConfirm={executeReject}
+        title="Reject Attraction Submission?"
+        message="Are you sure you want to reject and remove this attraction from the verification queue?"
+        confirmText="Reject & Remove"
+        cancelText="Cancel"
+        variant="danger"
+        itemName={itemToReject?.name}
+      />
     </div>
   );
 };

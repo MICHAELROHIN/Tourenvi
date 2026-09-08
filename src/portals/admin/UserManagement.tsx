@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { MapPin, Sparkles, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import ConfirmationModal from "@/components/common/ConfirmationModal";
 
 export interface UserRow {
   id: string;
@@ -143,7 +144,13 @@ const UserManagement = () => {
     }
   };
 
+  const [userToDelete, setUserToDelete] = useState<UserRow | null>(null);
+
   const handleToggleStatus = async (user: UserRow) => {
+    if (user.email?.trim().toLowerCase() === "michaelrohin@gmail.com") {
+      toast.error("Security Protection: The Super Admin account cannot be suspended.");
+      return;
+    }
     const newStatus = user.status === "suspended" ? "active" : "suspended";
     try {
       await updateDoc(doc(adminDb || db, "users", user.id), { status: newStatus });
@@ -153,13 +160,20 @@ const UserManagement = () => {
     }
   };
 
-  const handleDeleteUser = async (user: UserRow) => {
-    if (!window.confirm(`Are you sure you want to delete user ${user.name || user.email}?`)) return;
+  const executeDeleteUser = async () => {
+    if (!userToDelete) return;
+    if (userToDelete.email?.trim().toLowerCase() === "michaelrohin@gmail.com") {
+      toast.error("Security Protection: The Super Admin account cannot be deleted.");
+      setUserToDelete(null);
+      return;
+    }
     try {
-      await deleteDoc(doc(adminDb || db, "users", user.id));
+      await deleteDoc(doc(adminDb || db, "users", userToDelete.id));
       toast.success("User account deleted.");
     } catch (err) {
       toast.error("Failed to delete user.");
+    } finally {
+      setUserToDelete(null);
     }
   };
 
@@ -218,58 +232,69 @@ const UserManagement = () => {
                 </td>
               </tr>
             ) : filtered.length > 0 ? (
-              filtered.map((row) => (
-                <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="p-3 font-semibold text-slate-900">
-                    {row.name || "Anonymous User"}
-                  </td>
-                  <td className="p-3 text-slate-600">{row.email || "N/A"}</td>
-                  <td className="p-3">
-                    <span className="px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200">
-                      {row.role || "user"}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase ${
-                        row.status === "suspended"
-                          ? "bg-red-50 text-red-700 border border-red-200"
-                          : "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                      }`}
-                    >
-                      {row.status || "active"}
-                    </span>
-                  </td>
-                  <td className="p-3 text-right whitespace-nowrap">
-                    <div className="flex justify-end items-center gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleViewUserTrips(row)}
-                        className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 cursor-pointer text-xs"
+              filtered.map((row) => {
+                const isSuper = row.email?.trim().toLowerCase() === "michaelrohin@gmail.com";
+                return (
+                  <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="p-3 font-semibold text-slate-900">
+                      {row.name || "Anonymous User"}
+                    </td>
+                    <td className="p-3 text-slate-600">{row.email || "N/A"}</td>
+                    <td className="p-3">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                        isSuper 
+                          ? "bg-amber-50 text-amber-800 border border-amber-300"
+                          : "bg-blue-50 text-blue-700 border border-blue-200"
+                      }`}>
+                        {isSuper ? "super_admin" : (row.role || "user")}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase ${
+                          row.status === "suspended"
+                            ? "bg-red-50 text-red-700 border border-red-200"
+                            : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        }`}
                       >
-                        View Trips
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => handleToggleStatus(row)}
-                        className="text-xs"
-                      >
-                        {row.status === "suspended" ? "Activate" : "Suspend"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDeleteUser(row)}
-                        className="text-xs"
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                        {isSuper ? "active (permanent)" : (row.status || "active")}
+                      </span>
+                    </td>
+                    <td className="p-3 text-right whitespace-nowrap">
+                      <div className="flex justify-end items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleViewUserTrips(row)}
+                          className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 cursor-pointer text-xs"
+                        >
+                          View Trips
+                        </Button>
+                        {!isSuper && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleToggleStatus(row)}
+                              className="text-xs"
+                            >
+                              {row.status === "suspended" ? "Activate" : "Suspend"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => setUserToDelete(row)}
+                              className="text-xs cursor-pointer"
+                            >
+                              Delete
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td colSpan={5} className="p-8 text-center text-slate-500">
@@ -381,6 +406,19 @@ const UserManagement = () => {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Custom Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={!!userToDelete}
+        onClose={() => setUserToDelete(null)}
+        onConfirm={executeDeleteUser}
+        title="Delete User Account?"
+        message="Are you sure you want to delete this user account? All account access and database profile records will be permanently removed."
+        confirmText="Delete User"
+        cancelText="Cancel"
+        variant="danger"
+        itemName={userToDelete ? (userToDelete.name || userToDelete.email || userToDelete.id) : undefined}
+      />
     </div>
   );
 };

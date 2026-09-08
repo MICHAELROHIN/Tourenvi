@@ -37,7 +37,7 @@ const roleRoutes: Record<UserRole, string> = {
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userRole, currentUser } = useAuth();
+  const { userRole, currentUser, userDoc, isSuperAdmin } = useAuth();
 
   // --- Auth States ---
   const [isRegister, setIsRegister] = useState(false);
@@ -62,7 +62,7 @@ const Login: React.FC = () => {
 
   // --- Redirect Logic ---
   useEffect(() => {
-    if (currentUser && userRole) {
+    if (currentUser && userRole && (isSuperAdmin || userDoc?.status !== "suspended")) {
       const from = (location.state as { from?: string } | null)?.from;
       if (from && from !== "/login") {
         navigate(from, { replace: true });
@@ -72,7 +72,7 @@ const Login: React.FC = () => {
       const target = userRole === "admin" ? "/hero" : (roleRoutes[userRole] || "/hero");
       navigate(target, { replace: true });
     }
-  }, [currentUser, navigate, userRole, location.state]);
+  }, [currentUser, navigate, userRole, userDoc, isSuperAdmin, location.state]);
 
   const routeAfterAuth = (role: UserRole | null) => {
     const from = (location.state as { from?: string } | null)?.from;
@@ -150,6 +150,22 @@ const Login: React.FC = () => {
     try {
       await logout().catch(() => undefined);
       const credential = await loginWithEmail(email, password);
+
+      const userEmail = credential.user.email?.toLowerCase().trim() || "";
+      const isSuper = userEmail === "michaelrohin@gmail.com";
+
+      // Check suspension status from Firestore
+      const adminSnap = await getDoc(doc(db, "admins", credential.user.uid));
+      const userSnap = await getDoc(doc(db, "users", credential.user.uid));
+      const docData = adminSnap.exists() ? adminSnap.data() : (userSnap.exists() ? userSnap.data() : null);
+
+      if (!isSuper && docData?.status === "suspended") {
+        await logout().catch(() => undefined);
+        toast.error("Your account has been temporarily suspended. Please contact the administrator at michaelrohin@gmail.com.");
+        setLoading(false);
+        return;
+      }
+
       const resolvedRole = await resolveExistingAccount(credential.user);
       toast.success("Signed in successfully");
       routeAfterAuth(resolvedRole);
@@ -196,9 +212,23 @@ const Login: React.FC = () => {
     try {
       const credential = await loginWithGoogle();
       if (credential?.user) {
+        const userEmail = credential.user.email?.toLowerCase().trim() || "";
+        const isSuper = userEmail === "michaelrohin@gmail.com";
+
         const adminSnap = await getDoc(doc(db, "admins", credential.user.uid));
         const userRef = doc(db, "users", credential.user.uid);
         const userSnap = await getDoc(userRef);
+
+        const docData = adminSnap.exists() ? adminSnap.data() : (userSnap.exists() ? userSnap.data() : null);
+
+        // Check if account is suspended
+        if (!isSuper && docData?.status === "suspended") {
+          await logout().catch(() => undefined);
+          toast.error("Your account has been temporarily suspended. Please contact the administrator at michaelrohin@gmail.com.");
+          setLoading(false);
+          return;
+        }
+
         let resolvedRole: UserRole = "user";
 
         if (adminSnap.exists()) {
@@ -217,6 +247,7 @@ const Login: React.FC = () => {
             email: credential.user.email || "",
             phone: credential.user.phoneNumber || "",
             role: "user",
+            status: "active",
             createdAt: serverTimestamp(),
           });
         }
