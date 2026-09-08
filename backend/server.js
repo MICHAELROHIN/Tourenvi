@@ -633,7 +633,7 @@ async function resolveWikidataImage(wikidataId) {
       }
     }
   } catch (e) {
-   
+
   }
   return null;
 }

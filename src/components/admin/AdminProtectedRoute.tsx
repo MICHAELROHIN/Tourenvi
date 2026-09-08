@@ -49,12 +49,15 @@ const AdminProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#051124] text-white">
-        <div className="flex flex-col items-center space-y-4 p-8 rounded-2xl border border-white/10 bg-[#0B2B5C]/30 backdrop-blur-xl shadow-2xl">
-          <Loader2 className="h-10 w-10 animate-spin text-[#D4AF37]" />
-          <p className="text-sm font-medium tracking-wide text-gray-300">
-            Verifying Admin Session...
-          </p>
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] text-slate-800 font-['Poppins',sans-serif] p-4">
+        <div className="flex flex-col items-center space-y-4 p-8 rounded-2xl border border-slate-200/80 bg-white shadow-xl max-w-xs w-full text-center animate-fade-in">
+          <div className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200/80 shadow-xs">
+            <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
+          </div>
+          <div className="space-y-1">
+            <h4 className="text-sm font-bold text-slate-800">Verifying Admin Session...</h4>
+            <p className="text-xs text-slate-500">Checking credentials & privileges</p>
+          </div>
         </div>
       </div>
     );
@@ -66,27 +69,23 @@ const AdminProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
   if (userRole !== "admin") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#051124] p-6 text-white">
-        <div className="w-full max-w-md rounded-2xl border border-[#D4AF37]/20 bg-[#0B2B5C]/20 backdrop-blur-xl p-8 text-center shadow-2xl space-y-6 relative overflow-hidden">
-          {/* Decorative glowing orb */}
-          <div className="absolute -top-10 -left-10 w-32 h-32 bg-[#D4AF37]/10 rounded-full blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-[#0B2B5C]/50 rounded-full blur-2xl pointer-events-none" />
-          
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-[#D4AF37]/30 bg-[#0B2B5C]/50 text-[#D4AF37] shadow-[0_0_15px_rgba(212,175,55,0.2)] animate-pulse">
+      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] p-6 text-slate-800 font-['Poppins',sans-serif]">
+        <div className="w-full max-w-md rounded-2xl border border-slate-200/80 bg-white p-8 text-center shadow-xl space-y-6 relative overflow-hidden animate-fade-in">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-600 border border-red-200/80 shadow-xs">
             <ShieldAlert className="h-8 w-8" />
           </div>
           
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold tracking-tight text-white">403 Unauthorized Access</h2>
-            <p className="text-sm text-gray-300 leading-relaxed">
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900">403 Unauthorized Access</h2>
+            <p className="text-sm text-slate-500 leading-relaxed">
               Your account does not possess the administrative privileges required to view the operations panel.
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 pt-2 justify-center">
             <button
               onClick={() => navigate("/")}
-              className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-[#0B2B5C] bg-[#D4AF37] hover:bg-[#D4AF37]/90 rounded-lg transition-all duration-300 shadow-lg shadow-[#D4AF37]/20 active:scale-95 cursor-pointer"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-xs active:scale-95 cursor-pointer"
             >
               <ArrowLeft className="h-4 w-4" />
               Go to Homepage
@@ -96,7 +95,7 @@ const AdminProtectedRoute = ({ children }: { children: React.ReactNode }) => {
                 await signOut(adminAuth);
                 navigate("/admin/login");
               }}
-              className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-gray-200 border border-white/10 hover:bg-white/5 rounded-lg transition-all duration-300 active:scale-95 cursor-pointer"
+              className="flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-slate-700 border border-slate-200 hover:bg-slate-50 rounded-xl transition-all active:scale-95 cursor-pointer"
             >
               <LogOut className="h-4 w-4" />
               Sign Out

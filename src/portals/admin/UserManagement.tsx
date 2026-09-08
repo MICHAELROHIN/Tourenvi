@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { adminAuth, adminDb } from "@/lib/firebaseAdminAuth";
+import { onAuthStateChanged } from "firebase/auth";
 import { db } from "@/firebase";
 import {
   collection,
@@ -25,11 +27,16 @@ export interface UserRow {
   id: string;
   uid?: string;
   name?: string;
+  displayName?: string;
+  fullName?: string;
   email?: string;
   role?: string;
   status?: string;
-  createdAt?: string;
+  createdAt?: any;
   phone?: string;
+  phoneNumber?: string;
+  authProvider?: string;
+  [key: string]: any;
 }
 
 const UserManagement = () => {
@@ -42,24 +49,75 @@ const UserManagement = () => {
   const [userTrips, setUserTrips] = useState<any[]>([]);
   const [loadingTrips, setLoadingTrips] = useState(false);
 
-  useEffect(() => {
-    const unsub = onSnapshot(
-      collection(db, "users"),
-      (snapshot) => {
-        const list: UserRow[] = snapshot.docs.map((d) => ({
+  const fetchUsers = async () => {
+    setLoading(true);
+    try {
+      const snap = await getDocs(collection(adminDb || db, "users"));
+      const list: UserRow[] = snap.docs.map((d) => {
+        const data = d.data();
+        return {
           id: d.id,
-          uid: d.id,
-          ...(d.data() as Omit<UserRow, "id">),
-        }));
-        setUsers(list);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("UserManagement onSnapshot error:", err);
-        setLoading(false);
+          uid: data.uid || d.id,
+          name: data.name || data.displayName || data.fullName || (data.email ? data.email.split("@")[0] : "Traveler"),
+          email: data.email || "",
+          role: data.role || "user",
+          status: data.status || "active",
+          phone: data.phone || data.phoneNumber || "",
+          ...data,
+        };
+      });
+      setUsers(list);
+    } catch (err) {
+      console.error("UserManagement fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    let unsubSnapshot: (() => void) | null = null;
+
+    const unsubAuth = onAuthStateChanged(adminAuth, (user) => {
+      if (unsubSnapshot) {
+        unsubSnapshot();
+        unsubSnapshot = null;
       }
-    );
-    return () => unsub();
+
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      unsubSnapshot = onSnapshot(
+        collection(adminDb, "users"),
+        (snapshot) => {
+          const list: UserRow[] = snapshot.docs.map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              uid: data.uid || d.id,
+              name: data.name || data.displayName || data.fullName || (data.email ? data.email.split("@")[0] : "Traveler"),
+              email: data.email || "",
+              role: data.role || "user",
+              status: data.status || "active",
+              phone: data.phone || data.phoneNumber || "",
+              ...data,
+            };
+          });
+          setUsers(list);
+          setLoading(false);
+        },
+        (err) => {
+          console.warn("UserManagement onSnapshot notice:", err.message);
+          setLoading(false);
+        }
+      );
+    });
+
+    return () => {
+      unsubAuth();
+      if (unsubSnapshot) unsubSnapshot();
+    };
   }, []);
 
   const handleViewUserTrips = async (user: UserRow) => {
@@ -69,7 +127,7 @@ const UserManagement = () => {
 
     try {
       const uid = user.uid || user.id;
-      const q = query(collection(db, "trips"), where("userId", "==", uid));
+      const q = query(collection(adminDb || db, "trips"), where("userId", "==", uid));
       const snap = await getDocs(q);
 
       if (!snap.empty) {
@@ -88,7 +146,7 @@ const UserManagement = () => {
   const handleToggleStatus = async (user: UserRow) => {
     const newStatus = user.status === "suspended" ? "active" : "suspended";
     try {
-      await updateDoc(doc(db, "users", user.id), { status: newStatus });
+      await updateDoc(doc(adminDb || db, "users", user.id), { status: newStatus });
       toast.success(`User account marked as ${newStatus}.`);
     } catch (err) {
       toast.error("Failed to update status.");
@@ -98,18 +156,25 @@ const UserManagement = () => {
   const handleDeleteUser = async (user: UserRow) => {
     if (!window.confirm(`Are you sure you want to delete user ${user.name || user.email}?`)) return;
     try {
-      await deleteDoc(doc(db, "users", user.id));
+      await deleteDoc(doc(adminDb || db, "users", user.id));
       toast.success("User account deleted.");
     } catch (err) {
       toast.error("Failed to delete user.");
     }
   };
 
-  const filtered = users.filter((row) =>
-    [row.name || "", row.email || "", row.role || "", row.status || ""].some(
-      (field) => field.toLowerCase().includes(search.toLowerCase())
-    )
-  );
+  const filtered = users.filter((row) => {
+    const q = search.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (row.name || "").toLowerCase().includes(q) ||
+      (row.email || "").toLowerCase().includes(q) ||
+      (row.role || "").toLowerCase().includes(q) ||
+      (row.status || "").toLowerCase().includes(q) ||
+      (row.phone || "").toLowerCase().includes(q) ||
+      (row.id || row.uid || "").toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="container mx-auto px-4 py-20 space-y-6">
@@ -120,6 +185,10 @@ const UserManagement = () => {
             Inspect accounts, manage security roles, and view user-planned travel itineraries.
           </p>
         </div>
+        <Button onClick={fetchUsers} variant="outline" size="sm" className="gap-2">
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          Refresh Accounts
+        </Button>
       </div>
 
       <Input
@@ -171,29 +240,33 @@ const UserManagement = () => {
                       {row.status || "active"}
                     </span>
                   </td>
-                  <td className="p-3 text-right space-x-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleViewUserTrips(row)}
-                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 cursor-pointer"
-                    >
-                      View Trips
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => handleToggleStatus(row)}
-                    >
-                      {row.status === "suspended" ? "Activate" : "Suspend"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDeleteUser(row)}
-                    >
-                      Delete
-                    </Button>
+                  <td className="p-3 text-right whitespace-nowrap">
+                    <div className="flex justify-end items-center gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleViewUserTrips(row)}
+                        className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 cursor-pointer text-xs"
+                      >
+                        View Trips
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => handleToggleStatus(row)}
+                        className="text-xs"
+                      >
+                        {row.status === "suspended" ? "Activate" : "Suspend"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteUser(row)}
+                        className="text-xs"
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -222,8 +295,8 @@ const UserManagement = () => {
             <div className="space-y-4 pt-2">
               <div className="p-3 rounded-lg bg-slate-50 text-xs flex flex-wrap gap-4 text-slate-600 border border-slate-200">
                 <div>Email: <strong className="text-slate-900">{selectedUser.email}</strong></div>
-                <div>User ID: <strong className="font-mono text-slate-900">{selectedUser.uid || selectedUser.id}</strong></div>
                 <div>Role: <strong className="uppercase text-slate-900">{selectedUser.role || "user"}</strong></div>
+                <div>Status: <strong className="capitalize text-emerald-600">{selectedUser.status || "active"}</strong></div>
               </div>
 
               {loadingTrips ? (
