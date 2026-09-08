@@ -21,11 +21,22 @@ const AdminLogin: React.FC = () => {
     const unsubscribe = onAuthStateChanged(adminAuth, async (user) => {
       if (user) {
         try {
+          const userEmail = user.email?.trim().toLowerCase() || "";
+          const isSuper = userEmail === "michaelrohin@gmail.com";
+
           const adminSnap = await getDoc(doc(adminDb, "admins", user.uid));
           const userDocSnap = adminSnap.exists() ? adminSnap : await getDoc(doc(adminDb, "users", user.uid));
-          if (userDocSnap.exists() && userDocSnap.data().role === "admin") {
-            const from = (location.state as { from?: string } | null)?.from || "/admin";
-            navigate(from, { replace: true });
+          if (userDocSnap.exists()) {
+            const data = userDocSnap.data();
+            if (!isSuper && data.status === "suspended") {
+              await signOut(adminAuth);
+              toast.error("Your admin account has been suspended. Please contact the Super Admin at michaelrohin@gmail.com.");
+              return;
+            }
+            if (data.role === "admin") {
+              const from = (location.state as { from?: string } | null)?.from || "/admin";
+              navigate(from, { replace: true });
+            }
           }
         } catch (error) {
           console.error("Failed to query user profile in AdminLogin session listener:", error);
@@ -47,20 +58,36 @@ const AdminLogin: React.FC = () => {
       // 1. Sign in with isolated adminAuth instance
       const credential = await signInWithEmailAndPassword(adminAuth, email.trim(), password);
 
-      // 2. Fetch User Profile from Firestore to check Role (Check admins collection first, then users)
+      const userEmail = credential.user.email?.trim().toLowerCase() || "";
+      const isSuper = userEmail === "michaelrohin@gmail.com";
+
+      // 2. Fetch User Profile from Firestore to check Role and Status
       let role: string | null = null;
+      let status = "active";
       try {
         const adminSnap = await getDoc(doc(adminDb, "admins", credential.user.uid));
         if (adminSnap.exists()) {
-          role = adminSnap.data().role || "admin";
+          const data = adminSnap.data();
+          role = data.role || "admin";
+          status = data.status || "active";
         } else {
           const userDocSnap = await getDoc(doc(adminDb, "users", credential.user.uid));
           if (userDocSnap.exists()) {
-            role = userDocSnap.data().role;
+            const data = userDocSnap.data();
+            role = data.role;
+            status = data.status || "active";
           }
         }
       } catch (firestoreErr) {
         console.warn("Admin Firestore role check error:", firestoreErr);
+      }
+
+      // Check suspension status
+      if (!isSuper && status === "suspended") {
+        await signOut(adminAuth);
+        toast.error("Access denied. This administrator account has been temporarily suspended.");
+        setLoading(false);
+        return;
       }
 
       if (role !== "admin") {
@@ -71,7 +98,7 @@ const AdminLogin: React.FC = () => {
       }
 
       // Success
-      toast.success("Welcome back, Commander.");
+      toast.success(isSuper ? "Welcome back, Super Admin." : "Welcome back, Commander.");
       navigate("/admin", { replace: true });
     } catch (error: unknown) {
       console.error("Admin sign in error:", error);

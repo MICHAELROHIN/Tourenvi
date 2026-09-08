@@ -39,18 +39,18 @@ import ErrorBoundary from "@/components/shared/ErrorBoundary";
 const queryClient = new QueryClient();
 
 const AuthGate = ({ children }: { children: React.ReactNode }) => {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, userDoc, isSuperAdmin } = useAuth();
   if (loading) return null;
-  if (currentUser) {
+  if (currentUser && (isSuperAdmin || userDoc?.status !== "suspended")) {
     return <Navigate to="/hero" replace />;
   }
   return <>{children}</>;
 };
 
 const RootRedirect = () => {
-  const { currentUser, loading, userRole } = useAuth();
+  const { currentUser, loading, userRole, userDoc, isSuperAdmin } = useAuth();
   if (loading) return null;
-  if (currentUser) {
+  if (currentUser && (isSuperAdmin || userDoc?.status !== "suspended")) {
     const roleRoutes: Record<string, string> = {
       user: "/hero",
       admin: "/hero", // Admins land on /hero user homepage by default from root

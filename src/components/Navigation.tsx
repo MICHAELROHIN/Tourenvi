@@ -153,11 +153,9 @@ const Navigation = () => {
       console.error("Error deleting account:", error);
       setIsDeleteModalOpen(false);
       if (error.code === "auth/requires-recent-login") {
-        alert(
-          "Security Check: Please Sign Out and Log In again before deleting your account.",
-        );
+        toast.error("Security Check: Please Sign Out and Log In again before deleting your account.");
       } else {
-        alert("Failed to delete account. Please try again.");
+        toast.error("Failed to delete account. Please try again.");
       }
     }
   };
