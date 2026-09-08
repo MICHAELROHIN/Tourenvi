@@ -32,13 +32,9 @@ import {
   Loader2,
   Bed,
   Sparkles,
-  Calendar as CalendarIcon,
+  Calendar,
   LocateFixed,
 } from "lucide-react";
-import { Calendar as CalendarUI } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
-import MaterialClockPicker from "@/components/trip/MaterialClockPicker";
 import { toast } from "sonner";
 import axios from "axios";
 import { getLiveLocationName, getCurrentPositionAsync } from "@/utils/Livelocationservice";
@@ -86,19 +82,15 @@ const ElitePlanner = () => {
   const { currentUser } = useAuth();
   const [searchParams] = useSearchParams();
   const [currentStage, setCurrentStage] = useState(0);
-  const [maxStageReached, setMaxStageReached] = useState(0);
   const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
-    if (currentStage > maxStageReached) {
-      setMaxStageReached(currentStage);
-    }
     stepRefs.current[currentStage]?.scrollIntoView({
       behavior: "smooth",
       inline: "center",
       block: "nearest",
     });
-  }, [currentStage, maxStageReached]);
+  }, [currentStage]);
 
   useEffect(() => {
     const step = searchParams.get("step") || searchParams.get("stage");
@@ -108,7 +100,6 @@ const ElitePlanner = () => {
   }, [searchParams]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [timePickerOpen, setTimePickerOpen] = useState(false);
   const [carSuggestions, setCarSuggestions] = useState<Array<{ brand: string; model: string; fuel: string; mileage: number }>>([]);
   const [customCarName, setCustomCarName] = useState("");
   const [customMileage, setCustomMileage] = useState(String(trip.mileage || 15));
@@ -610,8 +601,8 @@ const ElitePlanner = () => {
     }
   };
 
-  const isStageValid = (stageIndex: number = currentStage) => {
-    switch (stageIndex) {
+  const isStageValid = () => {
+    switch (currentStage) {
       case 0:
         return !!trip.tripType && trip.numberOfMembers > 0;
       case 1:
@@ -632,14 +623,6 @@ const ElitePlanner = () => {
       default:
         return true;
     }
-  };
-
-  const canNavigateToStage = (targetIndex: number) => {
-    if (targetIndex <= currentStage || targetIndex <= maxStageReached) return true;
-    for (let i = 0; i < targetIndex; i++) {
-      if (!isStageValid(i)) return false;
-    }
-    return true;
   };
 
   const handleNext = () => {
@@ -715,7 +698,13 @@ const ElitePlanner = () => {
             </span>
           </div>
 
-
+          {/* Desktop connecting line */}
+          <div className="hidden md:block relative w-full mb-0">
+            <div className="absolute left-0 top-1/2 w-full h-0.5 bg-gray-200 -z-10 -translate-y-1/2"></div>
+            <div
+              className={`absolute left-0 top-1/2 h-0.5 bg-emerald-500 -z-10 -translate-y-1/2 transition-all duration-500 ${trackerWidthClasses[currentStage] || "w-[12.5%]"}`}
+            ></div>
+          </div>
 
           {/* Steps container (scrollable on mobile, evenly distributed on desktop) */}
           <div className="flex items-center justify-start md:justify-between gap-2 sm:gap-4 overflow-x-auto no-scrollbar py-1 px-1 relative">
@@ -727,14 +716,10 @@ const ElitePlanner = () => {
                   key={stage}
                   ref={(el) => (stepRefs.current[index] = el)}
                   onClick={() => {
-                    if (canNavigateToStage(index)) {
-                      setCurrentStage(index);
-                    } else {
-                      toast.error("Please complete required details in previous steps first.");
-                    }
+                    if (index < currentStage) setCurrentStage(index);
                   }}
                   className={`flex flex-col items-center gap-1 sm:gap-2 shrink-0 px-1 sm:px-2 cursor-pointer transition-all ${
-                    canNavigateToStage(index) ? "hover:opacity-80" : "opacity-60 cursor-not-allowed"
+                    index < currentStage ? "hover:opacity-80" : ""
                   }`}
                 >
                   <div
@@ -852,163 +837,69 @@ const ElitePlanner = () => {
                           value={trip.startLocation}
                           onChange={(e) => updateTrip("startLocation", e.target.value)}
                           placeholder={isDetectingLocation ? "Fetching live GPS location..." : "e.g. Chennai, India"}
-                          className="pl-10 pr-24 h-10 sm:h-11 text-xs sm:text-sm bg-white border border-gray-100/90 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)] focus:shadow-[0_6px_20px_rgba(0,0,0,0.08)] focus:border-gray-200/80 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-all duration-300"
+                          className="pl-11 pr-24 h-12 sm:h-14 text-base sm:text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20"
                         />
                         {locationDetected && trip.startLocation && !isDetectingLocation && (
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                            <CheckCircle2 size={11} className="text-emerald-600" /> GPS Live
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                            <CheckCircle2 size={12} className="text-emerald-600" /> GPS Live
                           </span>
                         )}
                       </div>
                     </div>
 
                     <div className="relative">
-                      <label className="block text-xs sm:text-sm font-semibold text-emerald-800 mb-1.5">Destination</label>
+                      <label className="block text-xs sm:text-sm font-semibold text-emerald-800 mb-2">Destination</label>
                       <div className="relative">
-                        <MapPin className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-600" size={16} />
+                        <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600" size={18} />
                         <Input
                           value={trip.destinations[0] || ""}
                           onChange={(e) => updateTrip("destinations", [e.target.value])}
                           placeholder="e.g. Ooty, Tamil Nadu"
-                          className="pl-10 h-10 sm:h-11 text-xs sm:text-sm bg-white border border-gray-100/90 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)] focus:shadow-[0_6px_20px_rgba(0,0,0,0.08)] focus:border-gray-200/80 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 transition-all duration-300"
+                          className="pl-11 h-12 sm:h-14 text-base sm:text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pt-3.5 border-t border-gray-100/60">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pt-4 border-t border-gray-100">
                     <div className="relative">
-                      <label className="block text-xs sm:text-sm font-semibold text-emerald-800 mb-1.5">Start Date</label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button
-                            type="button"
-                            className="w-full h-10 sm:h-11 px-3.5 flex items-center justify-between text-left text-xs sm:text-sm bg-white border border-gray-100/90 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)] focus:shadow-[0_6px_20px_rgba(0,0,0,0.08)] transition-all duration-300 cursor-pointer"
-                          >
-                            <span className={trip.startDate ? "font-normal text-emerald-900" : "text-gray-400"}>
-                              {(() => {
-                                if (!trip.startDate) return "Select start date";
-                                const parts = trip.startDate.split("-");
-                                if (parts.length === 3) {
-                                  const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                                  return format(d, "dd - MM - yyyy");
-                                }
-                                return trip.startDate;
-                              })()}
-                            </span>
-                            <CalendarIcon size={16} className="text-emerald-600 shrink-0" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-3 bg-white border border-gray-100/90 rounded-2xl shadow-2xl z-50" align="start">
-                          <CalendarUI
-                            mode="single"
-                            selected={(() => {
-                              if (!trip.startDate) return undefined;
-                              const parts = trip.startDate.split("-");
-                              return parts.length === 3 ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])) : undefined;
-                            })()}
-                            onSelect={(date) => {
-                              if (date) {
-                                const formatted = format(date, "yyyy-MM-dd");
-                                updateTrip("startDate", formatted);
-                                if (trip.endDate) {
-                                  const endParts = trip.endDate.split("-");
-                                  if (endParts.length === 3) {
-                                    const endD = new Date(parseInt(endParts[0]), parseInt(endParts[1]) - 1, parseInt(endParts[2]));
-                                    if (endD < date) updateTrip("endDate", formatted);
-                                  }
-                                }
-                              }
-                            }}
-                            disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                            className="rounded-xl"
-                            classNames={{
-                              day_selected: "bg-emerald-600 text-white hover:bg-emerald-700 font-bold rounded-lg shadow-sm",
-                              day_today: "bg-emerald-50 text-emerald-800 font-semibold rounded-lg",
-                            }}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <label className="block text-xs sm:text-sm font-semibold text-emerald-800 mb-2">Start Date</label>
+                      <div className="relative">
+                        <Input
+                          type="date"
+                          value={trip.startDate}
+                          min={new Date().toISOString().split('T')[0]}
+                          onChange={(e) => updateTrip("startDate", e.target.value)}
+                          onClick={(e) => {
+                            try {
+                              e.currentTarget.showPicker();
+                            } catch (err) {
+                              console.error("Error opening date picker: ", err);
+                            }
+                          }}
+                          className="h-12 sm:h-14 text-base sm:text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20 focus:ring-2 cursor-pointer"
+                        />
+                      </div>
                     </div>
 
                     <div className="relative">
-                      <label className="block text-xs sm:text-sm font-semibold text-emerald-800 mb-1.5">End Date</label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <button
-                            type="button"
-                            className="w-full h-10 sm:h-11 px-3.5 flex items-center justify-between text-left text-xs sm:text-sm bg-white border border-gray-100/90 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-[0_4px_14px_rgba(0,0,0,0.06)] focus:shadow-[0_6px_20px_rgba(0,0,0,0.08)] transition-all duration-300 cursor-pointer"
-                          >
-                            <span className={trip.endDate ? "font-normal text-emerald-900" : "text-gray-400"}>
-                              {(() => {
-                                if (!trip.endDate) return "Select end date";
-                                const parts = trip.endDate.split("-");
-                                if (parts.length === 3) {
-                                  const d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                                  return format(d, "dd - MM - yyyy");
-                                }
-                                return trip.endDate;
-                              })()}
-                            </span>
-                            <CalendarIcon size={16} className="text-emerald-600 shrink-0" />
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-3 bg-white border border-gray-100/90 rounded-2xl shadow-2xl z-50" align="start">
-                          <CalendarUI
-                            mode="single"
-                            selected={(() => {
-                              if (!trip.endDate) return undefined;
-                              const parts = trip.endDate.split("-");
-                              return parts.length === 3 ? new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])) : undefined;
-                            })()}
-                            onSelect={(date) => {
-                              if (date) {
-                                const formatted = format(date, "yyyy-MM-dd");
-                                updateTrip("endDate", formatted);
-                              }
-                            }}
-                            disabled={(date) => {
-                              const today = new Date(new Date().setHours(0, 0, 0, 0));
-                              if (!trip.startDate) return date < today;
-                              const parts = trip.startDate.split("-");
-                              if (parts.length === 3) {
-                                const startD = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
-                                return date < startD;
-                              }
-                              return date < today;
-                            }}
-                            className="rounded-xl"
-                            classNames={{
-                              day_selected: "bg-emerald-600 text-white hover:bg-emerald-700 font-bold rounded-lg shadow-sm",
-                              day_today: "bg-emerald-50 text-emerald-800 font-semibold rounded-lg",
-                            }}
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-
-                  {/* Centered Start Time Picker with Material Clock Popover */}
-                  <div className="flex flex-col items-center justify-center pt-2 pb-1">
-                    <div className="w-full max-w-[200px] text-center">
-                      <Popover open={timePickerOpen} onOpenChange={setTimePickerOpen}>
-                        <PopoverTrigger asChild>
-                          <button
-                            type="button"
-                            className="w-full h-10 sm:h-11 px-3.5 flex items-center justify-center gap-2.5 text-xs sm:text-sm font-normal bg-white border border-gray-100/90 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.03)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.06)] focus:shadow-[0_6px_24px_rgba(0,0,0,0.08)] transition-all duration-300 cursor-pointer"
-                          >
-                            <Clock size={16} className="text-emerald-600 shrink-0" />
-                            <span className="text-emerald-900 font-normal font-sans">{trip.startTime || "00:00"}</span>
-                          </button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-4 bg-white border border-gray-100/90 rounded-2xl shadow-2xl z-50" align="center">
-                          <MaterialClockPicker
-                            value={trip.startTime || "00:00"}
-                            onChange={(newTime) => updateTrip("startTime", newTime)}
-                            onClose={() => setTimePickerOpen(false)}
-                          />
-                        </PopoverContent>
-                      </Popover>
+                      <label className="block text-xs sm:text-sm font-semibold text-emerald-800 mb-2">End Date</label>
+                      <div className="relative">
+                        <Input
+                          type="date"
+                          value={trip.endDate}
+                          min={trip.startDate || new Date().toISOString().split('T')[0]}
+                          onChange={(e) => updateTrip("endDate", e.target.value)}
+                          onClick={(e) => {
+                            try {
+                              e.currentTarget.showPicker();
+                            } catch (err) {
+                              console.error("Error opening date picker: ", err);
+                            }
+                          }}
+                          className="h-12 sm:h-14 text-base sm:text-lg bg-gray-50 border-gray-200 focus:border-emerald-600 focus:ring-emerald-600/20 focus:ring-2 cursor-pointer"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1481,7 +1372,7 @@ const ElitePlanner = () => {
 
                     <div className="flex items-center gap-3 pt-1">
                       <div className="p-2 rounded-lg bg-emerald-50 text-emerald-700 shrink-0">
-                        <CalendarIcon size={18} />
+                        <Calendar size={18} />
                       </div>
                       <div className="text-xs sm:text-sm font-semibold text-gray-700">
                         <span className="text-gray-400 uppercase font-bold text-[10px] block">Travel Timeline</span>

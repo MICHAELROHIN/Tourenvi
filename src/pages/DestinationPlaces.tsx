@@ -366,7 +366,7 @@ const DestinationPlaces = () => {
                       <img src={place.imageUrl} alt={place.name} className="h-full w-full object-cover transition duration-500 hover:scale-105" />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
                       <div className="absolute bottom-4 left-4 right-4">
-                        <span className="inline-flex rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-900">
+                        <span className="inline-flex rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-gt-blue">
                           {place.category}
                         </span>
                         <h3 className="mt-2 text-2xl font-serif font-semibold text-white drop-shadow-sm leading-tight">
