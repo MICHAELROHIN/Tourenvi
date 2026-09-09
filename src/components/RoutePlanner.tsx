@@ -39,7 +39,6 @@ import {
 } from "lucide-react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "@/firebase";
-import { toast } from "sonner";
 import { useOfflineMap } from "@/hooks/useOfflineMap";
 
 // Fix Leaflet default marker icon issue with bundlers
@@ -468,7 +467,7 @@ const RoutePlanner = ({
 
   const getDistanceData = async () => {
     if (!origin || !destination) {
-      toast.warning("Please enter both origin and destination locations.");
+      alert("Enter both origin and destination");
       return;
     }
 
@@ -486,7 +485,9 @@ const RoutePlanner = ({
       ]);
 
       if (!originGeo || !destGeo) {
-        toast.error("Could not find one or both locations. Try being more specific (e.g. 'Chennai, India').");
+        alert(
+          "Could not find one or both locations. Try being more specific (e.g. 'Chennai, India').",
+        );
         setLoading(false);
         return;
       }
@@ -505,7 +506,7 @@ const RoutePlanner = ({
         !routeData.routes ||
         routeData.routes.length === 0
       ) {
-        toast.error("Could not find a driving route between these locations.");
+        alert("Could not find a driving route between these locations.");
         setLoading(false);
         return;
       }
@@ -516,36 +517,36 @@ const RoutePlanner = ({
 
       const steps = bestRoute.legs?.[0]?.steps || [];
       const labels = [];
-      for (const step of steps) {
-        if (step.name && step.name.trim() !== "") {
-          labels.push(step.name);
-        }
+      for (
+        let i = 0;
+        i < steps.length;
+        i += Math.max(1, Math.floor(steps.length / 8))
+      ) {
+        const step = steps[i];
+        if (!step?.maneuver?.location) continue;
+        labels.push({
+          lat: step.maneuver.location[1],
+          lng: step.maneuver.location[0],
+          text: `~${Math.max(1, Math.round(step.duration / 60))} min`,
+        });
       }
+      setSegmentLabels(labels);
 
-      const tollData = estimateTolls(originGeo.display, destGeo.display);
-      setTolls(tollData);
+      // 3. Calculate tolls
+      const tollData = calculateTollsOnRoute(coords);
+      setActiveTolls(tollData.markers);
 
-      const durationMinutes = Math.round(bestRoute.duration / 60);
-      const hours = Math.floor(durationMinutes / 60);
-      const minutes = durationMinutes % 60;
-      const durationText =
-        hours > 0 ? `${hours} hr ${minutes} min` : `${minutes} min`;
-
-      const routeSummary =
-        labels.length > 0
-          ? labels.slice(0, 3).join(" → ")
-          : "Primary highway route";
-
+      // 4. Build route info
+      const routeSummary = bestRoute.legs[0]?.summary || "Driving Route";
       const routeOption: RouteOption = {
-        id: "osrm-fastest",
-        name: "Fastest Driving Route",
-        distance: `${(bestRoute.distance / 1000).toFixed(1)} km`,
-        duration: durationText,
-        durationMinutes,
-        tollCost: `₹${tollData.cost}`,
-        tollLocations: tollData.locations,
+        id: "0",
+        name: routeSummary || "Fastest Route",
+        distance: formatDistance(bestRoute.distance),
+        duration: formatDuration(bestRoute.duration),
+        tollCost: tollData.cost,
+        tollCount: tollData.count,
         type: "fastest",
-        description: `Via ${routeSummary}`,
+        description: `${originGeo.display.split(",")[0]} → ${destGeo.display.split(",")[0]}`,
         highlights: [routeSummary],
       };
 
@@ -560,7 +561,7 @@ const RoutePlanner = ({
       });
     } catch (err) {
       console.error("Route error:", err);
-      toast.error("An error occurred while fetching the route. Please try again.");
+      alert("An error occurred while fetching the route. Please try again.");
     } finally {
       setLoading(false);
     }

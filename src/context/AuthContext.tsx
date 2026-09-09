@@ -6,24 +6,15 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { doc, onSnapshot, setDoc, deleteDoc, getDoc, type DocumentData } from "firebase/firestore";
-import { auth, db, getGoogleRedirectResult, logout, type UserRole } from "@/firebase";
-import { onAuthStateChanged, type User } from "firebase/auth";
-import { toast } from "sonner";
-
-export const SUPER_ADMIN_EMAIL = "michaelrohin@gmail.com";
-
-export const isSuperAdminEmail = (email?: string | null): boolean => {
-  if (!email) return false;
-  return email.trim().toLowerCase() === SUPER_ADMIN_EMAIL;
-};
+import { doc, onSnapshot, setDoc, deleteDoc, type DocumentData } from "firebase/firestore";
+import { auth, db, onAuthChange, getGoogleRedirectResult, type UserRole } from "@/firebase";
+import type { User } from "firebase/auth";
 
 type AuthContextValue = {
   currentUser: User | null;
   userRole: UserRole | null;
   userDoc: DocumentData | null;
   loading: boolean;
-  isSuperAdmin: boolean;
 };
 
 const AuthContext = createContext<AuthContextValue>({
@@ -31,7 +22,6 @@ const AuthContext = createContext<AuthContextValue>({
   userRole: null,
   userDoc: null,
   loading: true,
-  isSuperAdmin: false,
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -41,129 +31,71 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let unsubs: (() => void)[] = [];
+    let unsubscribeUserDoc: (() => void) | null = null;
 
-    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
-      // Clear previous snapshot listeners
-      unsubs.forEach((u) => {
-        try { u(); } catch {}
-      });
-      unsubs = [];
+    const unsubscribeAuth = onAuthChange((user, role) => {
+      setCurrentUser(user);
+
+      if (unsubscribeUserDoc) {
+        unsubscribeUserDoc();
+        unsubscribeUserDoc = null;
+      }
 
       if (!user) {
-        setCurrentUser(null);
-        setUserRole(null);
         setUserDoc(null);
         setLoading(false);
         return;
       }
 
-      const userEmail = user.email?.trim().toLowerCase() || "";
-      const isSuper = userEmail === SUPER_ADMIN_EMAIL;
+      // Render protected routes immediately once auth is known.
+      setLoading(false);
 
-      // 1. Initial lookup to block suspended users before unlocking loading gate
-      try {
-        const [adminSnap, userSnap] = await Promise.all([
-          getDoc(doc(db, "admins", user.uid)).catch(() => null),
-          getDoc(doc(db, "users", user.uid)).catch(() => null),
-        ]);
-
-        const docData = adminSnap?.exists()
-          ? adminSnap.data()
-          : userSnap?.exists()
-          ? userSnap.data()
-          : null;
-
-        if (!isSuper && docData?.status === "suspended") {
-          await logout().catch(() => undefined);
-          setCurrentUser(null);
-          setUserRole(null);
-          setUserDoc(null);
-          setLoading(false);
-          toast.error("Your account has been temporarily suspended. Please contact the administrator at michaelrohin@gmail.com.");
-          return;
-        }
-
-        // Account is active
-        setCurrentUser(user);
-        if (adminSnap?.exists()) {
-          setUserDoc({ ...adminSnap.data(), isSuperAdmin: isSuper || !!adminSnap.data().isSuperAdmin });
-          setUserRole("admin");
-        } else if (userSnap?.exists()) {
-          const uData = userSnap.data();
-          if (uData.role === "admin") {
-            setDoc(doc(db, "admins", user.uid), { ...uData, role: "admin" }).then(() => {
-              deleteDoc(doc(db, "users", user.uid)).catch(() => {});
-            }).catch(() => {});
-            setUserDoc({ ...uData, role: "admin", isSuperAdmin: isSuper || !!uData.isSuperAdmin });
-            setUserRole("admin");
-          } else {
-            setUserDoc({ ...uData, isSuperAdmin: isSuper });
-            setUserRole((uData.role as UserRole) || "user");
-          }
-        } else {
-          setUserDoc({ isSuperAdmin: isSuper, status: "active", role: "user" });
-          setUserRole("user");
-        }
-      } catch (err) {
-        console.warn("Initial user doc check warning:", err);
-        setCurrentUser(user);
-        setUserRole("user");
-      } finally {
-        setLoading(false);
-      }
-
-      // 2. Realtime listener for live suspension enforcement
-      const unsubAdmins = onSnapshot(
+      // Check admins collection first, then fallback to users collection
+      unsubscribeUserDoc = onSnapshot(
         doc(db, "admins", user.uid),
         (adminSnap) => {
           if (adminSnap.exists()) {
             const data = adminSnap.data();
-            if (!isSuper && data.status === "suspended") {
-              logout().catch(() => undefined);
-              setCurrentUser(null);
-              setUserDoc(null);
-              setUserRole(null);
-              toast.error("Your account has been temporarily suspended. Please contact the administrator.");
-              return;
-            }
-            setUserDoc({ ...data, isSuperAdmin: isSuper || !!data.isSuperAdmin });
+            setUserDoc(data);
             setUserRole("admin");
+            setLoading(false);
+          } else {
+            onSnapshot(
+              doc(db, "users", user.uid),
+              (userSnap) => {
+                const data = userSnap.exists() ? userSnap.data() : null;
+                if (data && data.role === "admin") {
+                  // Auto-migrate legacy admin document to admins collection
+                  setDoc(doc(db, "admins", user.uid), { ...data, role: "admin" }).then(() => {
+                    deleteDoc(doc(db, "users", user.uid));
+                  });
+                  setUserDoc({ ...data, role: "admin" });
+                  setUserRole("admin");
+                } else {
+                  setUserDoc(data);
+                  setUserRole((data?.role as UserRole | undefined) ?? role ?? "user");
+                }
+                setLoading(false);
+              },
+              () => {
+                setUserDoc(null);
+                setLoading(false);
+              }
+            );
           }
         },
-        () => {}
+        () => {
+          setUserDoc(null);
+          setLoading(false);
+        }
       );
-      unsubs.push(unsubAdmins);
-
-      const unsubUsers = onSnapshot(
-        doc(db, "users", user.uid),
-        (userSnap) => {
-          if (userSnap.exists()) {
-            const data = userSnap.data();
-            if (!isSuper && data.status === "suspended") {
-              logout().catch(() => undefined);
-              setCurrentUser(null);
-              setUserDoc(null);
-              setUserRole(null);
-              toast.error("Your account has been temporarily suspended. Please contact the administrator.");
-              return;
-            }
-            if (data.role !== "admin") {
-              setUserDoc({ ...data, isSuperAdmin: isSuper });
-              setUserRole((data.role as UserRole) || "user");
-            }
-          }
-        },
-        () => {}
-      );
-      unsubs.push(unsubUsers);
     });
 
     return () => {
       unsubscribeAuth();
-      unsubs.forEach((u) => {
-        try { u(); } catch {}
-      });
+      if (unsubscribeUserDoc) {
+        unsubscribeUserDoc();
+      }
     };
   }, []);
 
@@ -174,19 +106,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
   }, []);
 
-  const isSuperAdmin = useMemo(() => {
-    return isSuperAdminEmail(currentUser?.email) || userDoc?.isSuperAdmin === true;
-  }, [currentUser, userDoc]);
-
   const value = useMemo(
     () => ({
       currentUser,
       userRole,
       userDoc,
       loading,
-      isSuperAdmin,
     }),
-    [currentUser, userRole, userDoc, loading, isSuperAdmin],
+    [currentUser, userRole, userDoc, loading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

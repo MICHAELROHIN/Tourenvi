@@ -7,7 +7,6 @@ import {
   LayoutDashboard,
   Users,
   ShieldCheck,
-  Crown,
   Navigation,
   Fuel,
   FileWarning,
@@ -15,8 +14,10 @@ import {
   Leaf,
   UserCheck,
   Headphones,
+  DollarSign,
   Activity,
   History,
+  AlertTriangle,
   Megaphone,
   X,
 } from "lucide-react";
@@ -25,7 +26,6 @@ export type AdminTab =
   | "overview"
   | "users"
   | "admins"
-  | "super_admins"
   | "fleet"
   | "fuel"
   | "logs"
@@ -123,11 +123,6 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
       icon: ShieldCheck,
     },
     {
-      id: "super_admins" as AdminTab,
-      label: "Super Admin Management",
-      icon: Crown,
-    },
-    {
       id: "fleet" as AdminTab,
       label: "Live Fleet Tracker",
       icon: Navigation,
@@ -171,38 +166,20 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
     }
   };
 
-  const getInitials = (name?: string, email?: string) => {
-    if (name && name.trim()) {
-      const parts = name.trim().split(/\s+/);
-      if (parts.length >= 2) {
-        return (parts[0][0] + parts[1][0]).toUpperCase();
-      }
-      return name.substring(0, 2).toUpperCase();
-    }
-    if (email && email.trim()) {
-      return email.substring(0, 2).toUpperCase();
-    }
-    return "AD";
-  };
-
-  const displayName = adminProfile?.name || adminUser?.displayName || "Michael Rohin";
-  const displayEmail = adminProfile?.email || adminUser?.email || "michaelrohin@gmail.com";
-  const userInitials = getInitials(displayName, displayEmail);
-
   const sidebarContent = (
-    <div className="flex flex-col h-full justify-between text-white select-none">
+    <div className="flex flex-col h-full justify-between overflow-hidden">
       {/* Brand Header */}
-      <div className="flex-shrink-0 pt-1 pb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-md text-[#1eb863]">
-              <Leaf className="h-6 w-6 fill-[#1eb863]/10" strokeWidth={2.2} />
+      <div className="flex-shrink-0">
+        <div className="flex items-center justify-between px-2 pt-1 pb-3 border-b border-slate-100/80">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#2ecc71] to-[#27ae60] text-white shadow-[0_4px_12px_rgba(46,204,113,0.3)]">
+              <Leaf className="h-5 w-5" strokeWidth={2.5} />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight text-white leading-tight">
-                Tourenvi Admin
+              <h1 className="text-lg font-bold tracking-tight text-[#1e3b34] leading-tight">
+                Tourenvi<span className="text-[#2ecc71] ml-1">Admin</span>
               </h1>
-              <p className="text-[10px] tracking-wider text-white/80 uppercase font-semibold">
+              <p className="text-[9px] tracking-widest text-[#2ecc71] uppercase font-extrabold">
                 Operations Center
               </p>
             </div>
@@ -212,7 +189,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
           {setMobileOpen && (
             <button
               onClick={() => setMobileOpen(false)}
-              className="lg:hidden p-1.5 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              className="lg:hidden p-1.5 rounded-xl text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
               aria-label="Close menu"
             >
               <X className="h-5 w-5" />
@@ -221,8 +198,8 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
         </div>
       </div>
 
-      {/* Navigation list */}
-      <nav className="flex-1 overflow-y-auto py-2 space-y-1.5 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {/* Navigation list with balanced compact spacing */}
+      <nav className="flex-1 overflow-y-auto pr-0.5 py-2.5 space-y-2 scrollbar-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
@@ -231,46 +208,55 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
             <button
               key={item.id}
               onClick={() => handleSelectTab(item.id)}
-              className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-[14px] font-medium tracking-normal transition-all duration-200 cursor-pointer text-left ${
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[14px] font-semibold tracking-normal transition-all duration-150 relative group cursor-pointer ${
                 isActive
-                  ? "bg-white/25 text-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] font-semibold backdrop-blur-xs"
-                  : "text-white/85 hover:text-white hover:bg-white/10"
+                  ? "text-[#2ecc71] bg-[#2ecc71]/10 shadow-[inset_3px_0_0_#2ecc71]"
+                  : "text-slate-600 hover:text-[#1e3b34] hover:bg-slate-50 hover:translate-x-0.5"
               }`}
             >
               <Icon
-                className={`h-4.5 w-4.5 shrink-0 transition-transform duration-200 ${
-                  isActive ? "text-white scale-105" : "text-white/85"
+                className={`h-4 w-4 transition-transform duration-200 group-hover:scale-110 shrink-0 ${
+                  isActive ? "text-[#2ecc71]" : "text-slate-400 group-hover:text-[#1e3b34]"
                 }`}
-                strokeWidth={isActive ? 2.2 : 1.8}
               />
               <span className="truncate">{item.label}</span>
+
+              {isActive && (
+                <span className="ml-auto w-1.5 h-1.5 rounded-full bg-[#2ecc71] shadow-[0_0_6px_rgba(46,204,113,0.8)] shrink-0" />
+              )}
             </button>
           );
         })}
       </nav>
 
-      {/* Footer Profile & Logout */}
-      <div className="flex-shrink-0 pt-4 mt-2 border-t border-white/15 space-y-3">
-        <div className="flex items-center gap-3 px-1">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white font-bold text-xs uppercase tracking-wider shrink-0 border border-white/30">
-            {userInitials}
-          </div>
-          <div className="min-w-0 flex-1">
-            <h4 className="text-xs font-bold text-white truncate leading-tight">
-              {displayName}
-            </h4>
-            <p className="text-[11px] text-white/75 truncate mt-0.5">
-              {displayEmail}
-            </p>
+      {/* Footer Profile & Logout - Compact & Clean */}
+      <div className="flex-shrink-0 pt-2.5 mt-1 border-t border-slate-100 space-y-2">
+        <div className="flex items-center justify-between gap-2.5 px-2 py-1 bg-slate-50/70 rounded-xl border border-slate-100">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-50 text-[#2ecc71] border border-emerald-200 shrink-0 font-bold text-xs uppercase">
+              {adminProfile?.name ? (
+                adminProfile.name.substring(0, 2)
+              ) : (
+                <UserCheck className="h-3.5 w-3.5" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="text-xs font-bold text-[#1e3b34] truncate leading-tight">
+                {adminProfile?.name || "System Admin"}
+              </h4>
+              <p className="text-[10px] text-slate-400 truncate">
+                {adminProfile?.email || adminUser?.email || "admin@tourenvi.com"}
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Dedicated Logout Button */}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-white/30 bg-white/5 hover:bg-white/15 text-white text-xs font-semibold tracking-wide transition-all duration-200 active:scale-98 cursor-pointer"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 hover:text-red-700 text-xs font-bold tracking-wide transition-all duration-200 active:scale-95 cursor-pointer shadow-xs"
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className="h-3.5 w-3.5" />
           <span>Log Out</span>
         </button>
       </div>
@@ -279,22 +265,22 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
   return (
     <>
-      {/* Desktop Fixed Sidebar */}
-      <aside className="hidden lg:flex w-72 xl:w-80 fixed top-5 left-5 h-[calc(100vh-2.5rem)] flex-col rounded-[28px] bg-[#1eb863] shadow-[0_12px_36px_rgba(30,184,99,0.25)] p-5 z-30 flex-shrink-0">
+      {/* Desktop Fixed Sticky Sidebar */}
+      <aside className="hidden lg:flex w-72 xl:w-80 fixed top-5 left-5 h-fit max-h-[calc(100vh-2.5rem)] flex-col rounded-3xl border border-slate-200/80 bg-white shadow-[0_4px_24px_rgba(0,0,0,0.04)] p-4 z-30 flex-shrink-0">
         {sidebarContent}
       </aside>
 
       {/* Mobile Drawer Overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 lg:hidden animate-fade-in"
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-40 lg:hidden animate-fade-in"
           onClick={() => setMobileOpen?.(false)}
         />
       )}
 
       {/* Mobile Slide-in Drawer */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-[#1eb863] p-5 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden flex flex-col ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-white p-5 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden flex flex-col ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

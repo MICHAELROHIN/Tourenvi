@@ -29,7 +29,6 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { RoadTripBudgetCard } from "@/components/cost/RoadTripBudgetCard";
 import { RouteOverviewCard } from "@/components/route/RouteOverviewCard";
-import ConfirmationModal from "@/components/common/ConfirmationModal";
 
 export interface PlannedTrip {
   id: string;
@@ -94,10 +93,7 @@ const TripsPlanned = () => {
   const navigate = useNavigate();
 
   const handleStartJourney = (plannedTrip: PlannedTrip, event?: React.MouseEvent) => {
-    if (event) {
-      event.stopPropagation();
-      event.preventDefault();
-    }
+    if (event) event.stopPropagation();
     const startLoc = plannedTrip.routeDetails?.startLocation || plannedTrip.tripData?.startLocation || "Origin";
     const destLoc = plannedTrip.routeDetails?.destination || plannedTrip.tripData?.destinations?.[0] || "Destination";
 
@@ -124,6 +120,8 @@ const TripsPlanned = () => {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
           setPlannedTrips(parsed);
+          // Expand first trip by default
+          setExpandedTripId(parsed[0].id);
           return;
         }
       }
@@ -166,6 +164,7 @@ const TripsPlanned = () => {
               }));
 
               setPlannedTrips(formattedTrips);
+              setExpandedTripId(formattedTrips[0].id);
               localStorage.setItem(storageKey, JSON.stringify(formattedTrips));
             }
           };
@@ -176,19 +175,9 @@ const TripsPlanned = () => {
     }
   };
 
-  const [tripToDelete, setTripToDelete] = useState<{ id: string; name: string } | null>(null);
-
-  const promptDeleteTrip = (tripId: string, tripName: string, event?: React.MouseEvent) => {
-    if (event) {
-      event.stopPropagation();
-      event.preventDefault();
-    }
-    setTripToDelete({ id: tripId, name: tripName });
-  };
-
-  const executeDeleteTrip = () => {
-    if (!tripToDelete) return;
-    const tripId = tripToDelete.id;
+  const handleDeleteTrip = (tripId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!window.confirm("Are you sure you want to delete this planned trip?")) return;
 
     const updated = plannedTrips.filter((t) => t.id !== tripId);
     setPlannedTrips(updated);
@@ -210,9 +199,8 @@ const TripsPlanned = () => {
 
     toast.success("Trip removed successfully.");
     if (expandedTripId === tripId) {
-      setExpandedTripId(null);
+      setExpandedTripId(updated[0]?.id || null);
     }
-    setTripToDelete(null);
   };
 
   const toggleExpand = (id: string) => {
@@ -379,17 +367,9 @@ const TripsPlanned = () => {
                           </p>
                         </div>
 
-                        <div 
-                          className="flex items-center gap-2"
-                          onClick={(e) => e.stopPropagation()}
-                        >
+                        <div className="flex items-center gap-2">
                           <Button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              handleStartJourney(plannedTrip, e);
-                            }}
+                            onClick={(e) => handleStartJourney(plannedTrip, e)}
                             className="bg-gt-gold hover:bg-yellow-500 text-emerald-950 font-bold px-3.5 sm:px-4 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-transform active:scale-95 text-xs"
                           >
                             <Navigation size={13} className="text-emerald-950 animate-pulse" />
@@ -397,28 +377,17 @@ const TripsPlanned = () => {
                           </Button>
 
                           <Button
-                            type="button"
                             variant="ghost"
                             size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              promptDeleteTrip(plannedTrip.id, `${originName} ➔ ${destinationName}`, e);
-                            }}
-                            className="text-gray-300 hover:text-red-400 hover:bg-white/10 rounded-full h-8 w-8 sm:h-9 sm:w-9 cursor-pointer"
+                            onClick={(e) => handleDeleteTrip(plannedTrip.id, e)}
+                            className="text-gray-300 hover:text-red-400 hover:bg-white/10 rounded-full h-8 w-8 sm:h-9 sm:w-9"
                             title="Delete Trip"
                           >
                             <Trash2 size={16} />
                           </Button>
                           <Button
-                            type="button"
                             variant="ghost"
                             size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              toggleExpand(plannedTrip.id);
-                            }}
                             className="text-white hover:bg-white/10 rounded-full h-8 w-8 sm:h-9 sm:w-9"
                           >
                             {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -725,19 +694,6 @@ const TripsPlanned = () => {
           </div>
         )}
       </div>
-
-      {/* Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={!!tripToDelete}
-        onClose={() => setTripToDelete(null)}
-        onConfirm={executeDeleteTrip}
-        title="Delete Planned Trip?"
-        message="Are you sure you want to delete this planned trip? All itinerary stops, calculated routes, and budget estimates will be permanently removed."
-        confirmText="Delete Trip"
-        cancelText="Keep Trip"
-        variant="danger"
-        itemName={tripToDelete?.name}
-      />
     </div>
   );
 };

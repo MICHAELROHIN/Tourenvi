@@ -10,7 +10,7 @@ type ProtectedRouteProps = {
 };
 
 const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
-  const { currentUser, userRole, userDoc, isSuperAdmin, loading } = useAuth();
+  const { currentUser, userRole, loading } = useAuth();
   const location = useLocation();
   const provisionalRole = userRole ?? (allowedRoles?.includes("user") ? "user" : null);
 
@@ -36,7 +36,7 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
     );
   }
 
-  if (!currentUser || (!isSuperAdmin && userDoc?.status === "suspended")) {
+  if (!currentUser) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 

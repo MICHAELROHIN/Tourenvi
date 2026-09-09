@@ -37,7 +37,7 @@ const roleRoutes: Record<UserRole, string> = {
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { userRole, currentUser, userDoc, isSuperAdmin } = useAuth();
+  const { userRole, currentUser } = useAuth();
 
   // --- Auth States ---
   const [isRegister, setIsRegister] = useState(false);
@@ -62,7 +62,7 @@ const Login: React.FC = () => {
 
   // --- Redirect Logic ---
   useEffect(() => {
-    if (currentUser && userRole && (isSuperAdmin || userDoc?.status !== "suspended")) {
+    if (currentUser && userRole) {
       const from = (location.state as { from?: string } | null)?.from;
       if (from && from !== "/login") {
         navigate(from, { replace: true });
@@ -72,7 +72,7 @@ const Login: React.FC = () => {
       const target = userRole === "admin" ? "/hero" : (roleRoutes[userRole] || "/hero");
       navigate(target, { replace: true });
     }
-  }, [currentUser, navigate, userRole, userDoc, isSuperAdmin, location.state]);
+  }, [currentUser, navigate, userRole, location.state]);
 
   const routeAfterAuth = (role: UserRole | null) => {
     const from = (location.state as { from?: string } | null)?.from;
@@ -150,22 +150,6 @@ const Login: React.FC = () => {
     try {
       await logout().catch(() => undefined);
       const credential = await loginWithEmail(email, password);
-
-      const userEmail = credential.user.email?.toLowerCase().trim() || "";
-      const isSuper = userEmail === "michaelrohin@gmail.com";
-
-      // Check suspension status from Firestore
-      const adminSnap = await getDoc(doc(db, "admins", credential.user.uid));
-      const userSnap = await getDoc(doc(db, "users", credential.user.uid));
-      const docData = adminSnap.exists() ? adminSnap.data() : (userSnap.exists() ? userSnap.data() : null);
-
-      if (!isSuper && docData?.status === "suspended") {
-        await logout().catch(() => undefined);
-        toast.error("Your account has been temporarily suspended. Please contact the administrator at michaelrohin@gmail.com.");
-        setLoading(false);
-        return;
-      }
-
       const resolvedRole = await resolveExistingAccount(credential.user);
       toast.success("Signed in successfully");
       routeAfterAuth(resolvedRole);
@@ -212,23 +196,9 @@ const Login: React.FC = () => {
     try {
       const credential = await loginWithGoogle();
       if (credential?.user) {
-        const userEmail = credential.user.email?.toLowerCase().trim() || "";
-        const isSuper = userEmail === "michaelrohin@gmail.com";
-
         const adminSnap = await getDoc(doc(db, "admins", credential.user.uid));
         const userRef = doc(db, "users", credential.user.uid);
         const userSnap = await getDoc(userRef);
-
-        const docData = adminSnap.exists() ? adminSnap.data() : (userSnap.exists() ? userSnap.data() : null);
-
-        // Check if account is suspended
-        if (!isSuper && docData?.status === "suspended") {
-          await logout().catch(() => undefined);
-          toast.error("Your account has been temporarily suspended. Please contact the administrator at michaelrohin@gmail.com.");
-          setLoading(false);
-          return;
-        }
-
         let resolvedRole: UserRole = "user";
 
         if (adminSnap.exists()) {
@@ -247,7 +217,6 @@ const Login: React.FC = () => {
             email: credential.user.email || "",
             phone: credential.user.phoneNumber || "",
             role: "user",
-            status: "active",
             createdAt: serverTimestamp(),
           });
         }
@@ -288,7 +257,7 @@ const Login: React.FC = () => {
 
       {/* --- 1. SHUTTER --- */}
       <div
-        className={`fixed inset-0 z-50 flex items-center justify-center bg-[#1a3c35] transition-all duration-1000 ease-[cubic-bezier(0.77,0,0.175,1)]
+        className={`fixed inset-0 z-50 flex items-center justify-center bg-[#1a3c35] transition-all duration-1000 ease-in-out
           ${isLoaded ? "-translate-y-full rounded-b-[50%_20%]" : "translate-y-0 rounded-b-none"}
         `}
       >
@@ -304,13 +273,13 @@ const Login: React.FC = () => {
 
       {/* --- 2. MOBILE CARD (Visible on Mobile Only: < md) --- */}
       <div
-        className={`relative z-10 w-full max-w-[370px] sm:max-w-[400px] overflow-hidden rounded-[26px] bg-white p-6 sm:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.25)] transition-all duration-700 delay-[300ms] ease-out md:hidden
+        className={`relative z-10 w-full max-w-[370px] sm:max-w-[400px] overflow-hidden rounded-[26px] bg-white p-6 sm:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.25)] transition-all duration-700 delay-300 ease-out md:hidden
           ${isLoaded ? "translate-y-0 opacity-100 scale-100" : "translate-y-12 opacity-0 scale-95"}
         `}
       >
         {/* SLIDING CAROUSEL TRACK */}
         <div
-          className={`flex w-[200%] transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+          className={`flex w-[200%] transition-transform duration-500 ease-in-out ${
             isRegister ? "-translate-x-1/2" : "translate-x-0"
           }`}
         >
@@ -523,7 +492,7 @@ const Login: React.FC = () => {
 
       {/* --- 3. DESKTOP MAIN CARD (Unchanged, Visible on >= md only) --- */}
       <div
-        className={`relative z-10 hidden md:block min-h-[600px] w-[950px] max-w-[92%] overflow-hidden rounded-[30px] bg-white shadow-2xl transition-all duration-1000 delay-[400ms] ease-out
+        className={`relative z-10 hidden md:block min-h-[600px] w-[950px] max-w-[92%] overflow-hidden rounded-[30px] bg-white shadow-2xl transition-all duration-1000 delay-500 ease-out
           ${isLoaded ? "translate-y-0 opacity-100 scale-100" : "translate-y-16 opacity-0 scale-95"}
         `}
       >

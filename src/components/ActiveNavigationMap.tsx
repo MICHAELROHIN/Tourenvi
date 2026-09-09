@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { GoogleMap, useJsApiLoader, DirectionsRenderer, Marker, InfoWindow, Polyline } from "@react-google-maps/api";
-import { toast } from "sonner";
 
 const containerStyle = {
   width: "100%",
@@ -179,7 +178,7 @@ export const ActiveNavigationMap: React.FC<ActiveNavigationMapProps> = ({ origin
   const handleStartTracking = (e: React.FormEvent) => {
     e.preventDefault();
     if (!licensePlate.trim()) {
-      toast.warning("Please enter a valid License Plate to start tracking.");
+      alert("Please enter a valid License Plate to start tracking.");
       return;
     }
     startSimulation();

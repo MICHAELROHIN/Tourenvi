@@ -37,6 +37,7 @@ export type TripDraft = {
   tripType: TripType;
   startDate: string;
   endDate: string;
+  startTime?: string;
   numberOfMembers: number;
   startLocation: string;
   vehicleType: string;
@@ -77,6 +78,7 @@ const DEFAULT_TRIP: TripDraft = {
   tripType: "solo",
   startDate: "",
   endDate: "",
+  startTime: "00:00",
   numberOfMembers: 1,
   startLocation: "",
   vehicleType: "car",
