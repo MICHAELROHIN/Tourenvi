@@ -6,7 +6,7 @@ import { doc, setDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend } from "recharts";
-import { Leaf, MapPin, Coffee, Camera, Bed, CheckCircle2, Navigation, Sparkles } from "lucide-react";
+import { Leaf, MapPin, Coffee, Camera, Bed, CheckCircle2, Navigation, Sparkles, Clock } from "lucide-react";
 import { getRoute, watchLiveLocation, clearLocationWatch } from "@/utils/Livelocationservice";
 import { MapContainer, Marker, Popup, Polyline, TileLayer, useMap } from "react-leaflet";
 import L from "leaflet";
@@ -431,12 +431,19 @@ const EliteDashboard = () => {
           totalCost,
         },
         ecoData: { co2 },
+        startTime: trip.startTime || "06:00",
+        startDate: trip.startDate,
+        endDate: trip.endDate,
+        selectedHotelName: trip.selectedHotelName || null,
+        selectedHotelPrice: trip.selectedHotelPrice || null,
         routeDetails: {
           distanceKm: mockDistanceKm,
           vehicleType: trip.vehicleType,
           fuelType: trip.fuelType,
           startLocation: trip.startLocation || "Origin",
           destination: trip.destinations[0] || "Destination",
+          startTime: trip.startTime || "06:00",
+          selectedHotelName: trip.selectedHotelName || null,
           routePriority: trip.routePriority || "fastest",
         },
         itinerary: itineraryDays,
@@ -465,7 +472,7 @@ const EliteDashboard = () => {
 
       // 3. Save to IndexedDB
       const dbRequest = indexedDB.open("TourenviOfflineDB", 1);
-      
+
       dbRequest.onupgradeneeded = (event: any) => {
         const idb = event.target.result;
         if (!idb.objectStoreNames.contains("itineraries")) {
@@ -495,11 +502,10 @@ const EliteDashboard = () => {
           <button
             type="button"
             onClick={() => setMobileTab("itinerary")}
-            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              mobileTab === "itinerary"
+            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${mobileTab === "itinerary"
                 ? "bg-white text-emerald-800 shadow-xs"
                 : "text-gray-500 hover:text-gray-800"
-            }`}
+              }`}
           >
             <Sparkles size={14} className={mobileTab === "itinerary" ? "text-emerald-600" : ""} />
             Itinerary
@@ -507,11 +513,10 @@ const EliteDashboard = () => {
           <button
             type="button"
             onClick={() => setMobileTab("map")}
-            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              mobileTab === "map"
+            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${mobileTab === "map"
                 ? "bg-white text-emerald-800 shadow-xs"
                 : "text-gray-500 hover:text-gray-800"
-            }`}
+              }`}
           >
             <Navigation size={14} className={mobileTab === "map" ? "text-emerald-600" : ""} />
             Map & Route
@@ -519,11 +524,10 @@ const EliteDashboard = () => {
           <button
             type="button"
             onClick={() => setMobileTab("analysis")}
-            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
-              mobileTab === "analysis"
+            className={`py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${mobileTab === "analysis"
                 ? "bg-white text-emerald-800 shadow-xs"
                 : "text-gray-500 hover:text-gray-800"
-            }`}
+              }`}
           >
             <Leaf size={14} className={mobileTab === "analysis" ? "text-emerald-600" : ""} />
             Analysis
@@ -585,6 +589,22 @@ const EliteDashboard = () => {
               </div>
             ) : null}
 
+            {/* Schedule Summary Banner */}
+            <div className="mb-4 bg-emerald-50/90 border border-emerald-200/80 rounded-2xl p-3.5 sm:p-4 text-emerald-950 flex flex-wrap items-center justify-between gap-2.5 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <Clock size={16} className="text-emerald-700 shrink-0" />
+                <span className="text-xs sm:text-sm font-bold">
+                  Departure at {trip.startTime || "06:00 AM"}
+                </span>
+              </div>
+              {trip.selectedHotelName && (
+                <div className="flex items-center gap-1.5 text-xs text-emerald-800 bg-white px-2.5 py-1 rounded-xl border border-emerald-100 font-semibold shadow-2xs">
+                  <Bed size={13} className="text-emerald-600 shrink-0" />
+                  <span className="truncate max-w-[180px] sm:max-w-[240px]">Stay: {trip.selectedHotelName}</span>
+                </div>
+              )}
+            </div>
+
             {/* Pre-Day 1 Route Breakdown ("Where to Where") */}
             <RouteOverviewCard
               startLocation={trip.startLocation || "Origin"}
@@ -620,15 +640,23 @@ const EliteDashboard = () => {
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent"></div>
                             <div className="absolute bottom-2.5 left-3 right-3 sm:bottom-3 sm:left-4 sm:right-4">
-                              <span className="px-2 py-0.5 bg-emerald-600 text-white font-bold rounded text-[9px] sm:text-[10px] uppercase tracking-wider">
-                                Sightseeing Landmark
+                              <span className="px-2 py-0.5 bg-emerald-600 text-white font-bold rounded text-[9px] sm:text-[10px] uppercase tracking-wider shadow-2xs">
+                                {item.type === "transit" || item.iconName === "Navigation"
+                                  ? "Highway Transit"
+                                  : item.type === "lodging" || item.iconName === "Bed"
+                                  ? "Hotel Night Stay & Check-in"
+                                  : item.type === "food" || item.iconName === "Coffee"
+                                  ? "Culinary Experience"
+                                  : "Sightseeing Landmark"}
                               </span>
                             </div>
                           </div>
                         )}
                         <div className="p-3.5 sm:p-4">
                           <div className="flex items-center gap-2.5 sm:gap-3 mb-1.5 sm:mb-2">
-                            {item.type === "food" || item.iconName === "Coffee" ? (
+                            {item.type === "transit" || item.iconName === "Navigation" ? (
+                              <Navigation size={15} className="text-emerald-600 animate-bounce-subtle" />
+                            ) : item.type === "food" || item.iconName === "Coffee" ? (
                               <Coffee size={15} className="text-emerald-600 animate-bounce-subtle" />
                             ) : item.type === "lodging" || item.iconName === "Bed" ? (
                               <Bed size={15} className="text-emerald-600 animate-bounce-subtle" />
@@ -750,7 +778,7 @@ const EliteDashboard = () => {
           <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
             <h3 className="font-semibold text-gray-700 mb-6">Financial Breakdown</h3>
             <div className="relative h-64 mb-6 flex items-center justify-center">
-              <div 
+              <div
                 className="absolute w-36 h-36 rounded-full bg-gradient-to-br from-white to-gray-100 shadow-[inset_0_2px_4px_rgba(255,255,255,0.9),0_10px_20px_rgba(0,0,0,0.12),0_2px_4px_rgba(0,0,0,0.06)] border border-gray-200/60 flex flex-col items-center justify-center text-center pointer-events-none z-10 p-4 transition-all duration-300"
               >
                 <Leaf className="text-emerald-600 mb-1 drop-shadow-xs" size={22} />
@@ -759,7 +787,7 @@ const EliteDashboard = () => {
                     <span className="text-[9px] font-extrabold text-gray-400 uppercase tracking-widest leading-none">
                       {chartData[activePieIndex].name}
                     </span>
-                    <span 
+                    <span
                       className="text-lg font-black transition-all duration-300 mt-1.5 leading-none"
                       style={{ color: chartData[activePieIndex].color }}
                     >
@@ -806,8 +834,8 @@ const EliteDashboard = () => {
                     {chartData.map((entry, index) => {
                       const isActive = activePieIndex === index;
                       return (
-                        <Cell 
-                          key={`cell-${index}`} 
+                        <Cell
+                          key={`cell-${index}`}
                           fill={entry.color}
                           stroke="#ffffff"
                           strokeWidth={isActive ? 3.5 : 2}
@@ -832,19 +860,18 @@ const EliteDashboard = () => {
                 const pct = totalCost > 0 ? Math.round((item.value / totalCost) * 100) : 0;
                 const isActive = activePieIndex === index;
                 return (
-                  <div 
+                  <div
                     key={item.name}
                     onMouseEnter={() => setActivePieIndex(index)}
                     onMouseLeave={() => setActivePieIndex(null)}
-                    className={`p-3.5 rounded-2xl border transition-all duration-300 text-left ${
-                      isActive 
-                        ? "bg-emerald-50/40 border-emerald-200/80 shadow-md translate-y-[-2px]" 
+                    className={`p-3.5 rounded-2xl border transition-all duration-300 text-left ${isActive
+                        ? "bg-emerald-50/40 border-emerald-200/80 shadow-md translate-y-[-2px]"
                         : "bg-gray-50/50 border-gray-100 shadow-2xs hover:border-gray-200"
-                    }`}
+                      }`}
                     style={{ cursor: "pointer" }}
                   >
                     <div className="flex items-center justify-between mb-1.5">
-                      <span 
+                      <span
                         className="px-2.5 py-0.5 rounded-full text-[9px] font-bold text-white tracking-wider uppercase"
                         style={{ backgroundColor: item.color }}
                       >
@@ -874,7 +901,7 @@ const EliteDashboard = () => {
                 </span>
               </div>
             </div>
-            </div>
+          </div>
 
           <RoadTripBudgetCard financials={calcData?.financials} tripData={trip} className="mt-8" />
 

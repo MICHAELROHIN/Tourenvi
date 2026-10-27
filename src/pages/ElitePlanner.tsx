@@ -733,29 +733,26 @@ const ElitePlanner = () => {
                       toast.error("Please complete required details in previous steps first.");
                     }
                   }}
-                  className={`flex flex-col items-center gap-1 sm:gap-2 shrink-0 px-1 sm:px-2 cursor-pointer transition-all ${
-                    canNavigateToStage(index) ? "hover:opacity-80" : "opacity-60 cursor-not-allowed"
-                  }`}
+                  className={`flex flex-col items-center gap-1 sm:gap-2 shrink-0 px-1 sm:px-2 cursor-pointer transition-all ${canNavigateToStage(index) ? "hover:opacity-80" : "opacity-60 cursor-not-allowed"
+                    }`}
                 >
                   <div
-                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold transition-all duration-300 ${
-                      isActive
+                    className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold transition-all duration-300 ${isActive
                         ? "bg-emerald-700 text-white ring-4 ring-emerald-200 shadow-md scale-105"
                         : isCompleted
                           ? "bg-emerald-500 text-white shadow-xs"
                           : "bg-gray-100 text-gray-400 border border-gray-200"
-                    }`}
+                      }`}
                   >
                     {isCompleted ? <CheckCircle2 size={16} /> : index + 1}
                   </div>
                   <span
-                    className={`text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-colors ${
-                      isActive
+                    className={`text-[10px] sm:text-xs font-semibold whitespace-nowrap transition-colors ${isActive
                         ? "text-emerald-900 font-bold block"
                         : isCompleted
                           ? "text-emerald-700 hidden sm:block"
                           : "text-gray-400 hidden md:block"
-                    }`}
+                      }`}
                   >
                     {stage}
                   </span>
@@ -1013,17 +1010,38 @@ const ElitePlanner = () => {
                   </div>
 
                   {trip.startDate && trip.endDate && (
-                    <div className="mt-4 bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 sm:p-4 flex items-center justify-between text-emerald-800">
-                      <span className="text-xs sm:text-sm font-semibold">Calculated Trip Duration:</span>
-                      <span className="px-3.5 py-1 bg-emerald-600 text-white font-bold rounded-full text-xs sm:text-sm">
-                        {(() => {
-                          const startD = new Date(trip.startDate);
-                          const endD = new Date(trip.endDate);
-                          const diffTime = Math.abs(endD.getTime() - startD.getTime());
-                          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-                          return diffDays > 0 ? `${diffDays} Days` : "Invalid dates selected";
-                        })()}
-                      </span>
+                    <div className="mt-4 bg-emerald-50/90 border border-emerald-200/90 rounded-2xl p-4 sm:p-5 text-emerald-900 shadow-2xs">
+                      <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-emerald-200/60">
+                        <div className="flex items-center gap-2">
+                          <Clock size={16} className="text-emerald-700" />
+                          <span className="text-xs sm:text-sm font-bold text-emerald-950">Planned Schedule & Duration</span>
+                        </div>
+                        <span className="px-3.5 py-1 bg-emerald-600 text-white font-bold rounded-full text-xs shadow-2xs">
+                          {(() => {
+                            const startD = new Date(trip.startDate);
+                            const endD = new Date(trip.endDate);
+                            const diffTime = Math.abs(endD.getTime() - startD.getTime());
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                            const nights = Math.max(0, diffDays - 1);
+                            return diffDays > 0 ? `${diffDays} Days • ${nights} Night${nights !== 1 ? "s" : ""}` : "1 Day Road Trip";
+                          })()}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-3 text-xs">
+                        <div className="flex items-center gap-2 text-emerald-800">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                          <span>Departure: <strong>{format(new Date(trip.startDate), "dd MMM yyyy")}</strong> at <strong>{trip.startTime || "06:00 AM"}</strong></span>
+                        </div>
+                        <div className="flex items-center gap-2 text-emerald-800">
+                          <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                          <span>Return Date: <strong>{format(new Date(trip.endDate), "dd MMM yyyy")}</strong></span>
+                        </div>
+                      </div>
+
+                      <p className="text-[11px] text-emerald-700/90 mt-2.5 font-sans bg-white/70 p-2.5 rounded-xl border border-emerald-100">
+                        🛣️ Itinerary will be calculated from <strong>{trip.startTime || "06:00 AM"}</strong> with highway meal pitstops, destination arrival, hotel check-in / night stays, and attraction timings.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1666,4 +1684,4 @@ const ElitePlanner = () => {
 };
 
 export default ElitePlanner;
-
+

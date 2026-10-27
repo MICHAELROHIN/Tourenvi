@@ -61,6 +61,10 @@ import { useGeoFence } from "@/hooks/useGeoFence";
 import { PlannedTrip } from "@/pages/TripsPlanned";
 import { getBearing, haversineDistance, formatDistance } from "@/utils/geoUtils";
 import { API_BASE_URL } from "@/config/api";
+import { RouteAttractionsAlongWay } from "./RouteAttractionsAlongWay";
+import { getAttractionsAndFoodsAlongRoute } from "@/utils/routeAttractionsService";
+import { RealAttraction, FamousFoodSpecialty } from "@/utils/routeCorridorPlacesData";
+import { RealPlaceImage } from "@/components/trip/RealPlaceImage";
 
 // Fix Leaflet default marker icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -69,6 +73,50 @@ L.Icon.Default.mergeOptions({
   iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
+
+// Custom Corridor Sights Marker Icon
+const createCorridorAttractionIcon = (category: string, isAdded = false) => {
+  const iconEmoji =
+    category === "waterfall" ? "🌊" :
+    category === "temple" ? "🛕" :
+    category === "fort_palace" ? "🏰" :
+    category === "viewpoint" ? "🌄" :
+    category === "nature_park" ? "🌳" :
+    category === "museum" ? "🏛️" : "📍";
+
+  return new L.DivIcon({
+    className: "corridor-attraction-marker",
+    html: `
+      <div style="
+        display: flex; flex-direction: column; align-items: center;
+        transform: ${isAdded ? 'scale(1.15)' : 'scale(1)'};
+        transition: transform 0.2s ease;
+        cursor: pointer;
+      ">
+        <div style="
+          width: 34px; height: 34px; border-radius: 50%;
+          background: ${isAdded ? '#10b981' : '#047857'}; border: 2.5px solid #ffffff;
+          box-shadow: 0 4px 10px rgba(4, 120, 87, 0.45);
+          display: flex; align-items: center; justify-content: center;
+          color: white; font-size: 15px;
+        ">
+          ${iconEmoji}
+        </div>
+        ${isAdded ? `
+          <div style="
+            background: #10b981; color: #ffffff; font-size: 8.5px; font-weight: 900;
+            padding: 1px 4px; border-radius: 4px; border: 1px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2); margin-top: -4px;
+          ">
+            ADDED
+          </div>
+        ` : ''}
+      </div>
+    `,
+    iconSize: [34, 44],
+    iconAnchor: [17, 22],
+  });
+};
 
 // Google Maps 3D Rotating Navigation Arrow Marker
 const createNavigationArrowIcon = (heading = 0, isSimulating = false) => {
@@ -334,6 +382,71 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
 
     setDayItineraries(formatted);
   }, [trip]);
+
+  // Route Corridor Attractions & Famous Foods Discovery (100% Real-World Verified Places)
+  const startLoc = trip.routeDetails?.startLocation || trip.tripData?.startLocation || "Chennai";
+  const destLoc = trip.routeDetails?.destination || trip.tripData?.destinations?.[0] || "Courtallam";
+  const [addedPlaceIds, setAddedPlaceIds] = useState<Set<string>>(new Set());
+
+  const routeCorridorDiscovery = useMemo(() => {
+    return getAttractionsAndFoodsAlongRoute(startLoc, destLoc, routePolyline);
+  }, [startLoc, destLoc, routePolyline]);
+
+  // Handler to add a verified real attraction to the traveler's active day schedule
+  const handleAddAttractionToRoute = useCallback((attraction: RealAttraction) => {
+    setAddedPlaceIds((prev) => new Set([...prev, attraction.id]));
+    setDayItineraries((prev) => {
+      const currentItems = prev[activeDayIndex] || [];
+      const insertIndex = Math.max(1, currentItems.length - 1);
+      const newItem: ItineraryItem = {
+        id: `attr_${attraction.id}_${Date.now()}`,
+        time: "02:30 PM - 04:00 PM",
+        type: attraction.category === "temple" ? "temple" : "sightseeing",
+        title: attraction.name,
+        description: `${attraction.shortDescription} (Detour: +${attraction.detourKm} km, Visit: ${attraction.visitDurationHours})`,
+        durationMinutes: 90,
+        completed: false,
+        lat: attraction.lat,
+        lng: attraction.lng,
+      };
+      const updated = [...currentItems.slice(0, insertIndex), newItem, ...currentItems.slice(insertIndex)];
+      return {
+        ...prev,
+        [activeDayIndex]: updated,
+      };
+    });
+  }, [activeDayIndex]);
+
+  // Handler to add a verified regional famous food stop to the traveler's schedule
+  const handleAddFamousFoodToRoute = useCallback((food: FamousFoodSpecialty) => {
+    setDayItineraries((prev) => {
+      const currentItems = prev[activeDayIndex] || [];
+      const insertIndex = Math.min(2, currentItems.length);
+      const newItem: ItineraryItem = {
+        id: `food_${food.id}_${Date.now()}`,
+        time: "01:00 PM - 02:00 PM",
+        type: "food",
+        title: `${food.foodName} @ ${food.famousOutlet}`,
+        description: `${food.description} - ${food.whyFamous}`,
+        durationMinutes: 45,
+        completed: false,
+        lat: food.lat,
+        lng: food.lng,
+      };
+      const updated = [...currentItems.slice(0, insertIndex), newItem, ...currentItems.slice(insertIndex)];
+      return {
+        ...prev,
+        [activeDayIndex]: updated,
+      };
+    });
+  }, [activeDayIndex]);
+
+  // Handler to pan map to a specific attraction
+  const handleFocusMapOnPlace = useCallback((lat: number, lng: number, title: string) => {
+    setCurrentCoords([lat, lng]);
+    setFollowVehicle(false);
+    toast.info(`Focused map on ${title}`);
+  }, []);
 
   const currentDayItems = useMemo(() => {
     return dayItineraries[activeDayIndex] || [];
@@ -1328,6 +1441,54 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
                 </Marker>
               )}
 
+              {/* Verified Real Sights & Attractions along the Route Corridor */}
+              {routeCorridorDiscovery.allAttractions.map((attraction) => {
+                const isAdded = addedPlaceIds.has(attraction.id);
+                return (
+                  <Marker
+                    key={`corridor_attr_${attraction.id}`}
+                    position={[attraction.lat, attraction.lng]}
+                    icon={createCorridorAttractionIcon(attraction.category, isAdded)}
+                  >
+                    <Popup>
+                      <div className="p-2 font-sans text-xs space-y-2 max-w-[220px]">
+                        <div className="h-20 w-full rounded-lg overflow-hidden relative">
+                          <RealPlaceImage
+  name={attraction.name}
+  city={attraction.city}
+  alt={attraction.name}
+  className="w-full h-full object-cover"
+/>
+                          <span className="absolute top-1 right-1 bg-emerald-700 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                            {attraction.categoryLabel}
+                          </span>
+                        </div>
+                        <div>
+                          <p className="font-bold text-gray-900 leading-tight">{attraction.name}</p>
+                          <p className="text-[10px] text-gray-500">{attraction.city} • {attraction.detourKm === 0 ? "On Route" : `+${attraction.detourKm} km detour`}</p>
+                        </div>
+                        <p className="text-[11px] text-emerald-800 bg-emerald-50 p-1.5 rounded font-medium leading-tight">
+                          {attraction.whyVisit}
+                        </p>
+                        <button
+                          onClick={() => {
+                            handleAddAttractionToRoute(attraction);
+                            toast.success(`Added ${attraction.name} to itinerary!`);
+                          }}
+                          className={`w-full py-1.5 rounded-lg font-bold text-[11px] mt-1 transition-all cursor-pointer ${
+                            isAdded
+                              ? "bg-emerald-100 text-emerald-800"
+                              : "bg-emerald-700 hover:bg-emerald-800 text-white"
+                          }`}
+                        >
+                          {isAdded ? "✓ Added to Schedule" : "+ Add to Itinerary"}
+                        </button>
+                      </div>
+                    </Popup>
+                  </Marker>
+                );
+              })}
+
               {/* Food Stops Rendered DIRECTLY Along the Route */}
               {routeFoodSpots.map((food) => (
                 <Marker
@@ -1617,6 +1778,15 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
           </div>
         </div>
       </div>
+
+      {/* --- PLACES TO VISIT ALONG YOUR ROUTE & FAMOUS FOODS (100% Verified Real Corridor Discovery) --- */}
+      <RouteAttractionsAlongWay
+        discovery={routeCorridorDiscovery}
+        addedPlaceIds={addedPlaceIds}
+        onAddToRoute={handleAddAttractionToRoute}
+        onAddFoodToRoute={handleAddFamousFoodToRoute}
+        onFocusOnMap={handleFocusMapOnPlace}
+      />
 
       {/* --- SETUP VEHICLE MODAL --- */}
       {isSetupModalOpen && (

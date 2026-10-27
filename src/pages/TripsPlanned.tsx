@@ -1,6 +1,16 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
+import { db } from "@/firebase";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  doc,
+  setDoc,
+  deleteDoc,
+} from "firebase/firestore";
 import {
   Calendar,
   MapPin,
@@ -112,67 +122,155 @@ const TripsPlanned = () => {
     navigate("/live");
   };
 
-  // Load saved trips from localStorage and IndexedDB (re-load when user changes)
+  // Load saved trips from Firestore, localStorage and IndexedDB
   useEffect(() => {
     loadTrips();
-  }, [storageKey]);
+  }, [storageKey, uid]);
 
-  const loadTrips = () => {
+  const loadTrips = async () => {
+    const combinedMap = new Map<string, PlannedTrip>();
+
+    // 1. Read from localStorage
     try {
       const raw = localStorage.getItem(storageKey);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setPlannedTrips(parsed);
-          return;
+        if (Array.isArray(parsed)) {
+          parsed.forEach((t: PlannedTrip) => {
+            if (t && t.id) combinedMap.set(t.id, t);
+          });
         }
       }
+    } catch (err) {
+      console.warn("LocalStorage read error:", err);
+    }
 
-      // Fallback: Read from IndexedDB if localStorage is empty
+    // 2. Fetch from Firestore if logged in
+    if (uid) {
+      try {
+        const q1 = query(collection(db, "trips"), where("userId", "==", uid));
+        const snap1 = await getDocs(q1);
+        snap1.forEach((docSnap) => {
+          const data = docSnap.data() as any;
+          const formatted: PlannedTrip = {
+            id: docSnap.id,
+            createdAt: data.createdAt || new Date().toISOString(),
+            tripData: data.tripData || {
+              tripType: data.tripType || "family",
+              startDate: data.startDate || "",
+              endDate: data.endDate || "",
+              numberOfMembers: data.numberOfMembers || 1,
+              startLocation: data.startLocation || "Origin",
+              vehicleType: data.vehicleType || "car",
+              fuelType: data.fuelType || "petrol",
+              budgetCap: data.budgetCap || 0,
+              moods: data.moods || [],
+              destinations: data.destinations || [],
+            },
+            financials: data.financials || {
+              fuelExpenditure: data.costBreakdown?.fuel || 0,
+              totalLodging: data.costBreakdown?.hotel || 0,
+              tollPricing: data.costBreakdown?.toll || 0,
+              foodCost: data.costBreakdown?.food || 0,
+              placesCost: data.costBreakdown?.places || 0,
+              miscCost: data.costBreakdown?.misc || 0,
+              totalCost: data.totalCost || data.costBreakdown?.total || 0,
+            },
+            ecoData: data.ecoData || { co2: 0 },
+            routeDetails: data.routeDetails || {
+              distanceKm: 450,
+              vehicleType: data.vehicleType || "car",
+              fuelType: data.fuelType || "petrol",
+              startLocation: data.startLocation || "Origin",
+              destination: (data.destinations && data.destinations[0]) || "Destination",
+            },
+            itinerary: data.itinerary || [],
+            destinationShowcase: data.destinationShowcase || [],
+          };
+          combinedMap.set(docSnap.id, formatted);
+        });
+      } catch (fErr) {
+        console.warn("Firestore trips fetch error:", fErr);
+      }
+    }
+
+    // 3. Read from IndexedDB as fallback
+    try {
       const dbRequest = indexedDB.open("TourenviOfflineDB", 1);
       dbRequest.onsuccess = (event: any) => {
-        const db = event.target.result;
-        if (db.objectStoreNames.contains("itineraries")) {
-          const transaction = db.transaction("itineraries", "readonly");
+        const idb = event.target.result;
+        if (idb.objectStoreNames.contains("itineraries")) {
+          const transaction = idb.transaction("itineraries", "readonly");
           const store = transaction.objectStore("itineraries");
           const getAll = store.getAll();
           getAll.onsuccess = () => {
-            if (Array.isArray(getAll.result) && getAll.result.length > 0) {
-              const formattedTrips: PlannedTrip[] = getAll.result.map((item: any) => ({
-                id: item.id || "trip_" + Date.now(),
-                createdAt: item.timestamp || new Date().toISOString(),
-                tripData: item.tripData || {},
-                financials: {
-                  fuelExpenditure: item.financials?.fuelExpenditure || 0,
-                  totalLodging: item.financials?.totalLodging || 0,
-                  tollPricing: item.financials?.tollPricing || 0,
-                  foodCost: item.financials?.foodAndMisc ? Math.round(item.financials.foodAndMisc * 0.6) : 0,
-                  miscCost: item.financials?.foodAndMisc ? Math.round(item.financials.foodAndMisc * 0.4) : 0,
-                  totalCost:
-                    (item.financials?.fuelExpenditure || 0) +
-                    (item.financials?.totalLodging || 0) +
-                    (item.financials?.tollPricing || 0) +
-                    (item.financials?.foodAndMisc || 0),
-                },
-                ecoData: item.ecoData || { co2: 0 },
-                routeDetails: {
-                  distanceKm: 450,
-                  vehicleType: item.tripData?.vehicleType || "car",
-                  fuelType: item.tripData?.fuelType || "petrol",
-                  startLocation: item.tripData?.startLocation || "Origin",
-                  destination: item.tripData?.destinations?.[0] || "Destination",
-                },
-                itinerary: item.itinerary || [],
-              }));
+            if (Array.isArray(getAll.result)) {
+              getAll.result.forEach((item: any) => {
+                const tripId = item.id || "trip_" + Date.now();
+                if (!combinedMap.has(tripId)) {
+                  combinedMap.set(tripId, {
+                    id: tripId,
+                    createdAt: item.timestamp || item.createdAt || new Date().toISOString(),
+                    tripData: item.tripData || {},
+                    financials: {
+                      fuelExpenditure: item.financials?.fuelExpenditure || 0,
+                      totalLodging: item.financials?.totalLodging || 0,
+                      tollPricing: item.financials?.tollPricing || 0,
+                      foodCost: item.financials?.foodAndMisc ? Math.round(item.financials.foodAndMisc * 0.6) : (item.financials?.foodCost || 0),
+                      miscCost: item.financials?.foodAndMisc ? Math.round(item.financials.foodAndMisc * 0.4) : (item.financials?.miscCost || 0),
+                      totalCost:
+                        (item.financials?.totalCost) ||
+                        ((item.financials?.fuelExpenditure || 0) +
+                        (item.financials?.totalLodging || 0) +
+                        (item.financials?.tollPricing || 0) +
+                        (item.financials?.foodAndMisc || 0)),
+                    },
+                    ecoData: item.ecoData || { co2: 0 },
+                    routeDetails: {
+                      distanceKm: 450,
+                      vehicleType: item.tripData?.vehicleType || "car",
+                      fuelType: item.tripData?.fuelType || "petrol",
+                      startLocation: item.tripData?.startLocation || "Origin",
+                      destination: item.tripData?.destinations?.[0] || "Destination",
+                    },
+                    itinerary: item.itinerary || [],
+                  });
+                }
+              });
+            }
+            const allTrips = Array.from(combinedMap.values());
+            setPlannedTrips(allTrips);
+            localStorage.setItem(storageKey, JSON.stringify(allTrips));
 
-              setPlannedTrips(formattedTrips);
-              localStorage.setItem(storageKey, JSON.stringify(formattedTrips));
+            // Sync unpushed offline trips to Firestore if user is authenticated
+            if (uid) {
+              allTrips.forEach(async (t) => {
+                try {
+                  await setDoc(doc(db, "trips", t.id), {
+                    ...t,
+                    userId: uid,
+                    uid,
+                    userEmail: currentUser?.email || "",
+                  }, { merge: true });
+                } catch {}
+              });
             }
           };
+        } else {
+          const allTrips = Array.from(combinedMap.values());
+          setPlannedTrips(allTrips);
+          localStorage.setItem(storageKey, JSON.stringify(allTrips));
         }
+      };
+      dbRequest.onerror = () => {
+        const allTrips = Array.from(combinedMap.values());
+        setPlannedTrips(allTrips);
+        localStorage.setItem(storageKey, JSON.stringify(allTrips));
       };
     } catch (err) {
       console.error("Failed to load saved trips:", err);
+      const allTrips = Array.from(combinedMap.values());
+      setPlannedTrips(allTrips);
     }
   };
 
@@ -186,7 +284,7 @@ const TripsPlanned = () => {
     setTripToDelete({ id: tripId, name: tripName });
   };
 
-  const executeDeleteTrip = () => {
+  const executeDeleteTrip = async () => {
     if (!tripToDelete) return;
     const tripId = tripToDelete.id;
 
@@ -194,13 +292,22 @@ const TripsPlanned = () => {
     setPlannedTrips(updated);
     localStorage.setItem(storageKey, JSON.stringify(updated));
 
+    // Delete from Firestore if authenticated
+    if (uid) {
+      try {
+        await deleteDoc(doc(db, "trips", tripId));
+      } catch (err) {
+        console.warn("Firestore delete trip error:", err);
+      }
+    }
+
     // Also delete from IndexedDB
     try {
       const dbRequest = indexedDB.open("TourenviOfflineDB", 1);
       dbRequest.onsuccess = (e: any) => {
-        const db = e.target.result;
-        if (db.objectStoreNames.contains("itineraries")) {
-          const tx = db.transaction("itineraries", "readwrite");
+        const idb = e.target.result;
+        if (idb.objectStoreNames.contains("itineraries")) {
+          const tx = idb.transaction("itineraries", "readwrite");
           tx.objectStore("itineraries").delete(tripId);
         }
       };
@@ -379,7 +486,7 @@ const TripsPlanned = () => {
                           </p>
                         </div>
 
-                        <div 
+                        <div
                           className="flex items-center gap-2"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -450,10 +557,19 @@ const TripsPlanned = () => {
                         <span>Eco Score: {ecoData.co2} kg CO₂</span>
                       </span>
 
-                      {tripData.selectedHotelName && (
+                      {(plannedTrip.startTime || tripData.startTime) && (
+                        <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-emerald-200 font-semibold text-[11px] sm:text-xs">
+                          <Clock size={13} className="text-emerald-600" />
+                          <span>Starts at {plannedTrip.startTime || tripData.startTime}</span>
+                        </span>
+                      )}
+
+                      {(plannedTrip.selectedHotelName || tripData.selectedHotelName) && (
                         <span className="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-emerald-200 font-semibold text-[11px] sm:text-xs">
                           <Bed size={13} className="text-emerald-600" />
-                          <span className="truncate max-w-[140px] sm:max-w-[200px]">{tripData.selectedHotelName}</span>
+                          <span className="truncate max-w-[140px] sm:max-w-[200px]">
+                            Stay: {plannedTrip.selectedHotelName || tripData.selectedHotelName}
+                          </span>
                         </span>
                       )}
                     </div>
@@ -474,32 +590,29 @@ const TripsPlanned = () => {
                       <div className="flex border-b border-gray-200 space-x-3 sm:space-x-6 overflow-x-auto no-scrollbar pb-0.5">
                         <button
                           onClick={() => setTabForTrip(plannedTrip.id, "itinerary")}
-                          className={`pb-2.5 sm:pb-3 font-semibold text-xs sm:text-sm whitespace-nowrap transition-colors border-b-2 ${
-                            activeTab === "itinerary"
+                          className={`pb-2.5 sm:pb-3 font-semibold text-xs sm:text-sm whitespace-nowrap transition-colors border-b-2 ${activeTab === "itinerary"
                               ? "border-emerald-600 text-emerald-700"
                               : "border-transparent text-gray-400 hover:text-gray-700"
-                          }`}
+                            }`}
                         >
                           Day-by-Day Itinerary
                         </button>
                         <button
                           onClick={() => setTabForTrip(plannedTrip.id, "breakdown")}
-                          className={`pb-2.5 sm:pb-3 font-semibold text-xs sm:text-sm whitespace-nowrap transition-colors border-b-2 ${
-                            activeTab === "breakdown"
+                          className={`pb-2.5 sm:pb-3 font-semibold text-xs sm:text-sm whitespace-nowrap transition-colors border-b-2 ${activeTab === "breakdown"
                               ? "border-emerald-600 text-emerald-700"
                               : "border-transparent text-gray-400 hover:text-gray-700"
-                          }`}
+                            }`}
                         >
                           Cost Breakdown & Eco Analysis
                         </button>
                         {destinationShowcase && destinationShowcase.length > 0 && (
                           <button
                             onClick={() => setTabForTrip(plannedTrip.id, "places")}
-                            className={`pb-2.5 sm:pb-3 font-semibold text-xs sm:text-sm whitespace-nowrap transition-colors border-b-2 ${
-                              activeTab === "places"
+                            className={`pb-2.5 sm:pb-3 font-semibold text-xs sm:text-sm whitespace-nowrap transition-colors border-b-2 ${activeTab === "places"
                                 ? "border-emerald-600 text-emerald-700"
                                 : "border-transparent text-gray-400 hover:text-gray-700"
-                            }`}
+                              }`}
                           >
                             Sightseeing Highlights
                           </button>
@@ -518,7 +631,7 @@ const TripsPlanned = () => {
                                   Bespoke Travel Schedule
                                 </h4>
                                 <p className="text-xs text-emerald-700">
-                                  {itinerary.length} Days Itinerary crafted for {destinationName}
+                                  {itinerary.length} Days Itinerary crafted for {destinationName} (Starts: {plannedTrip.startTime || tripData.startTime || "06:00 AM"})
                                 </p>
                               </div>
                             </div>
@@ -546,52 +659,66 @@ const TripsPlanned = () => {
                               itinerary.map((day, dIdx) => (
                                 <div
                                   key={dIdx}
-                                  className="bg-gray-50/80 rounded-2xl p-6 border border-gray-100 relative"
+                                  className="bg-gray-50/80 rounded-2xl p-4 sm:p-6 border border-gray-100 relative"
                                 >
                                   <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 rounded-full bg-gt-gold text-emerald-900 font-bold flex items-center justify-center text-sm shadow-sm">
+                                    <div className="w-10 h-10 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-sm shadow-sm">
                                       D{day.day}
                                     </div>
                                     <div>
-                                      <h3 className="font-serif font-bold text-lg text-emerald-800">
+                                      <h3 className="font-serif font-bold text-base sm:text-lg text-emerald-900">
                                         Day {day.day}: {day.title}
                                       </h3>
-                                      <p className="text-xs text-gray-500">Planned activities schedule</p>
+                                      <p className="text-xs text-gray-500">Scheduled activity timeline</p>
                                     </div>
                                   </div>
 
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-2 md:pl-4">
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {day.items.map((item, iIdx) => (
                                       <div
                                         key={iIdx}
-                                        className="bg-white p-4 rounded-xl border border-gray-100 shadow-2xs hover:border-gt-gold/40 transition-colors flex gap-3"
+                                        className="bg-white p-3.5 sm:p-4 rounded-xl border border-gray-100 shadow-2xs hover:border-emerald-500/40 transition-all flex flex-col sm:flex-row gap-3 overflow-hidden"
                                       >
-                                        <div className="p-2.5 rounded-lg bg-gray-100 text-emerald-700 h-fit">
-                                          {item.type === "food" ? (
-                                            <Coffee size={18} />
-                                          ) : item.type === "sightseeing" ? (
-                                            <Camera size={18} className="text-gt-gold" />
-                                          ) : item.type === "lodging" ? (
-                                            <Bed size={18} className="text-emerald-600" />
-                                          ) : (
-                                            <MapPin size={18} className="text-emerald-600" />
-                                          )}
-                                        </div>
-
-                                        <div className="space-y-1 overflow-hidden">
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-gray-400">
-                                              {item.time}
-                                            </span>
+                                        {item.image && (
+                                          <div className="w-full sm:w-24 h-28 sm:h-20 rounded-lg overflow-hidden shrink-0">
+                                            <img
+                                              src={item.image}
+                                              alt={item.title}
+                                              className="w-full h-full object-cover"
+                                            />
+                                          </div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                          <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                                            <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+                                              {item.type === "transit" || item.iconName === "Navigation" ? (
+                                                <Navigation size={13} className="text-emerald-600" />
+                                              ) : item.type === "food" || item.iconName === "Coffee" ? (
+                                                <Coffee size={13} className="text-emerald-600" />
+                                              ) : item.type === "lodging" || item.iconName === "Bed" ? (
+                                                <Bed size={13} className="text-emerald-600" />
+                                              ) : item.type === "sightseeing" || item.iconName === "Camera" ? (
+                                                <Camera size={13} className="text-emerald-600" />
+                                              ) : (
+                                                <MapPin size={13} className="text-emerald-600" />
+                                              )}
+                                              <span>{item.time}</span>
+                                            </div>
                                             <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600">
-                                              {item.type}
+                                              {item.type === "transit"
+                                                ? "Transit"
+                                                : item.type === "lodging"
+                                                ? "Hotel Stay"
+                                                : item.type === "food"
+                                                ? "Meals"
+                                                : "Attraction"}
                                             </span>
                                           </div>
-                                          <h4 className="font-semibold text-emerald-800 text-sm">
+                                          <h4 className="font-semibold text-emerald-950 text-sm mb-1 leading-snug">
                                             {item.title}
                                           </h4>
                                           {item.description && (
-                                            <p className="text-xs text-gray-500 line-clamp-2 leading-relaxed">
+                                            <p className="text-xs text-gray-500 font-sans line-clamp-2 leading-relaxed">
                                               {item.description}
                                             </p>
                                           )}

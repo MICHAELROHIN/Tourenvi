@@ -259,7 +259,18 @@ const TripCalculator = () => {
     const newPlannedTrip = {
       id: tripId,
       userId: uid,
+      uid: uid,
+      userEmail: auth.currentUser?.email || "",
+      tripName: `${trip.startLocation || "Origin"} ➔ ${trip.destinations?.[0] || "Destination"} Trip`,
       createdAt: new Date().toISOString(),
+      startLocation: trip.startLocation || "Origin",
+      destinations: trip.destinations || [],
+      numberOfDays: days,
+      numberOfMembers: trip.numberOfMembers || 1,
+      vehicleType,
+      fuelType: trip.fuelType,
+      budgetLevel,
+      totalCost: total,
       tripData: {
         tripType: trip.tripType,
         startDate: trip.startDate,

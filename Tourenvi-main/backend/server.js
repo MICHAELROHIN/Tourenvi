@@ -633,7 +633,7 @@ async function resolveWikidataImage(wikidataId) {
       }
     }
   } catch (e) {
-   
+
   }
   return null;
 }
@@ -1520,101 +1520,67 @@ function generateActionTitle(place, slotTime = "") {
   return `Must-Visit Iconic Sightseeing at ${name}`;
 }
 
-async function generateStructuredRealItinerary(destination, totalDays, source) {
-  const normDest = normalizeLookupText(destination);
+// Helper time calculations for itinerary planning
+function parseTimeToMinutes(timeStr) {
+  if (!timeStr || typeof timeStr !== "string") return 360; // 06:00 AM default
+  const clean = timeStr.trim().toUpperCase();
+  if (clean === "00:00" || clean === "0:00") return 360; // default to 6 AM if default unconfigured
 
-  if (genAI) {
-    try {
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const minPlacesRequired = Math.max(12, totalDays * 4);
-
-      const prompt = `Generate a complete, real-world day-by-day road trip itinerary for a self-drive trip from ${source || "Origin"} to ${destination} for ${totalDays} days.
-Rules:
-1. ONLY use real, verified tourist spots, viewpoints, and attractions in ${destination}. Do NOT invent places.
-2. ALL places across the entire multi-day itinerary MUST be 100% unique. Absolutely NO repeated places.
-3. Every single day MUST include dedicated time slots for Breakfast (08:00 AM - 09:00 AM), Lunch (01:00 PM - 02:30 PM), and Dinner (08:00 PM - 09:30 PM).
-4. Populate EVERY single day with 4 structured sightseeing slots between meal times.
-5. NEVER output placeholder text like 'Stay in room', 'Rest at hotel', or 'Free day'.
-6. Provide a minimum of ${minPlacesRequired} unique real tourist attractions across the itinerary.
-
-Respond ONLY with raw JSON (no markdown delimiters, no \`\`\`json wrappers) following this exact schema:
-{
-  "places": [
-    { "name": "Exact Real Place Name", "category": "Category", "description": "1-2 sentence real description" }
-  ],
-  "itinerary": [
-    {
-      "day": 1,
-      "title": "Day 1: Title",
-      "items": [
-        { "time": "08:00 AM - 09:00 AM", "slot": "breakfast", "type": "food", "title": "Breakfast at Local Cafe", "placeName": "Local Cafe", "description": "Fresh hot breakfast & coffee" },
-        { "time": "09:00 AM - 11:30 AM", "slot": "morning", "type": "sightseeing", "title": "Visit [Real Place 1]", "placeName": "Real Place 1", "description": "Real description" },
-        { "time": "11:30 AM - 01:00 PM", "slot": "morning", "type": "sightseeing", "title": "Explore [Real Place 2]", "placeName": "Real Place 2", "description": "Real description" },
-        { "time": "01:00 PM - 02:30 PM", "slot": "lunch", "type": "food", "title": "Authentic Regional Lunch", "placeName": "Central Restaurant", "description": "Regional thali & specials" },
-        { "time": "02:30 PM - 05:30 PM", "slot": "afternoon", "type": "sightseeing", "title": "Visit [Real Place 3]", "placeName": "Real Place 3", "description": "Real description" },
-        { "time": "05:30 PM - 07:30 PM", "slot": "evening", "type": "sightseeing", "title": "Walk around [Real Place 4/Market]", "placeName": "Real Place 4", "description": "Real description" },
-        { "time": "08:00 PM - 09:30 PM", "slot": "dinner", "type": "food", "title": "Dinner & Evening Dining", "placeName": "Town Dining", "description": "Gourmet local dinner" }
-      ]
-    }
-  ]
-}`;
-
-      const result = await model.generateContent(prompt);
-      const text = result.response.text().trim();
-      const jsonText = text.replace(/```json/gi, "").replace(/```/g, "").trim();
-      const parsed = JSON.parse(jsonText);
-
-      if (parsed && Array.isArray(parsed.places) && Array.isArray(parsed.itinerary) && parsed.itinerary.length === totalDays) {
-        const richPlaces = await Promise.all(
-          parsed.places.map(async (p, idx) => ({
-            id: `place_gemini_${idx + 1}`,
-            name: p.name,
-            category: p.category || "Tourism",
-            description: p.description || `Real-world attraction in ${destination}.`,
-            image: await getAttractionImageUrl(p.name, destination),
-            imageUrl: await getAttractionImageUrl(p.name, destination),
-          }))
-        );
-
-        const formattedItinerary = await Promise.all(
-          parsed.itinerary.map(async (dayObj) => {
-            const itemsWithImages = await Promise.all(
-              (dayObj.items || []).map(async (item) => ({
-                ...item,
-                image: item.type === "food"
-                  ? (item.slot === "breakfast" ? "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=1200&auto=format&fit=crop&q=80"
-                    : item.slot === "lunch" ? "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?w=1200&auto=format&fit=crop&q=80"
-                      : "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80")
-                  : (item.placeName ? await getAttractionImageUrl(item.placeName, destination) : null),
-              }))
-            );
-            return {
-              day: dayObj.day,
-              title: dayObj.title || `Day ${dayObj.day}: Core Attractions`,
-              items: itemsWithImages,
-            };
-          })
-        );
-
-        const destinationAttractions = [{
-          id: `dest_node_gemini_1`,
-          destination,
-          matchedDestination: destination,
-          region: null,
-          attractions: richPlaces.slice(0, 12),
-        }];
-
-        return {
-          places: richPlaces,
-          destinationAttractions,
-          itinerary: formattedItinerary,
-          source: "gemini_ai",
-        };
-      }
-    } catch (e) {
-      console.warn("Gemini AI API call failed or rate-limited, falling back to verified destination engine:", e.message);
-    }
+  // Check 12-hour format with AM/PM (e.g., "06:30 AM", "2:15 PM")
+  const match12 = clean.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+  if (match12) {
+    let hours = parseInt(match12[1], 10);
+    const minutes = parseInt(match12[2], 10);
+    const ampm = match12[3];
+    if (ampm === "PM" && hours < 12) hours += 12;
+    if (ampm === "AM" && hours === 12) hours = 0;
+    return hours * 60 + minutes;
   }
+
+  // Check 24-hour format (e.g., "06:30", "14:45", "6:00")
+  const match24 = clean.match(/^(\d{1,2}):(\d{2})$/);
+  if (match24) {
+    const hours = parseInt(match24[1], 10);
+    const minutes = parseInt(match24[2], 10);
+    return Math.min(1439, Math.max(0, hours * 60 + minutes));
+  }
+
+  return 360; // fallback 6:00 AM
+}
+
+function minutesToTimeString(totalMinutes) {
+  const normalized = ((Math.round(totalMinutes) % 1440) + 1440) % 1440;
+  const hours24 = Math.floor(normalized / 60);
+  const minutes = normalized % 60;
+  const ampm = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+  const padHours = String(hours12).padStart(2, "0");
+  const padMins = String(minutes).padStart(2, "0");
+  return `${padHours}:${padMins} ${ampm}`;
+}
+
+function formatTimeRange(startMin, durationMinutes) {
+  const startStr = minutesToTimeString(startMin);
+  const endStr = minutesToTimeString(startMin + durationMinutes);
+  return `${startStr} - ${endStr}`;
+}
+
+async function generateStructuredRealItinerary(
+  destination,
+  totalDays,
+  source = "Origin",
+  startTime = "06:00",
+  selectedHotelName = null,
+  oneWayDistanceKm = 450
+) {
+  const normDest = normalizeLookupText(destination);
+  const startMin = parseTimeToMinutes(startTime);
+  const driveHours = Math.max(2, Math.round(((oneWayDistanceKm || 400) / 55) * 10) / 10);
+  const driveMinutes = Math.round(driveHours * 60);
+  const arrivalMin = startMin + driveMinutes;
+  const hotelDisplayName = selectedHotelName && selectedHotelName.trim()
+    ? selectedHotelName.trim()
+    : `${destination} Luxury Resort & Stay`;
 
   let verifiedPlaces = [];
   const dbMatchKey = Object.keys(VERIFIED_DESTINATION_DATABASE).find((key) => normDest.includes(key) || key.includes(normDest));
@@ -1675,88 +1641,296 @@ Respond ONLY with raw JSON (no markdown delimiters, no \`\`\`json wrappers) foll
   }
 
   for (let d = 1; d <= totalDays; d++) {
-    let dayTitle = `Day ${d}: Sightseeing & Exploration in ${destination}`;
-    if (d === 1) dayTitle = `Day 1: Arrival & Core Attractions in ${destination}`;
-    if (d === totalDays) dayTitle = `Day ${d}: Final Highlights & Departure`;
+    const isFirstDay = d === 1;
+    const isLastDay = d === totalDays && totalDays > 1;
 
-    const p1 = getNextUniquePlace();
-    const p2 = getNextUniquePlace();
-    const p3 = getNextUniquePlace();
-    const p4 = getNextUniquePlace();
+    let dayTitle = `Day ${d}: Sightseeing & Regional Exploration in ${destination}`;
+    if (isFirstDay) dayTitle = `Day 1: Departure (${minutesToTimeString(startMin)}), Highway Transit & Check-in at ${destination}`;
+    if (isLastDay) dayTitle = `Day ${d}: Morning Highlights, Check-out & Return Journey`;
 
-    const items = [
-      {
+    const dayItems = [];
+
+    if (isFirstDay) {
+      // 1. Departure from Origin
+      dayItems.push({
+        time: minutesToTimeString(startMin),
+        slot: "transit",
+        type: "transit",
+        iconName: "Navigation",
+        title: `Highway Departure from ${source} (${minutesToTimeString(startMin)})`,
+        placeName: `${source} Express Tollway`,
+        description: `Kick off your bespoke road trip adventure from ${source}. Begin the ~${oneWayDistanceKm} km journey along the National Highway corridor.`,
+        image: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1200&auto=format&fit=crop&q=80",
+      });
+
+      // 2. En-Route Highway Pitstop (Breakfast or Snack or Lunch based on departure time)
+      if (startMin < 540) {
+        // Depart before 9 AM -> Highway Breakfast
+        const bFastStart = startMin + 120;
+        dayItems.push({
+          time: formatTimeRange(bFastStart, 45),
+          slot: "breakfast",
+          type: "food",
+          iconName: "Coffee",
+          title: `En-Route Highway Breakfast & Refreshment Stop`,
+          placeName: `Highway Express Food Plaza`,
+          description: `Enjoy piping hot idlis, crispy dosas, filter coffee, tea, and quick vehicle refueling at the highway rest stop.`,
+          image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=1200&auto=format&fit=crop&q=80",
+        });
+      } else if (startMin < 720) {
+        // Depart 9 AM - 12 PM -> Highway Lunch Stop
+        const lunchStart = startMin + 150;
+        dayItems.push({
+          time: formatTimeRange(lunchStart, 60),
+          slot: "lunch",
+          type: "food",
+          iconName: "Coffee",
+          title: `Midway Highway Lunch & Rest Stop`,
+          placeName: `Highway Express Food Hub`,
+          description: `Savor delicious regional thali meals and take a relaxing pitstop before proceeding on the final approach drive.`,
+          image: "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?w=1200&auto=format&fit=crop&q=80",
+        });
+      } else {
+        // Afternoon departure -> Highway Tea/Snack Stop
+        const snackStart = startMin + 120;
+        dayItems.push({
+          time: formatTimeRange(snackStart, 40),
+          slot: "snack",
+          type: "food",
+          iconName: "Coffee",
+          title: `En-Route Highway Tea & Snack Break`,
+          placeName: `Highway Transit Hub`,
+          description: `Enjoy fresh tea, coffee, cool refreshments, and stretch your legs before the ghat incline.`,
+          image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80",
+        });
+      }
+
+      // 3. Destination Arrival & Hotel Check-in / Night Stay Setup
+      dayItems.push({
+        time: formatTimeRange(arrivalMin, 60),
+        slot: "lodging",
+        type: "lodging",
+        iconName: "Bed",
+        title: `Arrival at ${destination} & Hotel Check-in at ${hotelDisplayName}`,
+        placeName: hotelDisplayName,
+        description: `Arrive in ${destination} after the ~${driveHours} hrs scenic road journey. Complete express check-in, unpack luggage, and settle into your room for the night stay.`,
+        image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?w=1200&auto=format&fit=crop&q=80",
+      });
+
+      // 4. Post-Arrival Meal or Afternoon Sightseeing
+      const p1 = getNextUniquePlace();
+      const p2 = getNextUniquePlace();
+
+      if (arrivalMin < 840) {
+        // Arrive before 2:00 PM -> Lunch in Destination + Afternoon Sightseeing
+        dayItems.push({
+          time: formatTimeRange(Math.max(arrivalMin + 60, 780), 60),
+          slot: "lunch",
+          type: "food",
+          iconName: "Coffee",
+          title: `Authentic Regional Lunch in ${destination}`,
+          placeName: `${destination} Central Restaurant`,
+          description: `Savor traditional South Indian delicacies, fresh local specialties, and refreshing drinks.`,
+          image: "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?w=1200&auto=format&fit=crop&q=80",
+        });
+
+        dayItems.push({
+          time: "03:30 PM - 05:30 PM",
+          slot: "afternoon",
+          type: "sightseeing",
+          iconName: "Camera",
+          title: generateActionTitle(p1, "03:30 PM - 05:30 PM"),
+          placeName: p1.name,
+          description: p1.description,
+          image: p1.image,
+        });
+      } else {
+        // Arrive later afternoon -> Afternoon / Sunset Exploration
+        dayItems.push({
+          time: formatTimeRange(arrivalMin + 60, 90),
+          slot: "afternoon",
+          type: "sightseeing",
+          iconName: "Camera",
+          title: generateActionTitle(p1, "Evening Arrival Exploration"),
+          placeName: p1.name,
+          description: p1.description,
+          image: p1.image,
+        });
+      }
+
+      // 5. Evening Sunset & Local Artisan Markets
+      dayItems.push({
+        time: "05:45 PM - 07:30 PM",
+        slot: "evening",
+        type: "sightseeing",
+        iconName: "Camera",
+        title: `Sunset Views & Evening Promenade at ${p2.name}`,
+        placeName: p2.name,
+        description: p2.description || `Catch evening sunset hues and explore local handcrafted souvenirs and spice stalls.`,
+        image: p2.image,
+      });
+
+      // 6. Dinner & Night Stay
+      dayItems.push({
+        time: "08:00 PM - 09:30 PM",
+        slot: "dinner",
+        type: "food",
+        iconName: "Bed",
+        title: `Dinner & Night Stay at ${hotelDisplayName}`,
+        placeName: `${hotelDisplayName} Fine Dining`,
+        description: `Delight in a sumptuous dinner featuring local specialties, followed by a restful and comfortable night stay at ${hotelDisplayName}.`,
+        image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80",
+      });
+    } else if (isLastDay) {
+      // Final Day: Morning breakfast, check-out, highlights, lunch & return journey
+      const p1 = getNextUniquePlace();
+      const p2 = getNextUniquePlace();
+
+      dayItems.push({
         time: "08:00 AM - 09:00 AM",
         slot: "breakfast",
         type: "food",
-        title: `Breakfast at Resort / South Indian Cafe`,
-        placeName: `${destination} Breakfast Cafe`,
-        description: `Fuel up with fresh hot idlis, crispy dosas, filter coffee, and traditional breakfast delicacies before heading out.`,
-        image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=1200&auto=format&fit=crop&q=80"
-      },
-      {
-        time: "09:00 AM - 11:30 AM",
+        iconName: "Coffee",
+        title: `Breakfast & Hotel Check-out at ${hotelDisplayName}`,
+        placeName: `${hotelDisplayName} Breakfast Lounge`,
+        description: `Enjoy a hearty buffet breakfast, complete hotel check-out formalities, and pack bags into the vehicle.`,
+        image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=1200&auto=format&fit=crop&q=80",
+      });
+
+      dayItems.push({
+        time: "09:15 AM - 11:30 AM",
         slot: "morning",
         type: "sightseeing",
-        title: generateActionTitle(p1, "09:00 AM - 11:30 AM"),
+        iconName: "Camera",
+        title: generateActionTitle(p1, "09:15 AM - 11:30 AM"),
         placeName: p1.name,
         description: p1.description,
         image: p1.image,
-      },
-      {
+      });
+
+      dayItems.push({
         time: "11:30 AM - 01:00 PM",
         slot: "morning",
         type: "sightseeing",
+        iconName: "Camera",
         title: generateActionTitle(p2, "11:30 AM - 01:00 PM"),
         placeName: p2.name,
         description: p2.description,
         image: p2.image,
-      },
-      {
+      });
+
+      dayItems.push({
+        time: "01:00 PM - 02:15 PM",
+        slot: "lunch",
+        type: "food",
+        iconName: "Coffee",
+        title: `Farewell Lunch & Refreshment`,
+        placeName: `${destination} Valley View Restaurant`,
+        description: `Relish a farewell feast and refreshments before commencing the road journey back.`,
+        image: "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?w=1200&auto=format&fit=crop&q=80",
+      });
+
+      dayItems.push({
+        time: "02:30 PM Onwards",
+        slot: "transit",
+        type: "transit",
+        iconName: "Navigation",
+        title: `Return Road Journey towards ${source}`,
+        placeName: `Return Express Highway Route`,
+        description: `Commence return drive with scenic highway descents and scheduled evening refreshment stops back to ${source}.`,
+        image: "https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1200&auto=format&fit=crop&q=80",
+      });
+    } else {
+      // Intermediate Full Day in Destination
+      const p1 = getNextUniquePlace();
+      const p2 = getNextUniquePlace();
+      const p3 = getNextUniquePlace();
+      const p4 = getNextUniquePlace();
+
+      dayItems.push({
+        time: "08:00 AM - 09:00 AM",
+        slot: "breakfast",
+        type: "food",
+        iconName: "Coffee",
+        title: `Morning Breakfast at ${hotelDisplayName}`,
+        placeName: `${hotelDisplayName} Cafe`,
+        description: `Fuel up with fresh hot breakfast delicacies, tropical fruits, and fresh coffee/tea before starting the day's excursions.`,
+        image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=1200&auto=format&fit=crop&q=80",
+      });
+
+      dayItems.push({
+        time: "09:15 AM - 11:30 AM",
+        slot: "morning",
+        type: "sightseeing",
+        iconName: "Camera",
+        title: generateActionTitle(p1, "09:15 AM - 11:30 AM"),
+        placeName: p1.name,
+        description: p1.description,
+        image: p1.image,
+      });
+
+      dayItems.push({
+        time: "11:30 AM - 01:00 PM",
+        slot: "morning",
+        type: "sightseeing",
+        iconName: "Camera",
+        title: generateActionTitle(p2, "11:30 AM - 01:00 PM"),
+        placeName: p2.name,
+        description: p2.description,
+        image: p2.image,
+      });
+
+      dayItems.push({
         time: "01:00 PM - 02:30 PM",
         slot: "lunch",
         type: "food",
+        iconName: "Coffee",
         title: `Authentic Regional Lunch & Refreshment`,
-        placeName: `${destination} Central Restaurant`,
-        description: `Savor an authentic South Indian thali, regional specials, and fresh fruit juices.`,
-        image: "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?w=1200&auto=format&fit=crop&q=80"
-      },
-      {
+        placeName: `${destination} Heritage Dining`,
+        description: `Savor authentic regional cuisine, local breads, aromatic curries, and fresh beverages.`,
+        image: "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?w=1200&auto=format&fit=crop&q=80",
+      });
+
+      dayItems.push({
         time: "02:30 PM - 05:30 PM",
         slot: "afternoon",
         type: "sightseeing",
+        iconName: "Camera",
         title: generateActionTitle(p3, "02:30 PM - 05:30 PM"),
         placeName: p3.name,
         description: p3.description,
         image: p3.image,
-      },
-      {
+      });
+
+      dayItems.push({
         time: "05:30 PM - 07:30 PM",
         slot: "evening",
         type: "sightseeing",
+        iconName: "Camera",
         title: generateActionTitle(p4, "05:30 PM - 07:30 PM"),
         placeName: p4.name,
-        description: p4.description || `Catch breathtaking sunset vistas and explore local handicraft, spice, and souvenir markets.`,
+        description: p4.description || `Catch sunset views and explore vibrant local markets, spices, and craft shops.`,
         image: p4.image,
-      },
-      {
+      });
+
+      dayItems.push({
         time: "08:00 PM - 09:30 PM",
         slot: "dinner",
         type: "food",
-        title: `Dinner & Evening Culinary Experience`,
-        placeName: `${destination} Fine Dining`,
-        description: `Unwind with a gourmet dinner, authentic local specialties, homemade desserts, and warm beverages.`,
-        image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80"
-      },
-    ];
+        iconName: "Bed",
+        title: `Dinner & Night Stay at ${hotelDisplayName}`,
+        placeName: `${hotelDisplayName} Restaurant`,
+        description: `Unwind with a gourmet multi-course dinner, followed by a cozy night stay at ${hotelDisplayName}.`,
+        image: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=1200&auto=format&fit=crop&q=80",
+      });
+    }
 
     itinerary.push({
       day: d,
       title: dayTitle,
-      items,
+      items: dayItems,
     });
   }
-
 
   const destinationAttractions = [{
     id: `dest_node_verified_1`,
@@ -1784,6 +1958,8 @@ app.post("/api/build-itinerary", async (req, res) => {
   // 1. EXTRACT PARAMETERS WITH FALLBACK TO CURRENT TRIP DATA
   const source = req.body.source || tripData.startLocation || "Chennai";
   const destination = req.body.destination || tripData.destinations?.[0] || "Kodaikanal";
+  const startTime = tripData.startTime || req.body.startTime || "06:00";
+  const selectedHotelName = tripData.selectedHotelName || req.body.selectedHotelName || null;
 
   // Parse Start Date and End Date to calculate totalDays dynamically: numberOfDays = (endDate - startDate) + 1
   const startDateStr = req.body.startDate || tripData.startDate;
@@ -1847,8 +2023,15 @@ app.post("/api/build-itinerary", async (req, res) => {
   // Food Cost: Members * Days * Daily Food Rate
   const foodCost = groupSize * totalDays * dailyFoodRatePerPerson;
 
-  // FETCH REAL WORLD ITINERARY AND ATTRACTIONS
-  const realItineraryData = await generateStructuredRealItinerary(destination, totalDays, source);
+  // FETCH REAL WORLD ITINERARY AND ATTRACTIONS SCHEDULED FROM USER'S START TIME
+  const realItineraryData = await generateStructuredRealItinerary(
+    destination,
+    totalDays,
+    source,
+    startTime,
+    selectedHotelName,
+    oneWayDistanceKm
+  );
   const placesCount = realItineraryData.places ? realItineraryData.places.length : totalDays * 3;
   const avgTicketPrice = 50;
   const sightseeingCost = groupSize * placesCount * avgTicketPrice;

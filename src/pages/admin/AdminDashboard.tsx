@@ -73,6 +73,8 @@ import {
   PieChart as PieIcon,
   Layers,
   Leaf,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { exportToCSV } from "@/utils/csvExporter";
 import {
@@ -97,31 +99,6 @@ import { GoogleMap, useJsApiLoader, MarkerF, InfoWindowF } from "@react-google-m
 const COLORS_MOOD = ["#10B981", "#F59E0B", "#06B6D4", "#8B5CF6"];
 const COLORS_VEHICLE = ["#10B981", "#3B82F6", "#F59E0B"];
 
-const TRIP_TRENDS_DATA = [
-  { month: "Jan", trips: 420, lastYear: 280 },
-  { month: "Feb", trips: 380, lastYear: 310 },
-  { month: "Mar", trips: 510, lastYear: 350 },
-  { month: "Apr", trips: 290, lastYear: 210 },
-  { month: "May", trips: 620, lastYear: 430 },
-  { month: "Jun", trips: 540, lastYear: 390 },
-  { month: "Jul", trips: 720, lastYear: 480 },
-];
-
-const MOODS_DATA = [
-  { name: "Nature", value: 45, color: "#10B981", percent: "39%" },
-  { name: "Adventure", value: 30, color: "#F59E0B", percent: "26%" },
-  { name: "Spiritual", value: 25, color: "#06B6D4", percent: "22%" },
-  { name: "Culture", value: 15, color: "#8B5CF6", percent: "13%" },
-];
-
-const TOTAL_VIBE_COUNT = MOODS_DATA.reduce((acc, curr) => acc + curr.value, 0);
-
-const VEHICLES_DATA = [
-  { name: "EV", value: 60 },
-  { name: "Hybrid", value: 25 },
-  { name: "Gas", value: 15 },
-];
-
 const AdminDashboard: React.FC = () => {
   const [adminName, setAdminName] = useState("Officer");
   const [activeTab, setActiveTab] = useState<AdminTab>("overview");
@@ -132,6 +109,7 @@ const AdminDashboard: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [chartViewMode, setChartViewMode] = useState<"bar" | "area">("bar");
   const [activePieIndex, setActivePieIndex] = useState<number | null>(null);
+  const [allTrips, setAllTrips] = useState<any[]>([]);
 
   // Custom Confirmation Dialog Modal State (Replaces native window.confirm)
   const [confirmModal, setConfirmModal] = useState<{
@@ -218,6 +196,7 @@ const AdminDashboard: React.FC = () => {
   const [selectedUserModal, setSelectedUserModal] = useState<any | null>(null);
   const [userTripsModal, setUserTripsModal] = useState<any[]>([]);
   const [loadingTripsModal, setLoadingTripsModal] = useState(false);
+  const [expandedModalTripId, setExpandedModalTripId] = useState<string | null>(null);
 
   const [overrideCity, setOverrideCity] = useState("");
   const [overridePetrol, setOverridePetrol] = useState("");
@@ -232,6 +211,117 @@ const AdminDashboard: React.FC = () => {
     id: "admin-google-map-script",
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "",
   });
+
+  // Dynamic Monthly Trip Trends computed from real user trips
+  const monthlyTripTrends = useMemo(() => {
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const now = new Date();
+    const currentYear = now.getFullYear();
+
+    // 7 rolling months up to current month
+    const monthsToDisplay: { name: string; monthIndex: number; year: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      monthsToDisplay.push({
+        name: monthNames[d.getMonth()],
+        monthIndex: d.getMonth(),
+        year: d.getFullYear(),
+      });
+    }
+
+    const monthlyCounts: Record<string, { trips: number; lastYear: number }> = {};
+    monthsToDisplay.forEach((m) => {
+      monthlyCounts[m.name] = { trips: 0, lastYear: 0 };
+    });
+
+    allTrips.forEach((trip) => {
+      let tripDate: Date | null = null;
+      if (trip.createdAt?.toDate) {
+        tripDate = trip.createdAt.toDate();
+      } else if (trip.createdAt?.seconds) {
+        tripDate = new Date(trip.createdAt.seconds * 1000);
+      } else if (trip.createdAt) {
+        tripDate = new Date(trip.createdAt);
+      } else if (trip.tripData?.startDate) {
+        tripDate = new Date(trip.tripData.startDate);
+      }
+
+      if (tripDate && !isNaN(tripDate.getTime())) {
+        const mName = monthNames[tripDate.getMonth()];
+        const tripYr = tripDate.getFullYear();
+        if (monthlyCounts[mName]) {
+          if (tripYr === currentYear) {
+            monthlyCounts[mName].trips += 1;
+          } else if (tripYr === currentYear - 1) {
+            monthlyCounts[mName].lastYear += 1;
+          } else {
+            monthlyCounts[mName].trips += 1;
+          }
+        }
+      }
+    });
+
+    return monthsToDisplay.map((m) => ({
+      month: m.name,
+      trips: monthlyCounts[m.name]?.trips || 0,
+      lastYear: monthlyCounts[m.name]?.lastYear || 0,
+    }));
+  }, [allTrips]);
+
+  // Dynamic Trip Vibe Distribution from real user data
+  const { moodsData, totalVibeCount } = useMemo(() => {
+    const moodCountMap: Record<string, number> = {};
+    allTrips.forEach((t) => {
+      const moods = Array.isArray(t.moods) && t.moods.length
+        ? t.moods
+        : Array.isArray(t.tripData?.moods) && t.tripData.moods.length
+          ? t.tripData.moods
+          : Array.isArray(t.tripData?.genres)
+            ? t.tripData.genres
+            : [];
+
+      moods.forEach((m: string) => {
+        if (typeof m === "string" && m.trim()) {
+          const cap = m.trim().charAt(0).toUpperCase() + m.trim().slice(1).toLowerCase();
+          moodCountMap[cap] = (moodCountMap[cap] || 0) + 1;
+        }
+      });
+    });
+
+    const entries = Object.entries(moodCountMap);
+    const total = entries.reduce((sum, [, count]) => sum + count, 0);
+
+    const palette = ["#10B981", "#F59E0B", "#06B6D4", "#8B5CF6", "#EC4899", "#3B82F6", "#6366F1"];
+
+    if (entries.length === 0) {
+      return {
+        moodsData: [
+          { name: "Nature", value: 0, color: "#10B981", percent: "0%" },
+          { name: "Adventure", value: 0, color: "#F59E0B", percent: "0%" },
+          { name: "Spiritual", value: 0, color: "#06B6D4", percent: "0%" },
+          { name: "Culture", value: 0, color: "#8B5CF6", percent: "0%" },
+        ],
+        totalVibeCount: 0,
+      };
+    }
+
+    const formatted = entries.slice(0, 4).map(([name, val], idx) => ({
+      name,
+      value: val,
+      color: palette[idx % palette.length],
+      percent: total > 0 ? `${Math.round((val / total) * 100)}%` : "0%",
+    }));
+
+    return { moodsData: formatted, totalVibeCount: total };
+  }, [allTrips]);
+
+  // Dynamic Total CO2 Saved calculation
+  const co2SavedTotal = useMemo(() => {
+    const total = allTrips.reduce((acc, t) => {
+      return acc + (t.ecoData?.co2 || t.ecoScore?.co2kg || 0);
+    }, 0);
+    return total > 0 ? total.toFixed(0) : "0";
+  }, [allTrips]);
 
   // Centralized Audit Logging Helper
   const logAdminAction = async (action: string, target: string, details?: string) => {
@@ -576,6 +666,39 @@ const AdminDashboard: React.FC = () => {
         (err) => console.warn("Announcements listener notice:", err.message)
       );
       unsubs.push(unsubAnnouncements);
+
+      // 10. Live Trips Telemetry Listener
+      const unsubTrips = onSnapshot(
+        collection(adminDb, "trips"),
+        (snap) => {
+          const tripsFromDb = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+          const localTripsMap = new Map<string, any>();
+          tripsFromDb.forEach((t) => localTripsMap.set(t.id, t));
+
+          try {
+            for (let i = 0; i < localStorage.length; i++) {
+              const k = localStorage.key(i);
+              if (k && k.startsWith("tourenvi.planned.trips")) {
+                const raw = localStorage.getItem(k);
+                if (raw) {
+                  const parsed = JSON.parse(raw);
+                  if (Array.isArray(parsed)) {
+                    parsed.forEach((t: any) => {
+                      if (t && t.id && !localTripsMap.has(t.id)) {
+                        localTripsMap.set(t.id, t);
+                      }
+                    });
+                  }
+                }
+              }
+            }
+          } catch {}
+
+          setAllTrips(Array.from(localTripsMap.values()));
+        },
+        (err) => console.warn("Trips live listener notice:", err.message)
+      );
+      unsubs.push(unsubTrips);
     });
 
     return () => {
@@ -621,10 +744,14 @@ const AdminDashboard: React.FC = () => {
   const handleForceSyncData = async () => {
     setIsSyncing(true);
     try {
-      const [userSnap, adminSnap] = await Promise.all([
+      const [userSnap, adminSnap, tripsSnap] = await Promise.all([
         getDocs(collection(adminDb, "users")),
         getDocs(collection(adminDb, "admins")),
+        getDocs(collection(adminDb, "trips")),
       ]);
+
+      const tripsFromDb = tripsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setAllTrips(tripsFromDb);
 
       const uList = userSnap.docs.map((d) => ({
         id: d.id,
@@ -993,10 +1120,10 @@ const AdminDashboard: React.FC = () => {
         await updateDoc(doc(db, "admins", targetUid), updatePayload);
       } catch {}
       try {
+        
         await updateDoc(doc(adminDb, "users", targetUid), updatePayload);
       } catch {}
 
-      // Write notification record
       try {
         await addDoc(collection(adminDb, "notifications"), {
           targetUid,
@@ -1097,17 +1224,76 @@ const AdminDashboard: React.FC = () => {
   const handleOpenUserModal = async (user: any) => {
     setSelectedUserModal(user);
     setLoadingTripsModal(true);
+    setExpandedModalTripId(null);
 
     try {
       const targetUid = user.uid || user.id;
-      const q = query(collection(adminDb, "trips"), where("userId", "==", targetUid));
-      const snap = await getDocs(q);
+      const userEmail = user.email ? user.email.trim().toLowerCase() : "";
+      const foundTripsMap = new Map<string, any>();
 
-      if (!snap.empty) {
-        setUserTripsModal(snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() })));
-      } else {
-        setUserTripsModal([]);
+      // 1. Query by userId in adminDb
+      try {
+        const q1 = query(collection(adminDb, "trips"), where("userId", "==", targetUid));
+        const snap1 = await getDocs(q1);
+        snap1.forEach((d) => foundTripsMap.set(d.id, { id: d.id, ...d.data() }));
+      } catch (e) {
+        console.warn("Trip query by userId failed:", e);
       }
+
+      // 2. Query by uid in adminDb
+      try {
+        const q2 = query(collection(adminDb, "trips"), where("uid", "==", targetUid));
+        const snap2 = await getDocs(q2);
+        snap2.forEach((d) => foundTripsMap.set(d.id, { id: d.id, ...d.data() }));
+      } catch (e) {}
+
+      // 3. Query by memberIds contains targetUid
+      try {
+        const q3 = query(collection(adminDb, "trips"), where("memberIds", "array-contains", targetUid));
+        const snap3 = await getDocs(q3);
+        snap3.forEach((d) => foundTripsMap.set(d.id, { id: d.id, ...d.data() }));
+      } catch (e) {}
+
+      // 4. Query by userEmail if present
+      if (userEmail) {
+        try {
+          const q4 = query(collection(adminDb, "trips"), where("userEmail", "==", userEmail));
+          const snap4 = await getDocs(q4);
+          snap4.forEach((d) => foundTripsMap.set(d.id, { id: d.id, ...d.data() }));
+        } catch (e) {}
+      }
+
+      // 5. Query subcollection users/{targetUid}/trips
+      try {
+        const subSnap = await getDocs(collection(adminDb, "users", targetUid, "trips"));
+        subSnap.forEach((d) => foundTripsMap.set(d.id, { id: d.id, ...d.data() }));
+      } catch (e) {}
+
+      // 6. Check main client db if adminDb missed anything
+      try {
+        const qDb = query(collection(db, "trips"), where("userId", "==", targetUid));
+        const snapDb = await getDocs(qDb);
+        snapDb.forEach((d) => foundTripsMap.set(d.id, { id: d.id, ...d.data() }));
+      } catch (e) {}
+
+      // 7. Check localStorage fallback for targetUid
+      try {
+        const localKey = `tourenvi.planned.trips.${targetUid}`;
+        const rawLocal = localStorage.getItem(localKey);
+        if (rawLocal) {
+          const parsed = JSON.parse(rawLocal);
+          if (Array.isArray(parsed)) {
+            parsed.forEach((t: any) => {
+              if (t.id && !foundTripsMap.has(t.id)) {
+                foundTripsMap.set(t.id, t);
+              }
+            });
+          }
+        }
+      } catch (e) {}
+
+      const allTrips = Array.from(foundTripsMap.values());
+      setUserTripsModal(allTrips);
     } catch (error) {
       console.error("Error loading user planned trips:", error);
       setUserTripsModal([]);
@@ -1413,7 +1599,7 @@ const AdminDashboard: React.FC = () => {
                   <div>
                     <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Trips Planned</p>
                     <h3 className="text-2xl sm:text-3xl font-semibold font-black text-slate-900 mt-1 group-hover:text-blue-700 transition-colors">
-                      2,480
+                      {allTrips.length.toLocaleString()}
                     </h3>
                   </div>
                   <div className="p-3 rounded-2xl bg-white text-blue-600 border border-blue-100/80 shadow-xs group-hover:scale-105 transition-transform">
@@ -1421,7 +1607,7 @@ const AdminDashboard: React.FC = () => {
                   </div>
                 </div>
                 <div className="mt-3 flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold">
-                  <TrendingUp className="h-3.5 w-3.5" /> +18.2% from route builder
+                  <TrendingUp className="h-3.5 w-3.5" /> Real-time active database records
                 </div>
               </div>
 
@@ -1449,7 +1635,7 @@ const AdminDashboard: React.FC = () => {
                   <div>
                     <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">CO₂ Saved</p>
                     <h3 className="text-2xl sm:text-3xl font-semibold font-black text-slate-900 mt-1 group-hover:text-amber-700 transition-colors">
-                      4,820 <span className="text-sm font-semibold text-slate-400">kg</span>
+                      {co2SavedTotal} <span className="text-sm font-semibold text-slate-400">kg</span>
                     </h3>
                   </div>
                   <div className="p-3 rounded-2xl bg-white text-amber-600 border border-amber-100/80 shadow-xs group-hover:scale-105 transition-transform">
@@ -1462,19 +1648,19 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Graphs Grid: Left = Image 2 Style Comparison Bar/Wave Chart, Right = Image 3 Financial Breakdown Donut */}
+            {/* Graphs Grid: Left = Dynamic Monthly Trends Bar/Wave Chart, Right = Dynamic Trip Vibe Distribution */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Monthly Activity Trends - Styled like Image 2 "Overview Income" */}
+              {/* Monthly Activity Trends */}
               <div className="lg:col-span-2 p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
                   <div>
                     <h3 className="text-base font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                       <BarChart2 className="h-4.5 w-4.5 text-purple-600" /> Monthly Trip Activity Trends
                     </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">Comparative monthly trip telemetry & frequency</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Real-time user trip creations across past 7 months</p>
                   </div>
 
-                  {/* Chart controls matching Image 2 */}
+                  {/* Chart controls */}
                   <div className="flex items-center gap-3 flex-wrap">
                     <div className="flex items-center gap-3 text-xs font-semibold">
                       <span className="flex items-center gap-1.5 text-slate-700">
@@ -1513,19 +1699,19 @@ const AdminDashboard: React.FC = () => {
                 <div className="h-72 w-full pt-2">
                   <ResponsiveContainer width="100%" height="100%">
                     {chartViewMode === "bar" ? (
-                      <BarChart data={TRIP_TRENDS_DATA} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                      <BarChart data={monthlyTripTrends} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                         <XAxis dataKey="month" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={{ stroke: "#E2E8F0" }} />
-                        <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={{ stroke: "#E2E8F0" }} />
+                        <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={{ stroke: "#E2E8F0" }} allowDecimals={false} />
                         <Tooltip
                           content={({ active, payload, label }) => {
                             if (active && payload && payload.length) {
                               return (
                                 <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xl text-xs">
-                                  <p className="font-bold text-slate-800 mb-1">{label} Telemetry</p>
+                                  <p className="font-bold text-slate-800 mb-1">{label} Planned Trips</p>
                                   <p className="text-purple-600 font-semibold flex items-center gap-1.5">
                                     <span className="w-2 h-2 rounded-full bg-purple-600"></span>
-                                    This year: <span className="font-black">{payload[0]?.value}</span> trips
+                                    This year: <span className="font-black">{payload[0]?.value}</span> {payload[0]?.value === 1 ? "trip" : "trips"}
                                   </p>
                                   {payload[1] && (
                                     <p className="text-slate-400 font-semibold flex items-center gap-1.5 mt-0.5">
@@ -1539,11 +1725,11 @@ const AdminDashboard: React.FC = () => {
                             return null;
                           }}
                         />
-                        <Bar dataKey="trips" fill="#7C3AED" radius={[6, 6, 0, 0]} barSize={14} name="This year" />
-                        <Bar dataKey="lastYear" fill="#E2E8F0" radius={[6, 6, 0, 0]} barSize={14} name="Last year" />
+                        <Bar dataKey="trips" fill="#7C3AED" radius={[6, 6, 0, 0]} barSize={18} name="This year" />
+                        <Bar dataKey="lastYear" fill="#E2E8F0" radius={[6, 6, 0, 0]} barSize={18} name="Last year" />
                       </BarChart>
                     ) : (
-                      <AreaChart data={TRIP_TRENDS_DATA} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                      <AreaChart data={monthlyTripTrends} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                         <defs>
                           <linearGradient id="colorTripsVibrant" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.35} />
@@ -1552,7 +1738,7 @@ const AdminDashboard: React.FC = () => {
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
                         <XAxis dataKey="month" stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={{ stroke: "#E2E8F0" }} />
-                        <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={{ stroke: "#E2E8F0" }} />
+                        <YAxis stroke="#94A3B8" fontSize={12} tickLine={false} axisLine={{ stroke: "#E2E8F0" }} allowDecimals={false} />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: "#FFFFFF",
@@ -1570,29 +1756,29 @@ const AdminDashboard: React.FC = () => {
                 </div>
               </div>
 
-              {/* Trip Vibe Distribution - Exact Image 3 Layout (3D Center Badge + 2x2 Callout Cards) */}
+              {/* Trip Vibe Distribution */}
               <div className="p-6 rounded-2xl border border-slate-200/80 bg-white shadow-xs space-y-4">
                 <div>
                   <h3 className="text-base font-bold text-slate-800 uppercase tracking-wider flex items-center gap-2">
                     <Sparkles className="h-4.5 w-4.5 text-emerald-600" /> Trip Vibe Distribution
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">User preferred trip atmospheres</p>
+                  <p className="text-xs text-slate-500 mt-0.5">User preferred trip atmospheres from saved trips</p>
                 </div>
 
                 {/* 3D-effect Circular Donut with Center Leaf Badge */}
                 <div className="relative h-56 flex items-center justify-center">
                   <div className="absolute w-32 h-32 rounded-full bg-gradient-to-br from-white to-slate-50 shadow-[inset_0_2px_4px_rgba(255,255,255,0.9),0_10px_20px_rgba(0,0,0,0.08),0_2px_4px_rgba(0,0,0,0.04)] border border-slate-200/60 flex flex-col items-center justify-center text-center pointer-events-none z-10 p-3 transition-all duration-300">
                     <Leaf className="text-emerald-600 mb-0.5" size={20} />
-                    {activePieIndex !== null ? (
+                    {activePieIndex !== null && moodsData[activePieIndex] ? (
                       <>
-                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">
-                          {MOODS_DATA[activePieIndex].name}
+                        <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none truncate max-w-[90px]">
+                          {moodsData[activePieIndex].name}
                         </span>
                         <span
                           className="text-lg font-black transition-all duration-300 mt-1 leading-none"
-                          style={{ color: MOODS_DATA[activePieIndex].color }}
+                          style={{ color: moodsData[activePieIndex].color }}
                         >
-                          {MOODS_DATA[activePieIndex].value}%
+                          {moodsData[activePieIndex].percent}
                         </span>
                       </>
                     ) : (
@@ -1601,7 +1787,7 @@ const AdminDashboard: React.FC = () => {
                           Total Vibes
                         </span>
                         <span className="text-lg font-black text-slate-800 mt-1 leading-none">
-                          100%
+                          {totalVibeCount > 0 ? `${totalVibeCount}` : "100%"}
                         </span>
                       </>
                     )}
@@ -1610,7 +1796,7 @@ const AdminDashboard: React.FC = () => {
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
-                        data={MOODS_DATA}
+                        data={moodsData}
                         cx="50%"
                         cy="50%"
                         innerRadius={65}
@@ -1621,7 +1807,7 @@ const AdminDashboard: React.FC = () => {
                         onMouseEnter={(_, index) => setActivePieIndex(index)}
                         onMouseLeave={() => setActivePieIndex(null)}
                       >
-                        {MOODS_DATA.map((entry, index) => {
+                        {moodsData.map((entry, index) => {
                           const isActive = activePieIndex === index;
                           return (
                             <Cell
@@ -1639,9 +1825,9 @@ const AdminDashboard: React.FC = () => {
                   </ResponsiveContainer>
                 </div>
 
-                {/* 2x2 Callout Cards Grid - Exact Image 3 Layout */}
+                {/* 2x2 Callout Cards Grid */}
                 <div className="grid grid-cols-2 gap-3 pt-1">
-                  {MOODS_DATA.map((item, index) => {
+                  {moodsData.map((item, index) => {
                     const isActive = activePieIndex === index;
                     return (
                       <div
@@ -3437,228 +3623,422 @@ const AdminDashboard: React.FC = () => {
       </main>
 
       {selectedUserModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-2xl p-4 sm:p-6 space-y-6">
-            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 border border-emerald-200/80 text-emerald-600 text-lg font-black uppercase shadow-xs">
-                  {selectedUserModal.name ? selectedUserModal.name.substring(0, 2) : "US"}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-900/50 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-5xl max-h-[92vh] flex flex-col rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-2xl overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 sm:p-6 border-b border-slate-100 bg-linear-to-r from-emerald-50/50 via-slate-50/30 to-white">
+              <div className="flex items-center gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-linear-to-br from-emerald-500 to-teal-600 text-white text-xl font-black uppercase shadow-md shadow-emerald-500/20">
+                  {selectedUserModal.name ? selectedUserModal.name.substring(0, 2).toUpperCase() : "US"}
                 </div>
                 <div>
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-800 flex items-center gap-2">
-                    {selectedUserModal.name || "Anonymous User"}
-                  </h3>
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-500 mt-1">
-                    <span className="flex items-center gap-1 text-slate-600">
-                      <Mail className="h-3.5 w-3.5 text-emerald-600" /> {selectedUserModal.email}
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h3 className="text-xl font-bold text-slate-900">
+                      {selectedUserModal.name || "Anonymous Traveler"}
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      {selectedUserModal.role || "user"}
+                    </span>
+                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                      selectedUserModal.status === "suspended"
+                        ? "bg-red-50 text-red-600 border border-red-200"
+                        : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                    }`}>
+                      {selectedUserModal.status === "suspended" ? "Suspended" : "Active & Verified"}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 mt-1.5">
+                    <a
+                      href={`mailto:${selectedUserModal.email}`}
+                      className="flex items-center gap-1.5 text-slate-600 hover:text-emerald-600 transition-colors font-medium"
+                    >
+                      <Mail className="h-3.5 w-3.5 text-emerald-500" /> {selectedUserModal.email || "No email"}
+                    </a>
+                    <span>•</span>
+                    <span className="flex items-center gap-1.5 text-slate-600 font-medium">
+                      <Phone className="h-3.5 w-3.5 text-emerald-500" /> {selectedUserModal.phone || "No phone added"}
                     </span>
                     <span>•</span>
-                    <span className="flex items-center gap-1 text-slate-600">
-                      <Phone className="h-3.5 w-3.5 text-emerald-600" /> {selectedUserModal.phone || "No phone added"}
+                    <span className="text-slate-400">
+                      Member since: {selectedUserModal.createdAt?.toLocaleDateString
+                        ? selectedUserModal.createdAt.toLocaleDateString()
+                        : selectedUserModal.createdAt?.seconds
+                        ? new Date(selectedUserModal.createdAt.seconds * 1000).toLocaleDateString()
+                        : "Registered User"}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <button
-                onClick={() => setSelectedUserModal(null)}
-                className="p-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-all cursor-pointer"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
-                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Account Role</span>
-                <div className="font-bold text-slate-800 uppercase text-xs">{selectedUserModal.role || "user"}</div>
-              </div>
-
-              <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
-                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Login Method</span>
-                <div>{renderAuthProviderBadge(selectedUserModal)}</div>
-              </div>
-
-              <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
-                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Account Status</span>
-                <div className={selectedUserModal.status === "suspended" ? "text-red-500 font-bold" : "text-emerald-600 font-bold"}>
-                  {selectedUserModal.status === "suspended" ? "Suspended" : "Active & Verified"}
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 space-y-1">
-                <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Member Since</span>
-                <div className="font-semibold text-slate-700 text-xs">
-                  {selectedUserModal.createdAt?.toLocaleDateString
-                    ? selectedUserModal.createdAt.toLocaleDateString()
-                    : selectedUserModal.createdAt?.seconds
-                    ? new Date(selectedUserModal.createdAt.seconds * 1000).toLocaleDateString()
-                    : "Registered Traveler"}
-                </div>
+              <div className="flex items-center gap-2 self-end sm:self-center">
+                <button
+                  onClick={() => handleOpenUserModal(selectedUserModal)}
+                  disabled={loadingTripsModal}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-emerald-700 text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                  title="Re-sync and fetch planned trips from Firestore"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingTripsModal ? "animate-spin text-emerald-600" : ""}`} />
+                  Sync Trips
+                </button>
+                <button
+                  onClick={() => setSelectedUserModal(null)}
+                  className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition-all cursor-pointer shadow-2xs"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-emerald-500" /> User Planned Itineraries & Budget History
-                </h4>
-                <span className="text-xs text-slate-500 font-semibold">
-                  {userTripsModal.length} Planned Trip(s)
-                </span>
-              </div>
+            {/* Modal Body - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+              
+              {/* Overview Metric Cards */}
+              {(() => {
+                const totalTripsCount = userTripsModal.length;
+                const totalBudgetSum = userTripsModal.reduce((acc, t) => {
+                  return acc + (t.totalCost || t.financials?.totalCost || t.costBreakdown?.total || 0);
+                }, 0);
+                const totalDistSum = userTripsModal.reduce((acc, t) => {
+                  return acc + (t.routeDetails?.distanceKm || t.tripData?.distanceKm || 450);
+                }, 0);
+                const totalCO2Sum = userTripsModal.reduce((acc, t) => {
+                  return acc + (t.ecoData?.co2 || t.ecoScore?.co2kg || 0);
+                }, 0);
 
-              {loadingTripsModal ? (
-                <div className="p-8 text-center text-sm text-slate-400 flex items-center justify-center gap-2">
-                  <RefreshCw className="h-4 w-4 animate-spin text-emerald-500" /> Fetching planned trip itineraries...
-                </div>
-              ) : userTripsModal.length > 0 ? (
-                <div className="space-y-3">
-                  {userTripsModal.map((trip, idx) => {
-                    const startLoc = trip.startLocation || trip.routeDetails?.startLocation || trip.tripData?.startLocation || "Origin";
-                    const destList = Array.isArray(trip.destinations) && trip.destinations.length
-                      ? trip.destinations
-                      : Array.isArray(trip.tripData?.destinations) && trip.tripData.destinations.length
-                        ? trip.tripData.destinations
-                        : trip.routeDetails?.destination
-                          ? [trip.routeDetails.destination]
-                          : [];
-                    const destStr = destList.join(" ➔ ") || "Destination";
-                    const title = trip.tripName || `${startLoc} ➔ ${destStr} Trip`;
-                    const totalCostVal = trip.totalCost || trip.financials?.totalCost || trip.costBreakdown?.total || 0;
-                    const daysVal = trip.numberOfDays || trip.itinerary?.length || 3;
-                    const membersVal = trip.numberOfMembers || trip.tripData?.numberOfMembers || 1;
-                    const vehicleVal = trip.vehicleType || trip.routeDetails?.vehicleType || trip.tripData?.vehicleType || "Car";
-                    const fuelVal = trip.fuelType || trip.routeDetails?.fuelType || trip.tripData?.fuelType || "Petrol";
-                    const budgetVal = trip.budgetLevel || trip.tripData?.genres?.[0] || "Standard";
-                    const breakdown = trip.costBreakdown || (trip.financials ? {
-                      fuel: trip.financials.fuelExpenditure || 0,
-                      toll: trip.financials.tollPricing || 0,
-                      hotel: trip.financials.totalLodging || 0,
-                      food: trip.financials.foodCost || 0,
-                      places: trip.financials.placesCost || 0,
-                      misc: trip.financials.miscCost || 0,
-                    } : null);
-                    const moodsList = (Array.isArray(trip.moods) && trip.moods.length)
-                      ? trip.moods
-                      : (Array.isArray(trip.tripData?.moods) && trip.tripData.moods.length)
-                        ? trip.tripData.moods
-                        : [];
-
-                    return (
-                      <div
-                        key={idx}
-                        className="p-4 sm:p-5 rounded-xl border border-slate-200/80 bg-slate-50/50 space-y-3 relative overflow-hidden group hover:border-emerald-300 hover:bg-slate-50/80 transition-all shadow-xs"
-                      >
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b border-slate-200/60 pb-3">
-                          <div>
-                            <h5 className="font-bold text-slate-800 text-base group-hover:text-emerald-700 transition-colors">
-                              {title}
-                            </h5>
-                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
-                              <MapPin className="h-3.5 w-3.5 text-emerald-500" />
-                              <span>Route: <strong className="text-slate-700">{startLoc}</strong> ➔ {destStr}</span>
-                            </p>
-                          </div>
-                          <div className="sm:text-right">
-                            <div className="text-sm font-bold text-emerald-600 font-mono">
-                              Total Estimate: ₹{totalCostVal.toLocaleString()}
-                            </div>
-                            <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                              Level: {budgetVal}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 text-xs">
-                          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium">
-                            ⏱️ Duration: <strong>{daysVal} Days</strong>
-                          </span>
-                          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium">
-                            👥 Travelers: <strong>{membersVal} Persons</strong>
-                          </span>
-                          <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 font-medium">
-                            🚗 Vehicle: <strong>{vehicleVal}</strong> ({fuelVal})
-                          </span>
-                        </div>
-
-                        {breakdown && (
-                          <div className="p-3 rounded-lg border border-slate-200/70 bg-white text-xs grid grid-cols-2 sm:grid-cols-5 gap-2 text-center">
-                            <div>
-                              <div className="text-[10px] text-slate-400 uppercase font-semibold">Fuel</div>
-                              <div className="font-mono text-slate-800 font-bold">₹{breakdown.fuel?.toLocaleString()}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] text-slate-400 uppercase font-semibold">Tolls</div>
-                              <div className="font-mono text-slate-800 font-bold">₹{breakdown.toll?.toLocaleString()}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] text-slate-400 uppercase font-semibold">Hotel</div>
-                              <div className="font-mono text-slate-800 font-bold">₹{breakdown.hotel?.toLocaleString()}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] text-slate-400 uppercase font-semibold">Food</div>
-                              <div className="font-mono text-slate-800 font-bold">₹{breakdown.food?.toLocaleString()}</div>
-                            </div>
-                            <div>
-                              <div className="text-[10px] text-slate-400 uppercase font-semibold">Places</div>
-                              <div className="font-mono text-slate-800 font-bold">₹{breakdown.places?.toLocaleString()}</div>
-                            </div>
-                          </div>
-                        )}
-
-                        {moodsList.length > 0 && (
-                          <div className="flex items-center gap-1.5 text-xs pt-1 flex-wrap">
-                            <span className="text-[10px] text-slate-400 uppercase font-bold">Vibes:</span>
-                            {moodsList.map((m: string, mIdx: number) => (
-                              <span key={mIdx} className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">
-                                {m}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                return (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/70">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Saved Trips</span>
+                        <Navigation className="h-4 w-4 text-emerald-600" />
                       </div>
-                    );
-                  })}
+                      <div className="text-xl font-bold text-slate-900 mt-1">{totalTripsCount}</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Planned itineraries</div>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/70">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Estimated Budget</span>
+                        <DollarSign className="h-4 w-4 text-teal-600" />
+                      </div>
+                      <div className="text-xl font-bold text-slate-900 font-mono mt-1">₹{totalBudgetSum.toLocaleString()}</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Across all saved plans</div>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/70">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Total Distance</span>
+                        <MapPin className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div className="text-xl font-bold text-slate-900 mt-1">{totalDistSum.toLocaleString()} km</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Planned road travels</div>
+                    </div>
+
+                    <div className="p-4 rounded-xl border border-slate-200/80 bg-slate-50/70">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">CO₂ Footprint</span>
+                        <Leaf className="h-4 w-4 text-emerald-600" />
+                      </div>
+                      <div className="text-xl font-bold text-slate-900 mt-1">{totalCO2Sum > 0 ? `${totalCO2Sum.toFixed(1)} kg` : "Eco Optimized"}</div>
+                      <div className="text-[11px] text-slate-500 mt-0.5">Estimated carbon load</div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Planned Trips Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <h4 className="text-sm font-bold uppercase tracking-wider text-slate-700">
+                      Saved Trip Itineraries & Budget Plans
+                    </h4>
+                  </div>
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 text-xs font-bold">
+                    {userTripsModal.length} {userTripsModal.length === 1 ? "Trip" : "Trips"} Found
+                  </span>
                 </div>
-              ) : (
-                <div className="p-8 text-center rounded-xl border border-slate-200/80 bg-slate-50/50 text-slate-500 text-xs space-y-2">
-                  <Info className="h-6 w-6 mx-auto text-slate-400" />
-                  <p className="font-bold text-slate-700 text-sm">No Planned Trips Recorded Yet</p>
-                  <p>This user has not saved any trip itineraries with the trip calculator builder.</p>
-                </div>
-              )}
+
+                {loadingTripsModal ? (
+                  <div className="p-12 text-center text-sm text-slate-500 flex flex-col items-center justify-center gap-3 bg-slate-50/50 rounded-2xl border border-slate-200/60">
+                    <RefreshCw className="h-6 w-6 animate-spin text-emerald-600" />
+                    <p className="font-medium">Fetching trip itineraries & financial records...</p>
+                  </div>
+                ) : userTripsModal.length > 0 ? (
+                  <div className="space-y-4">
+                    {userTripsModal.map((trip, idx) => {
+                      const startLoc = trip.startLocation || trip.routeDetails?.startLocation || trip.tripData?.startLocation || "Origin";
+                      const destList = Array.isArray(trip.destinations) && trip.destinations.length
+                        ? trip.destinations
+                        : Array.isArray(trip.tripData?.destinations) && trip.tripData.destinations.length
+                          ? trip.tripData.destinations
+                          : trip.routeDetails?.destination
+                            ? [trip.routeDetails.destination]
+                            : [];
+                      const destStr = destList.join(" ➔ ") || "Destination";
+                      const title = trip.tripName || `${startLoc} ➔ ${destStr} Trip`;
+                      const totalCostVal = trip.totalCost || trip.financials?.totalCost || trip.costBreakdown?.total || 0;
+                      const daysVal = trip.numberOfDays || trip.itinerary?.length || (trip.tripData?.endDate && trip.tripData?.startDate ? Math.max(1, Math.round((new Date(trip.tripData.endDate).getTime() - new Date(trip.tripData.startDate).getTime()) / 86400000) + 1) : 3);
+                      const membersVal = trip.numberOfMembers || trip.tripData?.numberOfMembers || 1;
+                      const perPersonVal = Math.round(totalCostVal / Math.max(1, membersVal));
+                      const vehicleVal = trip.vehicleType || trip.routeDetails?.vehicleType || trip.tripData?.vehicleType || "Car";
+                      const fuelVal = trip.fuelType || trip.routeDetails?.fuelType || trip.tripData?.fuelType || "Petrol";
+                      const budgetVal = trip.budgetLevel || trip.tripData?.genres?.[0] || "Standard";
+                      const distanceVal = trip.routeDetails?.distanceKm || trip.tripData?.distanceKm || 450;
+                      const co2Val = trip.ecoData?.co2 || trip.ecoScore?.co2kg || Math.round(distanceVal * 0.12);
+                      const startDateStr = trip.tripData?.startDate || "";
+                      const endDateStr = trip.tripData?.endDate || "";
+                      const tripTypeVal = trip.tripData?.tripType || "Road Trip";
+
+                      const breakdown = trip.costBreakdown || (trip.financials ? {
+                        fuel: trip.financials.fuelExpenditure || 0,
+                        toll: trip.financials.tollPricing || 0,
+                        hotel: trip.financials.totalLodging || 0,
+                        food: trip.financials.foodCost || 0,
+                        places: trip.financials.placesCost || 0,
+                        misc: trip.financials.miscCost || 0,
+                      } : null);
+
+                      const moodsList = (Array.isArray(trip.moods) && trip.moods.length)
+                        ? trip.moods
+                        : (Array.isArray(trip.tripData?.moods) && trip.tripData.moods.length)
+                          ? trip.tripData.moods
+                          : [];
+
+                      const hasItinerary = Array.isArray(trip.itinerary) && trip.itinerary.length > 0;
+                      const isExpanded = expandedModalTripId === (trip.id || String(idx));
+
+                      return (
+                        <div
+                          key={trip.id || idx}
+                          className="rounded-2xl border border-slate-200/90 bg-white p-5 space-y-4 hover:border-emerald-300 transition-all shadow-xs"
+                        >
+                          {/* Trip Title & Main Badge Row */}
+                          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-100">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <h5 className="font-bold text-slate-900 text-base">
+                                  {title}
+                                </h5>
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  {trip.status || "Planned"}
+                                </span>
+                                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600">
+                                  {tripTypeVal}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-500 flex items-center gap-1.5">
+                                <MapPin className="h-3.5 w-3.5 text-emerald-600" />
+                                <span>Route: <strong className="text-slate-800">{startLoc}</strong> ➔ <strong className="text-slate-800">{destStr}</strong></span>
+                              </p>
+                            </div>
+
+                            <div className="sm:text-right bg-emerald-50/60 sm:bg-transparent p-3 sm:p-0 rounded-xl w-full sm:w-auto">
+                              <div className="text-base sm:text-lg font-bold text-emerald-700 font-mono">
+                                ₹{totalCostVal.toLocaleString()}
+                              </div>
+                              <div className="text-[11px] text-slate-500 font-medium">
+                                (₹{perPersonVal.toLocaleString()} / person • {budgetVal} Plan)
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 4 Highlights Badges */}
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center gap-2">
+                              <Calendar className="h-4 w-4 text-emerald-600 shrink-0" />
+                              <div className="truncate">
+                                <div className="text-[10px] text-slate-400 font-semibold uppercase">Dates / Duration</div>
+                                <div className="font-bold text-slate-800 truncate">
+                                  {startDateStr ? `${startDateStr}` : `${daysVal} Days Itinerary`}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center gap-2">
+                              <UsersIcon className="h-4 w-4 text-blue-600 shrink-0" />
+                              <div className="truncate">
+                                <div className="text-[10px] text-slate-400 font-semibold uppercase">Travelers</div>
+                                <div className="font-bold text-slate-800">
+                                  {membersVal} {membersVal === 1 ? "Person" : "Persons"}
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center gap-2">
+                              <Car className="h-4 w-4 text-purple-600 shrink-0" />
+                              <div className="truncate">
+                                <div className="text-[10px] text-slate-400 font-semibold uppercase">Vehicle & Fuel</div>
+                                <div className="font-bold text-slate-800 truncate">
+                                  {vehicleVal} ({fuelVal})
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-center gap-2">
+                              <Leaf className="h-4 w-4 text-emerald-600 shrink-0" />
+                              <div className="truncate">
+                                <div className="text-[10px] text-slate-400 font-semibold uppercase">Distance & CO₂</div>
+                                <div className="font-bold text-slate-800 truncate">
+                                  {distanceVal} km • {co2Val} kg
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Financials Cost Breakdown Grid */}
+                          {breakdown && (
+                            <div className="space-y-1.5">
+                              <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                Budget Breakdown
+                              </div>
+                              <div className="p-3 rounded-xl border border-slate-200/70 bg-slate-50/50 text-xs grid grid-cols-2 sm:grid-cols-6 gap-2 text-center">
+                                <div className="p-2 rounded-lg bg-white border border-slate-100">
+                                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Fuel</div>
+                                  <div className="font-mono text-slate-800 font-bold mt-0.5">₹{breakdown.fuel?.toLocaleString()}</div>
+                                </div>
+                                <div className="p-2 rounded-lg bg-white border border-slate-100">
+                                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Tolls</div>
+                                  <div className="font-mono text-slate-800 font-bold mt-0.5">₹{breakdown.toll?.toLocaleString()}</div>
+                                </div>
+                                <div className="p-2 rounded-lg bg-white border border-slate-100">
+                                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Hotel Stay</div>
+                                  <div className="font-mono text-slate-800 font-bold mt-0.5">₹{breakdown.hotel?.toLocaleString()}</div>
+                                </div>
+                                <div className="p-2 rounded-lg bg-white border border-slate-100">
+                                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Food & Dining</div>
+                                  <div className="font-mono text-slate-800 font-bold mt-0.5">₹{breakdown.food?.toLocaleString()}</div>
+                                </div>
+                                <div className="p-2 rounded-lg bg-white border border-slate-100">
+                                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Sightseeing</div>
+                                  <div className="font-mono text-slate-800 font-bold mt-0.5">₹{breakdown.places?.toLocaleString()}</div>
+                                </div>
+                                <div className="p-2 rounded-lg bg-white border border-slate-100">
+                                  <div className="text-[10px] text-slate-400 uppercase font-semibold">Misc & Buffer</div>
+                                  <div className="font-mono text-slate-800 font-bold mt-0.5">₹{breakdown.misc?.toLocaleString()}</div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Vibes / Moods Tags */}
+                          {moodsList.length > 0 && (
+                            <div className="flex items-center gap-1.5 text-xs flex-wrap pt-1">
+                              <span className="text-[11px] text-slate-400 uppercase font-bold">Vibes:</span>
+                              {moodsList.map((m: string, mIdx: number) => (
+                                <span key={mIdx} className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
+                                  {m}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Expandable Day-by-Day Detailed Itinerary */}
+                          {hasItinerary && (
+                            <div className="pt-2 border-t border-slate-100">
+                              <button
+                                onClick={() => setExpandedModalTripId(isExpanded ? null : (trip.id || String(idx)))}
+                                className="flex items-center justify-between w-full p-2.5 rounded-xl bg-slate-50 hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 text-xs font-bold transition-all cursor-pointer border border-slate-200/70"
+                              >
+                                <span className="flex items-center gap-2">
+                                  <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                                  {isExpanded ? "Hide Day-by-Day Itinerary Schedule" : `View Day-by-Day Itinerary Schedule (${trip.itinerary.length} Days)`}
+                                </span>
+                                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                              </button>
+
+                              {isExpanded && (
+                                <div className="mt-3 space-y-3 p-3.5 rounded-xl bg-slate-50/70 border border-slate-200/70 animate-fade-in">
+                                  {trip.itinerary.map((dayPlan: any, dIdx: number) => (
+                                    <div key={dIdx} className="p-3.5 rounded-xl bg-white border border-slate-200/80 space-y-2">
+                                      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                        <span className="font-bold text-slate-900 text-xs flex items-center gap-2">
+                                          <span className="px-2 py-0.5 rounded-md bg-emerald-600 text-white text-[10px] font-bold">
+                                            Day {dayPlan.day || dIdx + 1}
+                                          </span>
+                                          {dayPlan.title || `Day ${dIdx + 1} Exploration`}
+                                        </span>
+                                      </div>
+
+                                      {Array.isArray(dayPlan.items) && dayPlan.items.length > 0 ? (
+                                        <div className="space-y-2 pt-1">
+                                          {dayPlan.items.map((item: any, iIdx: number) => (
+                                            <div key={iIdx} className="flex items-start gap-2.5 text-xs p-2 rounded-lg bg-slate-50/60">
+                                              <span className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600 text-[10px] font-mono font-bold shrink-0">
+                                                {item.time || "Scheduled"}
+                                              </span>
+                                              <div>
+                                                <div className="font-bold text-slate-800">{item.title}</div>
+                                                {item.description && (
+                                                  <div className="text-slate-500 text-[11px] mt-0.5 leading-relaxed">{item.description}</div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        <div className="text-xs text-slate-400 italic">No specific activities listed for this day.</div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-10 text-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 text-slate-500 space-y-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 mx-auto">
+                      <Navigation className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-800 text-sm">No Planned Trips Recorded Yet</p>
+                      <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                        This user has not yet saved any trip itineraries. As soon as they build and save a trip in the Trip Planner, it will appear here in real-time.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
-              <div className="text-xs text-slate-400">
-                Use contact information above to run targeted marketing campaigns.
+            {/* Modal Footer */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 sm:p-5 border-t border-slate-100 bg-slate-50/50">
+              <div className="text-xs text-slate-500">
+                Logged user account: <strong className="text-slate-700">{selectedUserModal.email}</strong>
               </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
                 {selectedUserModal.phone && (
                   <a
                     href={`tel:${selectedUserModal.phone}`}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 text-white font-bold text-xs hover:bg-emerald-600 transition-all active:scale-95 cursor-pointer shadow-xs"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 transition-all active:scale-95 cursor-pointer shadow-xs"
                   >
                     <Phone className="h-3.5 w-3.5" /> Call User
                   </a>
                 )}
                 {selectedUserModal.email && (
                   <a
-                    href={`mailto:${selectedUserModal.email}?subject=Exclusive Tourenvi Travel Promo`}
+                    href={`mailto:${selectedUserModal.email}?subject=Tourenvi Travel Plan Support`}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all active:scale-95 cursor-pointer shadow-xs"
                   >
-                    <Mail className="h-3.5 w-3.5" /> Send Campaign Email
+                    <Mail className="h-3.5 w-3.5" /> Send Email
                   </a>
                 )}
                 <button
                   onClick={() => setSelectedUserModal(null)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs transition-all cursor-pointer"
+                  className="px-5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs transition-all cursor-pointer shadow-2xs"
                 >
                   Close
                 </button>
               </div>
             </div>
+
           </div>
         </div>
       )}
