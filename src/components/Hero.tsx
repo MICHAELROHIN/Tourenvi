@@ -24,16 +24,11 @@ const startTripFeatures = [
 
 const Hero = () => {
   const navigate = useNavigate();
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(true);
 
   const sendToSection = (section: string) => {
     navigate(`/hero#${section}`);
   };
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setIsReady(true), 30);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   const featureCards = [
     {

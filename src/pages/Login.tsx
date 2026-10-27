@@ -288,7 +288,7 @@ const Login: React.FC = () => {
 
       {/* --- 1. SHUTTER --- */}
       <div
-        className={`fixed inset-0 z-50 flex items-center justify-center bg-[#1a3c35] transition-all duration-1000 ease-[cubic-bezier(0.77,0,0.175,1)]
+        className={`fixed inset-0 z-50 flex items-center justify-center bg-[#1a3c35] transition-all duration-1000 ease-in-out
           ${isLoaded ? "-translate-y-full rounded-b-[50%_20%]" : "translate-y-0 rounded-b-none"}
         `}
       >
@@ -304,13 +304,13 @@ const Login: React.FC = () => {
 
       {/* --- 2. MOBILE CARD (Visible on Mobile Only: < md) --- */}
       <div
-        className={`relative z-10 w-full max-w-[370px] sm:max-w-[400px] overflow-hidden rounded-[26px] bg-white p-6 sm:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.25)] transition-all duration-700 delay-[300ms] ease-out md:hidden
+        className={`relative z-10 w-full max-w-[370px] sm:max-w-[400px] overflow-hidden rounded-[26px] bg-white p-6 sm:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.25)] transition-all duration-700 delay-300 ease-out md:hidden
           ${isLoaded ? "translate-y-0 opacity-100 scale-100" : "translate-y-12 opacity-0 scale-95"}
         `}
       >
         {/* SLIDING CAROUSEL TRACK */}
         <div
-          className={`flex w-[200%] transition-transform duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${
+          className={`flex w-[200%] transition-transform duration-500 ease-in-out ${
             isRegister ? "-translate-x-1/2" : "translate-x-0"
           }`}
         >
@@ -523,7 +523,7 @@ const Login: React.FC = () => {
 
       {/* --- 3. DESKTOP MAIN CARD (Unchanged, Visible on >= md only) --- */}
       <div
-        className={`relative z-10 hidden md:block min-h-[600px] w-[950px] max-w-[92%] overflow-hidden rounded-[30px] bg-white shadow-2xl transition-all duration-1000 delay-[400ms] ease-out
+        className={`relative z-10 hidden md:block min-h-[600px] w-[950px] max-w-[92%] overflow-hidden rounded-[30px] bg-white shadow-2xl transition-all duration-1000 delay-500 ease-out
           ${isLoaded ? "translate-y-0 opacity-100 scale-100" : "translate-y-16 opacity-0 scale-95"}
         `}
       >
