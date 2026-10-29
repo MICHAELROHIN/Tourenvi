@@ -40,8 +40,10 @@ import {
   VolumeX,
   Leaf,
   Wallet,
-  Check,
   Route as RouteIcon,
+  Gauge,
+  Edit3,
+  LogOut,
 } from "lucide-react";
 import {
   MapContainer,
@@ -65,6 +67,8 @@ import { RouteAttractionsAlongWay } from "./RouteAttractionsAlongWay";
 import { getAttractionsAndFoodsAlongRoute } from "@/utils/routeAttractionsService";
 import { RealAttraction, FamousFoodSpecialty } from "@/utils/routeCorridorPlacesData";
 import { RealPlaceImage } from "@/components/trip/RealPlaceImage";
+import { WhatsAppTripShareModal } from "./WhatsAppTripShareModal";
+import { getLiveLocationName } from "@/utils/Livelocationservice";
 
 // Fix Leaflet default marker icons
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -116,6 +120,21 @@ const createCorridorAttractionIcon = (category: string, isAdded = false) => {
     iconSize: [34, 44],
     iconAnchor: [17, 22],
   });
+};
+
+const toTitleCase = (str?: string): string => {
+  if (!str) return "";
+  return str
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+};
+
+const getHeadingLabel = (deg: number): string => {
+  const directions = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const index = Math.round(((deg % 360) / 45)) % 8;
+  return directions[index] || "N";
 };
 
 // Google Maps 3D Rotating Navigation Arrow Marker
@@ -341,6 +360,7 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
     }
   });
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [isWhatsAppShareOpen, setIsWhatsAppShareOpen] = useState(false);
   const [newExpenseCat, setNewExpenseCat] = useState<ExpenseLog["category"]>("fuel");
   const [newExpenseAmount, setNewExpenseAmount] = useState("");
   const [newExpenseTitle, setNewExpenseTitle] = useState("");
@@ -365,8 +385,8 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
         description: item.description || "",
         completed: false,
         durationMinutes: item.type === "food" ? 45 : item.type === "lodging" ? 30 : 75,
-        lat: typeof item.lat === "number" ? item.lat : undefined,
-        lng: typeof item.lng === "number" ? item.lng : undefined,
+        lat: typeof (item as any).lat === "number" ? (item as any).lat : undefined,
+        lng: typeof (item as any).lng === "number" ? (item as any).lng : undefined,
       }));
     });
 
@@ -593,7 +613,7 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
     const tollDist = tollResult?.distanceKm || Math.round(fastestDist * 1.08);
     const tollDuration = tollResult?.durationMin || fastestDuration + 18;
 
-    const mileage = trip.tripData?.mileage || 15;
+    const mileage = (trip.tripData as any)?.mileage || 15;
     const fuelPrice = 102.5;
     const baseFuel = Math.round((fastestDist / mileage) * fuelPrice);
     const tollCost = trip.financials?.tollPricing || Math.round(fastestDist * 1.6);
@@ -1022,16 +1042,33 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
   return (
     <div className="space-y-6 animate-in fade-in duration-300 font-sans">
       {/* Top Header Cockpit HUD */}
-      <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden border border-emerald-700/50">
-        <div className="absolute right-[-20px] top-[-20px] opacity-10 pointer-events-none">
+      <div className="bg-gradient-to-br from-[#dcfce7] via-[#d1fae5] to-[#bbf7d0] text-emerald-950 rounded-3xl p-6 lg:p-7 shadow-md relative overflow-hidden border border-emerald-300/90">
+        {/* Shaded Aesthetic Corner Accents */}
+        <div className="absolute top-0 right-0 w-36 h-36 overflow-hidden pointer-events-none z-0">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-bl from-emerald-500/25 via-teal-500/15 to-transparent rounded-bl-[44px] border-b border-l border-emerald-400/40 shadow-inner" />
+          <div className="absolute top-2 right-2 w-16 h-16 bg-white/20 rounded-full blur-md" />
+        </div>
+        <div className="absolute bottom-0 left-0 w-32 h-32 overflow-hidden pointer-events-none z-0">
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-gradient-to-tr from-emerald-600/20 via-teal-600/10 to-transparent rounded-tr-[38px] border-t border-r border-emerald-300/50 shadow-xs" />
+        </div>
+        {/* Subtle ambient lighting & watermark */}
+        <div className="absolute -top-32 -left-32 w-80 h-80 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-32 -right-32 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute right-[-20px] top-[-20px] opacity-[0.04] pointer-events-none text-emerald-800">
           <Compass size={280} />
         </div>
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2">
+        <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+          {/* Left Column: Status Pills, Trip Title, and Route Logic */}
+          <div className="space-y-3.5 max-w-2xl">
+            {/* Status Pills Row */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="px-3 py-1 bg-yellow-400 text-emerald-950 font-black rounded-full text-xs uppercase tracking-wider flex items-center gap-1.5 shadow-sm">
-                <Radio size={12} className="animate-pulse text-red-600" /> Google-Style GPS Co-Pilot
+              <span className="px-3 py-1 bg-white/90 text-emerald-800 font-bold rounded-full text-xs tracking-wide flex items-center gap-2 border border-emerald-300/80 shadow-2xs backdrop-blur-sm">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
+                </span>
+                GPS Co-Pilot
               </span>
 
               {/* Auto-Pilot ON/OFF Toggle */}
@@ -1046,57 +1083,62 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
                       : "⏸️ Auto-Pilot Paused: Manual checklist mode"
                   );
                 }}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition-all flex items-center gap-2 border cursor-pointer backdrop-blur-md ${
                   autoPilotEnabled
-                    ? "bg-emerald-500/30 text-emerald-200 border-emerald-400/50 shadow-sm"
-                    : "bg-white/10 text-gray-300 border-white/20 hover:bg-white/15"
+                    ? "bg-emerald-600 text-white border-emerald-600 hover:bg-emerald-700 shadow-xs"
+                    : "bg-white/80 text-emerald-800 border-emerald-200 hover:bg-white"
                 }`}
                 title="Toggle hands-free GPS Auto-Pilot"
               >
-                <span className={`w-2 h-2 rounded-full ${autoPilotEnabled ? "bg-emerald-400 animate-ping" : "bg-gray-400"}`} />
-                <span>Auto-Pilot: {autoPilotEnabled ? "ON" : "OFF"}</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${autoPilotEnabled ? "bg-emerald-400" : "bg-gray-400"}`} />
+                <span>Auto-Pilot: <strong className={autoPilotEnabled ? "text-emerald-300 font-bold" : "text-gray-300 font-normal"}>{autoPilotEnabled ? "ON" : "OFF"}</strong></span>
               </button>
 
               {/* Vehicle Number Badge with Edit Option */}
               <button
                 onClick={() => setIsSetupModalOpen(true)}
-                className="px-3 py-1 bg-white/15 hover:bg-white/25 text-white rounded-full text-xs font-mono font-bold backdrop-blur-sm border border-white/25 flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-3 py-1 bg-white/90 hover:bg-white text-emerald-900 rounded-full text-xs font-mono font-medium border border-emerald-200/90 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
                 title="Click to change vehicle registration"
               >
-                <Car size={13} className="text-yellow-300" />
+                <Car size={13} className="text-emerald-600" />
                 <span>{vehicleNumber}</span>
-                <Settings size={11} className="opacity-70" />
+                <Edit3 size={11} className="opacity-60 ml-0.5" />
               </button>
 
-              <span className="px-3 py-1 bg-emerald-500/20 text-emerald-200 rounded-full text-xs font-semibold border border-emerald-400/30 flex items-center gap-1">
-                <ShieldCheck size={13} /> 8:00 PM Guarantee
+              <span className="px-3 py-1 bg-amber-50 text-amber-900 rounded-full text-xs font-medium border border-amber-200/90 flex items-center gap-1.5 shadow-2xs">
+                <ShieldCheck size={13} className="text-amber-600" /> 8:00 PM Curfew Assurance
               </span>
             </div>
 
-            <h1 className="text-2xl md:text-4xl font-serif font-bold text-white flex items-center gap-2">
-              <MapPin className="text-yellow-400 shrink-0" size={28} />
-              <span>
-                {livePlaceName || trip.routeDetails?.startLocation || "Live GPS Location"} →{" "}
-                <span className="text-yellow-300">{trip.routeDetails?.destination || "Destination"}</span>
-              </span>
-            </h1>
-
-            <p className="text-xs md:text-sm text-emerald-100/90 max-w-xl">
-              Turn-by-turn guidance with live directional arrow, food stops along the route, and 8:00 PM hard-stop schedule assurance.
-            </p>
+            {/* Title & Route Destination */}
+            <div>
+              <div className="flex items-center gap-2.5">
+                <div className="h-9 w-9 rounded-xl bg-emerald-100 border border-emerald-300/80 flex items-center justify-center text-emerald-700 shrink-0 shadow-2xs">
+                  <MapPin size={18} className="text-emerald-700" />
+                </div>
+                <h1 className="text-2xl md:text-3xl lg:text-4xl font-extrabold text-emerald-950 tracking-tight flex items-center gap-2 flex-wrap">
+                  <span>{toTitleCase(livePlaceName || trip.routeDetails?.startLocation || "Chennai")}</span>
+                  <span className="text-emerald-500 font-light text-2xl">→</span>
+                  <span className="text-emerald-700">{toTitleCase(trip.routeDetails?.destination || "Destination")}</span>
+                </h1>
+              </div>
+              <p className="text-xs md:text-sm text-emerald-850 mt-1.5 ml-11 leading-relaxed font-medium">
+                Live turn-by-turn navigation with corridor stops and guaranteed 8:00 PM arrival protection.
+              </p>
+            </div>
 
             {/* Dynamic Route Logic Switcher Pills */}
-            <div className="pt-2 flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-emerald-200 mr-1 flex items-center gap-1">
-                <RouteIcon size={14} className="text-yellow-300" /> Route Logic:
+            <div className="pt-1 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-emerald-850 mr-1 flex items-center gap-1.5">
+                <RouteIcon size={14} className="text-emerald-600" /> Route:
               </span>
 
               <button
                 onClick={() => handleSelectRouteLogic("fastest")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   activeRouteLogic === "fastest"
-                    ? "bg-blue-600 text-white shadow-md ring-2 ring-blue-300 scale-102"
-                    : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
+                    ? "bg-blue-600 text-white shadow-md ring-2 ring-blue-400/50 scale-[1.02]"
+                    : "bg-white/10 text-white/90 hover:bg-white/15 border border-white/10"
                 }`}
                 title="Direct high-speed expressway"
               >
@@ -1106,72 +1148,94 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
 
               <button
                 onClick={() => handleSelectRouteLogic("eco-friendly")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   activeRouteLogic === "eco-friendly"
-                    ? "bg-emerald-500 text-emerald-950 font-black shadow-md ring-2 ring-emerald-300 scale-102"
-                    : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
+                    ? "bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-300 scale-[1.02]"
+                    : "bg-white/80 text-emerald-900 hover:bg-white border border-emerald-200/80 shadow-2xs"
                 }`}
                 title="Steady fuel-efficient cruising corridor (-15% fuel)"
               >
-                <Leaf size={13} className={activeRouteLogic === "eco-friendly" ? "text-emerald-950" : "text-emerald-300"} />
+                <Leaf size={13} className={activeRouteLogic === "eco-friendly" ? "text-white" : "text-emerald-600"} />
                 <span>🌱 Eco-Route</span>
                 {activeRouteLogic === "eco-friendly" && <span className="w-1.5 h-1.5 rounded-full bg-emerald-950 animate-pulse" />}
               </button>
 
               <button
                 onClick={() => handleSelectRouteLogic("toll-free")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                   activeRouteLogic === "toll-free"
-                    ? "bg-amber-500 text-amber-950 font-black shadow-md ring-2 ring-amber-300 scale-102"
-                    : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
+                    ? "bg-amber-600 text-white shadow-xs ring-2 ring-amber-300 scale-[1.02]"
+                    : "bg-white/80 text-emerald-900 hover:bg-white border border-emerald-200/80 shadow-2xs"
                 }`}
                 title="State highway bypass with ₹0 FASTag tolls"
               >
-                <Wallet size={13} className={activeRouteLogic === "toll-free" ? "text-amber-950" : "text-amber-300"} />
+                <Wallet size={13} className={activeRouteLogic === "toll-free" ? "text-white" : "text-amber-600"} />
                 <span>💰 Avoid Tolls</span>
                 {activeRouteLogic === "toll-free" && <span className="w-1.5 h-1.5 rounded-full bg-amber-950 animate-pulse" />}
               </button>
             </div>
           </div>
 
-          {/* Telemetry Metrics */}
-          <div className="flex flex-wrap items-center gap-4 bg-white/10 p-4 rounded-2xl border border-white/15 backdrop-blur-md">
-            <div>
-              <p className="text-[10px] text-emerald-200 uppercase font-bold">Speedometer</p>
-              <p className="text-xl font-black text-yellow-300 font-mono flex items-center gap-1">
-                {liveSpeed} <span className="text-xs font-normal text-white">km/h</span>
-              </p>
-              <p className="text-[10px] text-emerald-200">Heading: {Math.round(currentHeading)}°</p>
-            </div>
+          {/* Right Column: Telemetry Dashboard HUD */}
+          <div className="flex flex-col sm:flex-row xl:flex-col gap-3 shrink-0">
+            <div className="grid grid-cols-3 gap-3 bg-white/95 p-3.5 rounded-2xl border border-emerald-200/90 shadow-sm">
+              {/* Metric 1: Speedometer */}
+              <div className="px-2 sm:px-3 py-1 space-y-0.5">
+                <p className="text-[10px] text-emerald-700 uppercase font-bold tracking-wider flex items-center gap-1">
+                  <Gauge size={12} className="text-emerald-600" /> Speed
+                </p>
+                <p className="text-xl lg:text-2xl font-black text-emerald-950 font-mono tracking-tight">
+                  {liveSpeed} <span className="text-xs font-normal text-emerald-600">km/h</span>
+                </p>
+                <p className="text-[10px] text-emerald-700 font-mono">
+                  {Math.round(currentHeading)}° {getHeadingLabel(currentHeading)}
+                </p>
+              </div>
 
-            <div className="border-l border-white/20 pl-4">
-              <p className="text-[10px] text-emerald-200 uppercase font-bold">Today's Deadline</p>
-              <p className="text-xl font-black text-white font-mono flex items-center gap-1">
-                <Clock size={16} className="text-yellow-300" /> 08:00 PM
-              </p>
-              <p className="text-[10px] text-emerald-200">Est. Arrival: <strong className="text-white">{dayFinishEstimate}</strong></p>
-            </div>
+              {/* Metric 2: Today's Deadline */}
+              <div className="border-l border-emerald-100 px-2 sm:px-3 py-1 space-y-0.5">
+                <p className="text-[10px] text-emerald-300/80 uppercase font-bold tracking-wider flex items-center gap-1">
+                  <Clock size={12} className="text-amber-600" /> Curfew
+                </p>
+                <p className="text-xl lg:text-2xl font-black text-emerald-950 font-mono tracking-tight">
+                  08:00 <span className="text-xs font-medium text-amber-600">PM</span>
+                </p>
+                <p className="text-[10px] text-emerald-700 flex items-center gap-1 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>Est. {dayFinishEstimate}</span>
+                </p>
+              </div>
 
-            <div className="border-l border-white/20 pl-4">
-              <p className="text-[10px] text-emerald-200 uppercase font-bold">Progress</p>
-              <p className="text-xl font-black text-white">{dayProgressPercent}%</p>
-              <p className="text-[10px] text-emerald-200">{completedStopsCount}/{currentDayItems.length} stops</p>
+              {/* Metric 3: Progress */}
+              <div className="border-l border-white/10 px-2 sm:px-3 py-1 space-y-0.5">
+                <p className="text-[10px] text-emerald-300/80 uppercase font-bold tracking-wider flex items-center gap-1">
+                  <CheckCircle2 size={12} className="text-emerald-600" /> Progress
+                </p>
+                <p className="text-xl lg:text-2xl font-black text-emerald-950 font-mono tracking-tight">
+                  {dayProgressPercent}<span className="text-xs font-normal text-emerald-600">%</span>
+                </p>
+                <p className="text-[10px] text-emerald-700 font-medium">
+                  {completedStopsCount}/{currentDayItems.length} stops
+                </p>
+              </div>
             </div>
 
             {onExit && (
               <button
                 onClick={onExit}
-                className="px-3 py-1.5 bg-white/15 hover:bg-white/25 text-white rounded-xl text-xs font-semibold border border-white/20 transition-all ml-auto cursor-pointer"
+                className="w-full py-2 px-4 bg-white/90 hover:bg-emerald-50 text-emerald-800 hover:text-emerald-900 rounded-xl text-xs font-bold border border-emerald-200/90 transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
               >
-                Exit
+                <LogOut size={13} /> Exit Cockpit
               </button>
             )}
           </div>
         </div>
 
-        {/* Multi-Day Navigation Pills */}
-        <div className="mt-6 pt-4 border-t border-white/15 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-emerald-200 mr-2">Trip Days:</span>
+        {/* Multi-Day Navigation Tabs */}
+        <div className="mt-5 pt-4 border-t border-emerald-200/80 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-emerald-900 mr-2 flex items-center gap-1">
+            Trip Days:
+          </span>
           {Array.from({ length: totalDays }).map((_, idx) => (
             <button
               key={idx}
@@ -1179,14 +1243,14 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
                 setActiveDayIndex(idx);
                 setCurrentStopIndex(0);
               }}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeDayIndex === idx
-                  ? "bg-yellow-400 text-emerald-950 shadow-md scale-102"
-                  : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
+                  ? "bg-emerald-600 text-white font-extrabold shadow-xs scale-[1.02]"
+                  : "bg-white/80 text-emerald-900 hover:bg-white border border-emerald-200/80 shadow-2xs"
               }`}
             >
               <span>Day {idx + 1}</span>
-              {activeDayIndex === idx && <span className="w-2 h-2 rounded-full bg-emerald-900 animate-ping" />}
+              {activeDayIndex === idx && <span className="w-2 h-2 rounded-full bg-emerald-950 animate-ping" />}
             </button>
           ))}
         </div>
@@ -1219,9 +1283,13 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
         {/* LEFT COLUMN: Map & Turn-by-Turn Guidance (7 cols) */}
         <div className="lg:col-span-7 space-y-4">
           {/* Turn-by-Turn Maneuver Top Banner */}
-          <div className="bg-emerald-900 text-white p-4 rounded-2xl shadow-lg border border-emerald-700 flex items-center justify-between">
-            <div className="flex items-center gap-3.5">
-              <div className="p-3 bg-yellow-400 text-emerald-950 rounded-2xl shadow-inner font-black">
+          <div className="bg-gradient-to-r from-[#047857] via-[#059669] to-[#0f766e] text-white p-4 sm:p-4.5 rounded-2xl shadow-lg border border-emerald-400/40 flex items-center justify-between gap-4 relative overflow-hidden">
+            {/* Subtle glow edge inside maneuver banner */}
+            <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-emerald-300 via-teal-200 to-emerald-300 opacity-60" />
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="p-3 bg-gradient-to-br from-amber-300 via-amber-400 to-orange-400 text-slate-950 rounded-2xl shadow-[0_4px_16px_rgba(245,158,11,0.45)] ring-2 ring-white/80 ring-offset-2 ring-offset-emerald-700 font-black shrink-0 relative overflow-hidden flex items-center justify-center transform hover:scale-105 transition-transform">
+                {/* Subtle top gloss accent on yellow button */}
+                <div className="absolute top-0 inset-x-0 h-1.5 bg-white/40 rounded-t-full pointer-events-none" />
                 {currentHeading > 315 || currentHeading < 45 ? (
                   <ArrowUp size={24} />
                 ) : currentHeading >= 45 && currentHeading < 135 ? (
@@ -1232,56 +1300,56 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
                   <CornerUpLeft size={24} />
                 )}
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-[11px] text-emerald-300 font-bold uppercase tracking-wider">
-                    Next Waypoint: {currentStop?.title || "Destination"}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-[11px] text-emerald-300 font-bold uppercase tracking-wider truncate">
+                    Next: {currentStop?.title || "Destination"}
                   </p>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider shadow-2xs ${
                     activeRouteLogic === "eco-friendly"
-                      ? "bg-emerald-400 text-emerald-950"
+                      ? "bg-emerald-300 text-emerald-950 border border-emerald-200"
                       : activeRouteLogic === "toll-free"
-                      ? "bg-amber-400 text-amber-950"
-                      : "bg-blue-400 text-blue-950"
+                      ? "bg-amber-300 text-amber-950 border border-amber-200"
+                      : "bg-sky-400 text-slate-950 border border-sky-300"
                   }`}>
                     {availableRoutes[activeRouteLogic]?.badge || "Active Route"}
                   </span>
                 </div>
 
-                <h3 className="text-base md:text-lg font-bold text-white leading-tight mt-0.5">
+                <h3 className="text-base md:text-lg font-bold text-white leading-tight mt-0.5 truncate">
                   {activeRouteLogic === "eco-friendly"
-                    ? `Eco-cruising via highway towards ${trip.routeDetails?.destination || "Destination"}`
+                    ? `Eco-cruising via highway towards ${toTitleCase(trip.routeDetails?.destination || "Destination")}`
                     : activeRouteLogic === "toll-free"
-                    ? `Following toll-free state corridor towards ${trip.routeDetails?.destination || "Destination"}`
-                    : `Follow express highway towards ${trip.routeDetails?.destination || "Destination"}`}
+                    ? `Following toll-free corridor towards ${toTitleCase(trip.routeDetails?.destination || "Destination")}`
+                    : `Follow express highway towards ${toTitleCase(trip.routeDetails?.destination || "Destination")}`}
                 </h3>
 
-                <p className="text-xs text-emerald-200 mt-0.5 flex flex-wrap items-center gap-2">
-                  <span>{routeDistanceKm} km total • Est. Speed: {liveSpeed > 0 ? `${liveSpeed} km/h` : "Driving pace"}</span>
+                <p className="text-xs text-emerald-200/90 mt-1 flex flex-wrap items-center gap-2 font-medium">
+                  <span>{routeDistanceKm} km total • Speed: {liveSpeed > 0 ? `${liveSpeed} km/h` : "Driving pace"}</span>
                   {activeRouteLogic === "eco-friendly" && (
                     <span className="text-emerald-300 font-semibold">• 🌱 Saving ~15% Fuel &amp; {availableRoutes["eco-friendly"]?.co2SavedKg || 4} kg CO2</span>
                   )}
                   {activeRouteLogic === "toll-free" && (
-                    <span className="text-amber-300 font-semibold">• 💰 Saving ₹{trip.financials?.tollPricing || 420} in FASTag Tolls</span>
+                    <span className="text-amber-300 font-semibold">• 💰 Saving ₹{trip.financials?.tollPricing || 420} FASTag Tolls</span>
                   )}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={openExternalGoogleMaps}
-                className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all border border-white/15 cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 bg-white text-emerald-900 hover:bg-emerald-50 rounded-xl text-xs font-extrabold transition-all border border-emerald-200/80 cursor-pointer shadow-sm hover:shadow-md active:scale-95 shrink-0"
                 title="Open Google Maps App"
               >
-                <ExternalLink size={14} />
-                <span>Google Maps</span>
+                <ExternalLink size={14} className="text-emerald-700" />
+                <span className="hidden sm:inline">Google Maps</span>
               </button>
             </div>
           </div>
 
           {/* Leaflet Map Cockpit */}
-          <div className="relative rounded-3xl overflow-hidden border border-gray-200 shadow-md h-[440px] md:h-[500px]">
+          <div className="relative rounded-3xl overflow-hidden border border-emerald-200 shadow-sm h-[520px] lg:h-[580px]">
             <MapContainer
               center={currentCoords}
               zoom={11}
@@ -1584,110 +1652,54 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
             </div>
           </div>
 
-          {/* Live Trip Cost & Budget Guardian */}
-          <div className="bg-white rounded-3xl p-6 border border-gray-200/80 shadow-md space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
-                  <IndianRupee size={20} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900 text-base">Live Budget Guardian</h3>
-                  <p className="text-xs text-gray-500">Real-time expenditure tracking vs planned estimate</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setIsExpenseModalOpen(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
-              >
-                <PlusCircle size={14} /> Log Expense
-              </button>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="space-y-1.5">
-              <div className="flex justify-between text-xs font-semibold">
-                <span className="text-gray-600">Spent: ₹{totalSpent.toLocaleString("en-IN")}</span>
-                <span className="text-gray-500">Budget: ₹{plannedBudget.toLocaleString("en-IN")}</span>
-              </div>
-              <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-full transition-all duration-500 ${
-                    budgetHealthPercent > 90 ? "bg-red-500" : budgetHealthPercent > 70 ? "bg-amber-500" : "bg-emerald-500"
-                  }`}
-                  style={{ width: `${budgetHealthPercent}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Quick Breakdown Badges */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-              <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
-                <p className="text-[10px] text-gray-500 font-bold uppercase">⛽ Fuel Spent</p>
-                <p className="text-sm font-bold text-gray-800 mt-1">
-                  ₹{expenses.filter((e) => e.category === "fuel").reduce((a, b) => a + b.amount, 0).toLocaleString()}
-                </p>
-              </div>
-
-              <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
-                <p className="text-[10px] text-gray-500 font-bold uppercase">🎫 Tolls Spent</p>
-                <p className="text-sm font-bold text-gray-800 mt-1">
-                  ₹{expenses.filter((e) => e.category === "toll").reduce((a, b) => a + b.amount, 0).toLocaleString()}
-                </p>
-              </div>
-
-              <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
-                <p className="text-[10px] text-gray-500 font-bold uppercase">🍽️ Food Spent</p>
-                <p className="text-sm font-bold text-gray-800 mt-1">
-                  ₹{expenses.filter((e) => e.category === "food").reduce((a, b) => a + b.amount, 0).toLocaleString()}
-                </p>
-              </div>
-
-              <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
-                <p className="text-[10px] text-gray-500 font-bold uppercase">🏨 Stays Spent</p>
-                <p className="text-sm font-bold text-gray-800 mt-1">
-                  ₹{expenses.filter((e) => e.category === "hotel").reduce((a, b) => a + b.amount, 0).toLocaleString()}
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* RIGHT COLUMN: Day Schedule & Itinerary Checklist (5 cols) */}
         <div className="lg:col-span-5 space-y-4">
-          <div className="bg-white rounded-3xl p-6 border border-gray-200/80 shadow-md space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-emerald-100 shadow-sm flex flex-col justify-between h-full min-h-[520px] lg:min-h-[580px] space-y-3.5">
+            <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="font-serif font-bold text-gray-900 text-lg">
+                <h3 className="font-extrabold text-gray-900 text-lg tracking-tight">
                   Day {activeDayIndex + 1} Step-by-Step Schedule
                 </h3>
-                <p className="text-xs text-gray-500">
-                  {trip.itinerary?.[activeDayIndex]?.title || `Day ${activeDayIndex + 1}: Core Itinerary & Attractions`}
+                <p className="text-xs text-gray-500 font-medium">
+                  {toTitleCase(trip.itinerary?.[activeDayIndex]?.title || `Day ${activeDayIndex + 1}: Core Attractions in ${toTitleCase(trip.routeDetails?.destination || "Destination")}`)}
                 </p>
               </div>
-              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-full border border-emerald-200">
-                {currentDayItems.length} Stops
-              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => setIsWhatsAppShareOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full border border-emerald-200/80 transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-98"
+                  title="Share today's itinerary to WhatsApp"
+                >
+                  <svg className="w-3.5 h-3.5 fill-[#25D366]" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.888 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.82 11.82 0 00-3.48-8.413Z"/>
+                  </svg>
+                  <span>Share Day</span>
+                </button>
+                <span className="px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-full border border-emerald-200 shadow-xs">
+                  {currentDayItems.length} Stops
+                </span>
+              </div>
             </div>
 
             {/* Smart Auto-Pilot Status Banner */}
             <div
-              className={`p-3 rounded-2xl border flex items-center justify-between gap-3 text-xs transition-all ${
+              className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-xs transition-all shadow-xs ${
                 autoPilotEnabled
                   ? arrivedStopIndex === currentStopIndex
                     ? "bg-emerald-50 border-emerald-300 text-emerald-950 font-medium"
-                    : "bg-blue-50/80 border-blue-200 text-blue-950"
+                    : "bg-emerald-50/60 border-emerald-200/80 text-emerald-950"
                   : "bg-gray-50 border-gray-200 text-gray-600"
               }`}
             >
-              <div className="flex items-center gap-2">
-                <Sparkles size={15} className={autoPilotEnabled ? "text-emerald-600 animate-pulse shrink-0" : "text-gray-400 shrink-0"} />
-                <span className="leading-tight">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Sparkles size={16} className={autoPilotEnabled ? "text-emerald-600 animate-pulse shrink-0" : "text-gray-400 shrink-0"} />
+                <span className="leading-snug truncate">
                   {autoPilotEnabled
                     ? arrivedStopIndex === currentStopIndex
                       ? `📍 Arrived at Stop ${currentStopIndex + 1}: "${currentDayItems[currentStopIndex]?.title}" — Auto-completes when you depart!`
-                      : "✨ Auto-Pilot Active: GPS auto-detects arrival & advances to next stop as you drive."
+                      : "Auto-Pilot: GPS auto-detects arrival & advances to next stop"
                     : "Auto-Pilot Paused: Manual checklist mode"}
                 </span>
               </div>
@@ -1698,14 +1710,14 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
                   localStorage.setItem("tourenvi.journey.autopilot", String(next));
                   toast.success(next ? "🟢 Auto-Pilot Activated" : "⏸️ Auto-Pilot Paused");
                 }}
-                className="text-[11px] font-bold underline text-emerald-700 hover:text-emerald-900 cursor-pointer shrink-0"
+                className="text-xs font-bold px-2.5 py-1 rounded-lg bg-white/80 hover:bg-white text-emerald-700 border border-emerald-200/70 shadow-2xs cursor-pointer shrink-0 transition-all"
               >
                 {autoPilotEnabled ? "Turn Off" : "Turn On"}
               </button>
             </div>
 
             {/* Itinerary Timeline */}
-            <div className="space-y-3">
+            <div className="space-y-2.5 max-h-[460px] lg:max-h-[500px] overflow-y-auto pr-1.5 custom-scrollbar flex-1">
               {currentDayItems.map((item, idx) => {
                 const isCurrent = idx === currentStopIndex;
                 const isDone = item.completed;
@@ -1778,6 +1790,75 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
           </div>
         </div>
       </div>
+
+      {/* Live Trip Cost & Budget Guardian (Full-Width Panel) */}
+          <div className="bg-white rounded-3xl p-6 border border-emerald-100/90 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+                  <IndianRupee size={20} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-base">Live Budget Guardian</h3>
+                  <p className="text-xs text-gray-500">Real-time expenditure tracking vs planned estimate</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setIsExpenseModalOpen(true)}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
+              >
+                <PlusCircle size={14} /> Log Expense
+              </button>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="space-y-1.5">
+              <div className="flex justify-between text-xs font-semibold">
+                <span className="text-gray-600">Spent: ₹{totalSpent.toLocaleString("en-IN")}</span>
+                <span className="text-gray-500">Budget: ₹{plannedBudget.toLocaleString("en-IN")}</span>
+              </div>
+              <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full transition-all duration-500 ${
+                    budgetHealthPercent > 90 ? "bg-red-500" : budgetHealthPercent > 70 ? "bg-amber-500" : "bg-emerald-500"
+                  }`}
+                  style={{ width: `${budgetHealthPercent}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Quick Breakdown Badges */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+              <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                <p className="text-[10px] text-gray-500 font-bold uppercase">⛽ Fuel Spent</p>
+                <p className="text-sm font-bold text-gray-800 mt-1">
+                  ₹{expenses.filter((e) => e.category === "fuel").reduce((a, b) => a + b.amount, 0).toLocaleString()}
+                </p>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                <p className="text-[10px] text-gray-500 font-bold uppercase">🎫 Tolls Spent</p>
+                <p className="text-sm font-bold text-gray-800 mt-1">
+                  ₹{expenses.filter((e) => e.category === "toll").reduce((a, b) => a + b.amount, 0).toLocaleString()}
+                </p>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                <p className="text-[10px] text-gray-500 font-bold uppercase">🍽️ Food Spent</p>
+                <p className="text-sm font-bold text-gray-800 mt-1">
+                  ₹{expenses.filter((e) => e.category === "food").reduce((a, b) => a + b.amount, 0).toLocaleString()}
+                </p>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                <p className="text-[10px] text-gray-500 font-bold uppercase">🏨 Stays Spent</p>
+                <p className="text-sm font-bold text-gray-800 mt-1">
+                  ₹{expenses.filter((e) => e.category === "hotel").reduce((a, b) => a + b.amount, 0).toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
 
       {/* --- PLACES TO VISIT ALONG YOUR ROUTE & FAMOUS FOODS (100% Verified Real Corridor Discovery) --- */}
       <RouteAttractionsAlongWay
@@ -2018,6 +2099,15 @@ export const ActiveJourneyGuide: React.FC<ActiveJourneyGuideProps> = ({ trip, on
           </div>
         </div>
       )}
+
+      {/* WhatsApp Family Trip Share Modal */}
+      <WhatsAppTripShareModal
+        isOpen={isWhatsAppShareOpen}
+        onClose={() => setIsWhatsAppShareOpen(false)}
+        trip={trip}
+        activeDayIndex={activeDayIndex}
+        dayItems={currentDayItems}
+      />
     </div>
   );
 };

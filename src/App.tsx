@@ -205,6 +205,10 @@ const AppRoutes = () => {
           </ProtectedRoute>
         }
       />
+      <Route path="/ai-chat" element={<Navigate to="/chatAI" replace />} />
+      <Route path="/ai_chat" element={<Navigate to="/chatAI" replace />} />
+      <Route path="/ai-assistant" element={<Navigate to="/chatAI" replace />} />
+      <Route path="/ai_assistant" element={<Navigate to="/chatAI" replace />} />
       <Route
         path="/live"
         element={

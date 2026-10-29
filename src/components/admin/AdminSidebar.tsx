@@ -190,19 +190,19 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
   const userInitials = getInitials(displayName, displayEmail);
 
   const sidebarContent = (
-    <div className="flex flex-col h-full justify-between text-white select-none">
+    <div className="flex flex-col h-full justify-between select-none">
       {/* Brand Header */}
       <div className="flex-shrink-0 pt-1 pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-md text-[#1eb863]">
-              <Leaf className="h-6 w-6 fill-[#1eb863]/10" strokeWidth={2.2} />
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-sm border border-emerald-200 text-emerald-600">
+              <Leaf className="h-6 w-6 fill-emerald-600/10" strokeWidth={2.2} />
             </div>
             <div>
-              <h1 className="text-lg font-bold tracking-tight text-white leading-tight">
+              <h1 className="text-lg font-bold tracking-tight text-emerald-950 leading-tight">
                 Tourenvi Admin
               </h1>
-              <p className="text-[10px] tracking-wider text-white/80 uppercase font-semibold">
+              <p className="text-[10px] tracking-wider text-emerald-700 uppercase font-bold">
                 Operations Center
               </p>
             </div>
@@ -212,7 +212,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
           {setMobileOpen && (
             <button
               onClick={() => setMobileOpen(false)}
-              className="lg:hidden p-1.5 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+              className="lg:hidden p-1.5 rounded-xl text-emerald-800 hover:text-emerald-950 hover:bg-emerald-200/60 transition-colors"
               aria-label="Close menu"
             >
               <X className="h-5 w-5" />
@@ -233,13 +233,13 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
               onClick={() => handleSelectTab(item.id)}
               className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-[14px] font-medium tracking-normal transition-all duration-200 cursor-pointer text-left ${
                 isActive
-                  ? "bg-white/25 text-white shadow-[0_2px_8px_rgba(0,0,0,0.06)] font-semibold backdrop-blur-xs"
-                  : "text-white/85 hover:text-white hover:bg-white/10"
+                  ? "bg-emerald-600 text-white shadow-[0_4px_14px_rgba(5,150,105,0.3)] font-semibold"
+                  : "text-emerald-850 hover:text-emerald-950 hover:bg-emerald-200/60 text-emerald-800"
               }`}
             >
               <Icon
                 className={`h-4.5 w-4.5 shrink-0 transition-transform duration-200 ${
-                  isActive ? "text-white scale-105" : "text-white/85"
+                  isActive ? "text-white scale-105" : "text-emerald-600"
                 }`}
                 strokeWidth={isActive ? 2.2 : 1.8}
               />
@@ -250,16 +250,16 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
       </nav>
 
       {/* Footer Profile & Logout */}
-      <div className="flex-shrink-0 pt-4 mt-2 border-t border-white/15 space-y-3">
+      <div className="flex-shrink-0 pt-4 mt-2 border-t border-emerald-200/90 space-y-3">
         <div className="flex items-center gap-3 px-1">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white font-bold text-xs uppercase tracking-wider shrink-0 border border-white/30">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-200 text-emerald-900 font-bold text-xs uppercase tracking-wider shrink-0 border border-emerald-300">
             {userInitials}
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="text-xs font-bold text-white truncate leading-tight">
+            <h4 className="text-xs font-bold text-emerald-950 truncate leading-tight">
               {displayName}
             </h4>
-            <p className="text-[11px] text-white/75 truncate mt-0.5">
+            <p className="text-[11px] text-emerald-700/80 truncate mt-0.5 font-medium">
               {displayEmail}
             </p>
           </div>
@@ -268,7 +268,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
         {/* Dedicated Logout Button */}
         <button
           onClick={handleLogout}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-white/30 bg-white/5 hover:bg-white/15 text-white text-xs font-semibold tracking-wide transition-all duration-200 active:scale-98 cursor-pointer"
+          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-emerald-300/90 bg-white/80 hover:bg-red-50 text-emerald-800 hover:text-red-700 hover:border-red-200 text-xs font-semibold tracking-wide transition-all duration-200 active:scale-98 cursor-pointer shadow-xs"
         >
           <LogOut className="h-4 w-4" />
           <span>Log Out</span>
@@ -280,7 +280,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
   return (
     <>
       {/* Desktop Fixed Sidebar */}
-      <aside className="hidden lg:flex w-72 xl:w-80 fixed top-5 left-5 h-[calc(100vh-2.5rem)] flex-col rounded-[28px] bg-[#1eb863] shadow-[0_12px_36px_rgba(30,184,99,0.25)] p-5 z-30 flex-shrink-0">
+      <aside className="hidden lg:flex w-72 xl:w-80 fixed top-5 left-5 h-[calc(100vh-2.5rem)] flex-col rounded-[28px] bg-gradient-to-b from-[#e8f7ee] via-[#def4e6] to-[#d4f0df] border border-emerald-200/90 shadow-[0_12px_36px_rgba(16,185,129,0.15)] p-5 z-30 flex-shrink-0">
         {sidebarContent}
       </aside>
 
@@ -294,7 +294,7 @@ const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
       {/* Mobile Slide-in Drawer */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-[#1eb863] p-5 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden flex flex-col ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-gradient-to-b from-[#e8f7ee] via-[#def4e6] to-[#d4f0df] border-r border-emerald-200/90 p-5 shadow-2xl transition-transform duration-300 ease-in-out lg:hidden flex flex-col ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >

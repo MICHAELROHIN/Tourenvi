@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => ({
     host: "localhost",
     port: 8080,
     strictPort: true,
+    watch: {
+      ignored: ["**/dist/**"],
+    },
     hmr: {
       host: "localhost",
       protocol: "ws",
